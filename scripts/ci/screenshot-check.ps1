@@ -13,10 +13,26 @@ $p = Start-Process -FilePath $Exe -ArgumentList "--mode=$Mode", "--media=$Media"
   -PassThru -RedirectStandardError $err
 Start-Sleep -Seconds 14
 $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
-$bmp = New-Object System.Drawing.Bitmap $screen.Width, $screen.Height
-$g = [System.Drawing.Graphics]::FromImage($bmp)
-$op = [System.Drawing.CopyPixelOperation]::SourceCopy -bor [System.Drawing.CopyPixelOperation]::CaptureBlt
-$g.CopyFromScreen($screen.X, $screen.Y, 0, 0, $screen.Size, $op)
+# BitBlt met CAPTUREBLT: neemt ook "layered" (transparante) vensters mee
+Add-Type -Namespace Win -Name Cap -MemberDefinition @"
+[DllImport("user32.dll")] public static extern IntPtr GetDC(IntPtr hWnd);
+[DllImport("user32.dll")] public static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+[DllImport("gdi32.dll")] public static extern IntPtr CreateCompatibleDC(IntPtr hDC);
+[DllImport("gdi32.dll")] public static extern IntPtr CreateCompatibleBitmap(IntPtr hDC, int w, int h);
+[DllImport("gdi32.dll")] public static extern IntPtr SelectObject(IntPtr hDC, IntPtr h);
+[DllImport("gdi32.dll")] public static extern bool BitBlt(IntPtr dst, int x, int y, int w, int h, IntPtr src, int sx, int sy, int rop);
+[DllImport("gdi32.dll")] public static extern bool DeleteObject(IntPtr h);
+[DllImport("gdi32.dll")] public static extern bool DeleteDC(IntPtr hDC);
+"@
+$hdcScreen = [Win.Cap]::GetDC([IntPtr]::Zero)
+$hdcMem = [Win.Cap]::CreateCompatibleDC($hdcScreen)
+$hBmp = [Win.Cap]::CreateCompatibleBitmap($hdcScreen, $screen.Width, $screen.Height)
+$old = [Win.Cap]::SelectObject($hdcMem, $hBmp)
+$SRCCOPY = 0x00CC0020; $CAPTUREBLT = 0x40000000
+[void][Win.Cap]::BitBlt($hdcMem, 0, 0, $screen.Width, $screen.Height, $hdcScreen, $screen.X, $screen.Y, ($SRCCOPY -bor $CAPTUREBLT))
+$bmp = [System.Drawing.Image]::FromHbitmap($hBmp)
+[void][Win.Cap]::SelectObject($hdcMem, $old)
+[void][Win.Cap]::DeleteObject($hBmp); [void][Win.Cap]::DeleteDC($hdcMem); [void][Win.Cap]::ReleaseDC([IntPtr]::Zero, $hdcScreen)
 $png = Join-Path $OutDir "$Mode.png"
 $bmp.Save($png, [System.Drawing.Imaging.ImageFormat]::Png)
 
