@@ -25,6 +25,23 @@ ApplicationWindow {
         onClicked: player.togglePause()
     }
 
+    Text {
+        objectName: "hwdecLabel"
+        id: hwdecLabel
+        color: "white"
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        anchors.margins: 12
+        text: player.hwdecInfo()
+    }
+
+    Timer {
+        interval: 1000
+        running: true
+        repeat: true
+        onTriggered: hwdecLabel.text = player.hwdecInfo()
+    }
+
     Rectangle {
         objectName: "errorBanner"
         visible: errorText.text.length > 0

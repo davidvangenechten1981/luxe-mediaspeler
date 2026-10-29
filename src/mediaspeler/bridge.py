@@ -23,3 +23,19 @@ class PlayerBridge(QObject):
     @Slot()
     def togglePause(self) -> None:
         self.engine.toggle_pause()
+
+    @Slot(str)
+    def setHwdec(self, mode: str) -> None:
+        try:
+            self.engine.set_hwdec(mode)
+        except ValueError as e:
+            self.errorOccurred.emit(str(e))
+
+    @Slot(result=str)
+    def hwdecInfo(self) -> str:
+        report = self.engine.hwdec_report()
+        if report.fallback:
+            return "Decoder: software (terugval)"
+        if report.current:
+            return f"Decoder: {report.current}"
+        return "Decoder: software"

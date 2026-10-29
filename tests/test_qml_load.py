@@ -29,4 +29,5 @@ def test_qml_loads_and_has_overlay_button():
     assert root.findChild(QObject, "overlayPlayButton") is not None
     assert root.findChild(QObject, "videoSurface") is not None
     assert root.findChild(QObject, "errorBanner") is not None
+    assert root.findChild(QObject, "hwdecLabel") is not None
     del qt_app

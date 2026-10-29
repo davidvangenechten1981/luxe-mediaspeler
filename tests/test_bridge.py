@@ -38,3 +38,11 @@ def test_toggle_pause_delegates_to_engine():
     bridge, backend = make_bridge()
     bridge.togglePause()
     assert backend.pause is True
+
+
+def test_bridge_hwdec_text_mentions_fallback():
+    bridge, backend = make_bridge()
+    backend.hwdec_current = "no"
+    assert "terugval" in bridge.hwdecInfo()
+    backend.hwdec_current = "d3d11va"
+    assert "d3d11va" in bridge.hwdecInfo()

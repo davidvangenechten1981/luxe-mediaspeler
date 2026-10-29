@@ -1,14 +1,25 @@
 import os
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 from mediaspeler.errors import EngineUnavailableError, MediaError
 
 
+HWDEC_MODES = ("auto", "no", "d3d11va", "nvdec")
+
+
+@dataclass(frozen=True)
+class HwdecReport:
+    requested: str
+    current: str | None
+    fallback: bool
+
+
 def _default_backend() -> Any:
     import mpv  # pas hier importeren: laadt libmpv
 
-    return mpv.MPV(hwdec="auto")
+    return mpv.MPV(vo="libmpv", hwdec="auto")
 
 
 class Engine:
@@ -30,3 +41,14 @@ class Engine:
     def toggle_pause(self) -> bool:
         self.backend.pause = not self.backend.pause
         return bool(self.backend.pause)
+
+    def set_hwdec(self, mode: str) -> None:
+        if mode not in HWDEC_MODES:
+            raise ValueError(f"Onbekende hwdec-modus: {mode}")
+        self.backend.hwdec = mode
+
+    def hwdec_report(self) -> HwdecReport:
+        requested = str(self.backend.hwdec)
+        current = self.backend.hwdec_current or None
+        fallback = requested != "no" and current in (None, "no")
+        return HwdecReport(requested, current, fallback)
