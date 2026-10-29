@@ -2,7 +2,7 @@ name: Spike - video en interface op Windows
 
 on:
   push:
-    branches: [ultimate]
+    branches: [studio]
   workflow_dispatch:
 
 env:
