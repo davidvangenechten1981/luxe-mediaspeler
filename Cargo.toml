@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/vu-core", "src-tauri"]
+members = ["crates/vu-core", "crates/vu-vlc", "src-tauri"]
 
 [profile.release]
 panic = "abort"

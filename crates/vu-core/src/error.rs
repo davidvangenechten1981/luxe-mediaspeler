@@ -15,6 +15,8 @@ pub enum CoreError {
     Probe(String),
     #[error("FFmpeg-fout: {0}")]
     Ffmpeg(String),
+    #[error("Afspeelengine: {0}")]
+    Engine(String),
     #[error("Geannuleerd")]
     Cancelled,
 }
