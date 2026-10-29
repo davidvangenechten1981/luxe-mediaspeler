@@ -255,7 +255,11 @@ mod tests {
     use crate::services::testutil::*;
 
     fn wait_done(app: &TestApp, ids: &[u64]) -> Vec<JobSnapshot> {
-        assert!(wait_until(60, || list(&app.state).unwrap().iter().filter(|j| ids.contains(&j.id)).all(|j| !matches!(j.state, vu_core::convert::queue::JobState::Queued | vu_core::convert::queue::JobState::Running))));
+        assert!(wait_until(60, || list(&app.state)
+            .unwrap()
+            .iter()
+            .filter(|j| ids.contains(&j.id))
+            .all(|j| !matches!(j.state, vu_core::convert::queue::JobState::Queued | vu_core::convert::queue::JobState::Running))));
         list(&app.state).unwrap().into_iter().filter(|j| ids.contains(&j.id)).collect()
     }
 
@@ -360,7 +364,11 @@ mod tests {
             container: Container::Flac,
             equalizer: eq,
             normalize,
-            output: OutputChoice { dir: Some(app.dir.path().join("uit").to_string_lossy().into_owned()), template: None, overwrite: Overwrite::Rename },
+            output: OutputChoice {
+                dir: Some(app.dir.path().join("uit").to_string_lossy().into_owned()),
+                template: None,
+                overwrite: Overwrite::Rename,
+            },
         };
         assert!(add_audio_processing(&app.state, mk(None, false)).is_err());
         assert!(add_audio_processing(&app.state, mk(Some(EqConfig::default()), false)).is_err()); // vlakke EQ = niets te doen

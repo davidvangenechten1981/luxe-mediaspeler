@@ -4,8 +4,8 @@ pub mod audio;
 pub mod converter;
 pub mod history;
 pub mod library;
-pub mod playlists;
 pub mod player;
+pub mod playlists;
 pub mod settings;
 pub mod video;
 
@@ -32,7 +32,10 @@ pub mod testutil {
         let dir = tempfile::tempdir().unwrap();
         let sink = Arc::new(RecordingSink::default());
         let dirs = AppDirs::new(dir.path()).unwrap();
-        let state = AppState::init("0.0.0-test", dirs, Tools::discover(None), sink.clone(), vec!["--aout=dummy".into(), "--vout=dummy".into(), "--no-xlib".into()]).unwrap();
+        let mut vlc_args = vec!["--aout=dummy".to_string(), "--vout=dummy".to_string()];
+        #[cfg(not(windows))]
+        vlc_args.push("--no-xlib".into());
+        let state = AppState::init("0.0.0-test", dirs, Tools::discover(None), sink.clone(), vlc_args).unwrap();
         TestApp { state, sink, dir }
     }
 

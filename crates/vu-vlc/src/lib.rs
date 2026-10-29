@@ -4,7 +4,7 @@
 //! fout tonen als de DLL ontbreekt, en blijft de LGPL-scheiding tussen onze code
 //! en LibVLC helder (alleen dynamisch gekoppeld).
 
-mod ffi;
 mod engine;
+mod ffi;
 
-pub use engine::{Adjust, Rotation, VlcConfig, VlcEngine, Visualization};
+pub use engine::{Adjust, Rotation, Visualization, VlcConfig, VlcEngine};

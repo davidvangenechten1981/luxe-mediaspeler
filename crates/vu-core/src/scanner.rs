@@ -12,8 +12,8 @@ use std::sync::Arc;
 use walkdir::WalkDir;
 
 pub const DEFAULT_EXTENSIONS: &[&str] = &[
-    "mp4", "mkv", "avi", "mov", "webm", "mpg", "mpeg", "ts", "m2ts", "wmv", "flv", "ogv", "m4v", "mp3", "aac", "flac", "wav",
-    "alac", "ogg", "opus", "wma", "aiff", "aif", "m4a",
+    "mp4", "mkv", "avi", "mov", "webm", "mpg", "mpeg", "ts", "m2ts", "wmv", "flv", "ogv", "m4v", "mp3", "aac", "flac", "wav", "alac",
+    "ogg", "opus", "wma", "aiff", "aif", "m4a",
 ];
 
 pub trait Prober {
@@ -37,10 +37,7 @@ pub struct ScanOptions {
 
 impl Default for ScanOptions {
     fn default() -> Self {
-        ScanOptions {
-            extensions: DEFAULT_EXTENSIONS.iter().map(|s| s.to_string()).collect(),
-            cancel: Arc::new(AtomicBool::new(false)),
-        }
+        ScanOptions { extensions: DEFAULT_EXTENSIONS.iter().map(|s| s.to_string()).collect(), cancel: Arc::new(AtomicBool::new(false)) }
     }
 }
 
@@ -61,11 +58,7 @@ pub struct ScanProgress {
 }
 
 fn mtime_secs(m: &std::fs::Metadata) -> i64 {
-    m.modified()
-        .ok()
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
+    m.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_secs() as i64).unwrap_or(0)
 }
 
 fn to_new_media(path: &Path, info: &MediaInfo, size: u64, mtime: i64) -> Result<NewMedia> {
@@ -143,7 +136,11 @@ pub fn scan_folder(
         match prober.probe(path).and_then(|info| to_new_media(path, &info, *size, *mtime)) {
             Ok(new) => {
                 db.upsert_media(&new)?;
-                if existing.is_some() { report.updated += 1 } else { report.added += 1 }
+                if existing.is_some() {
+                    report.updated += 1
+                } else {
+                    report.added += 1
+                }
             }
             Err(e) => report.failed.push((key, e.to_string())),
         }

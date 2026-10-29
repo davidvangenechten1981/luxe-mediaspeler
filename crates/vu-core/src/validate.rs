@@ -91,9 +91,7 @@ fn is_local_host(host: &str) -> bool {
         return true;
     }
     match h.parse::<IpAddr>() {
-        Ok(IpAddr::V4(ip)) => {
-            ip.is_loopback() || ip.is_private() || ip.is_link_local() || ip.is_unspecified() || ip.is_broadcast()
-        }
+        Ok(IpAddr::V4(ip)) => ip.is_loopback() || ip.is_private() || ip.is_link_local() || ip.is_unspecified() || ip.is_broadcast(),
         Ok(IpAddr::V6(ip)) => {
             ip.is_loopback()
                 || ip.is_unspecified()
@@ -137,10 +135,7 @@ mod tests {
         std::fs::write(&f, b"x").unwrap();
         assert!(validate_media_path(f.to_str().unwrap()).is_ok());
         assert!(validate_media_path(dir.path().to_str().unwrap()).is_err());
-        assert!(matches!(
-            validate_media_path(dir.path().join("nee.mkv").to_str().unwrap()),
-            Err(CoreError::NotFound(_))
-        ));
+        assert!(matches!(validate_media_path(dir.path().join("nee.mkv").to_str().unwrap()), Err(CoreError::NotFound(_))));
     }
 
     #[test]

@@ -179,7 +179,7 @@ fn play_items_opens_the_first_item_starts_playback_and_records_history() {
     assert_eq!(store.0.lock().unwrap().plays, ["/m/a.mp3"]);
     assert_eq!(s.take_events(), vec![SessionEvent::TrackChanged { index: 0, location: "/m/a.mp3".into() }]);
     assert!(engine.with(|i| i.opened[0].1.audio_visual)); // mp3: spectrum aan
-    // een lege lijst afspelen is een duidelijke fout, geen stille no-op
+                                                          // een lege lijst afspelen is een duidelijke fout, geen stille no-op
     let err = s.play_items(vec![], 0).unwrap_err().to_string();
     assert!(err.contains("wachtrij is leeg"), "{err}");
     assert!(s.queue().is_empty());
@@ -188,7 +188,9 @@ fn play_items_opens_the_first_item_starts_playback_and_records_history() {
 
 #[test]
 fn resume_applies_only_for_unfinished_meaningful_positions() {
-    for (pos, completed, enabled, expected) in [(30_000, false, true, 30_000), (30_000, true, true, 0), (3_000, false, true, 0), (30_000, false, false, 0)] {
+    for (pos, completed, enabled, expected) in
+        [(30_000, false, true, 30_000), (30_000, true, true, 0), (3_000, false, true, 0), (30_000, false, false, 0)]
+    {
         let engine = FakeEngine::default();
         let store = FakeStore::default();
         store.0.lock().unwrap().resumes.insert("/m/a.mp3".into(), resume_point("/m/a.mp3", pos, completed));
@@ -243,7 +245,8 @@ fn a_failing_item_is_reported_and_skipped_during_auto_advance() {
     s.tick(0);
     let ev = s.take_events();
     assert!(ev.iter().any(|e| matches!(e, SessionEvent::OpenFailed { location, .. } if location == "/m/bad.mp3")));
-    assert_eq!(engine.with(|i| i.opened.last().unwrap().0.clone()), "/m/c.mp3"); // doorgegaan naar c
+    assert_eq!(engine.with(|i| i.opened.last().unwrap().0.clone()), "/m/c.mp3");
+    // doorgegaan naar c
 }
 
 #[test]

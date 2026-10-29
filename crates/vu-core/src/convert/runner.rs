@@ -55,11 +55,8 @@ fn civil_date(unix_secs: i64) -> String {
 pub fn expand_template(template: &str, input: &Path, profile: &str, now_unix: i64) -> String {
     let stem = input.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
     let ext = input.extension().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-    let raw = template
-        .replace("{name}", &stem)
-        .replace("{ext}", &ext)
-        .replace("{profile}", profile)
-        .replace("{date}", &civil_date(now_unix));
+    let raw =
+        template.replace("{name}", &stem).replace("{ext}", &ext).replace("{profile}", profile).replace("{date}", &civil_date(now_unix));
     sanitize_file_name(&raw)
 }
 
@@ -211,7 +208,13 @@ pub fn run_conversion(
                         "progress" => {
                             let out_ms = out_time_us / 1000;
                             let end = v.trim() == "end";
-                            let fraction = (info.duration_ms > 0).then(|| if end { 1.0 } else { (out_ms as f64 / info.duration_ms as f64).clamp(0.0, 0.999) });
+                            let fraction = (info.duration_ms > 0).then(|| {
+                                if end {
+                                    1.0
+                                } else {
+                                    (out_ms as f64 / info.duration_ms as f64).clamp(0.0, 0.999)
+                                }
+                            });
                             let eta = match (fraction, speed) {
                                 (Some(f), Some(sp)) if !end => {
                                     let remaining_ms = (info.duration_ms as f64 * (1.0 - f)).max(0.0);
@@ -422,7 +425,7 @@ mod tests {
         let sub = info.streams.iter().find(|s| s.kind == StreamKind::Subtitle).expect("ondertitelspoor ontbreekt");
         assert_eq!((sub.codec.as_str(), sub.language.as_deref()), ("mov_text", Some("nld")));
         assert_eq!(info.first_video().unwrap().codec, "h264"); // video niet opnieuw gecodeerd
-        // ondertitel in mkv blijft srt
+                                                               // ondertitel in mkv blijft srt
         let mut m = settings("remux_mkv");
         m.external_subtitle = s.external_subtitle.clone();
         let out2 = dir.path().join("met-ondertitel.mkv");
@@ -575,11 +578,22 @@ mod tests {
 
     #[test]
     fn missing_ffmpeg_binary_is_a_clear_error() {
-        let caps = Capabilities::from_text(include_str!("../../tests/fixtures/ffmpeg_encoders.txt"), include_str!("../../tests/fixtures/ffmpeg_muxers.txt"));
+        let caps = Capabilities::from_text(
+            include_str!("../../tests/fixtures/ffmpeg_encoders.txt"),
+            include_str!("../../tests/fixtures/ffmpeg_muxers.txt"),
+        );
         let tools = Tools { ffmpeg: Path::new("/bestaat/niet/ffmpeg"), ffprobe: Path::new("ffprobe"), caps: &caps };
         let info = crate::probe::parse_ffprobe_json(include_str!("../../tests/fixtures/sample.ffprobe.json")).unwrap();
         let dir = tempfile::tempdir().unwrap();
-        let r = run_conversion(&tools, Path::new("/in.mkv"), &dir.path().join("o.mkv"), &settings("remux_mkv"), &info, &AtomicBool::new(false), &mut |_| {});
+        let r = run_conversion(
+            &tools,
+            Path::new("/in.mkv"),
+            &dir.path().join("o.mkv"),
+            &settings("remux_mkv"),
+            &info,
+            &AtomicBool::new(false),
+            &mut |_| {},
+        );
         match r {
             Err(CoreError::Ffmpeg(m)) => assert!(m.contains("kon niet worden gestart"), "{m}"),
             other => panic!("{other:?}"),

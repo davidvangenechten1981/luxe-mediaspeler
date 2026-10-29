@@ -249,7 +249,12 @@ pub fn build_args(input: &Path, output: &Path, s: &Settings, info: &MediaInfo, c
                 push(&mut args, &["-map", &format!("0:{}", st.index)]);
                 kept_subs += 1;
             } else {
-                warnings.push(format!("Ondertiteltrack {} ({}) past niet in {} en wordt overgeslagen", st.index, st.codec, s.container.ext().to_uppercase()));
+                warnings.push(format!(
+                    "Ondertiteltrack {} ({}) past niet in {} en wordt overgeslagen",
+                    st.index,
+                    st.codec,
+                    s.container.ext().to_uppercase()
+                ));
             }
         }
     }
@@ -524,7 +529,7 @@ mod tests {
         assert!(has_pair(&p.args, "-map", "1:0") && has_pair(&p.args, "-c:s", "mov_text"));
         assert!(has_pair(&p.args, "-metadata:s:s:1", "language=nld")); // na het ingebedde spoor
         assert_eq!(p.mode, Mode::Remux); // video en audio blijven ongewijzigd
-        // alleen het externe spoor als de ingebedde worden verwijderd
+                                         // alleen het externe spoor als de ingebedde worden verwijderd
         s.subtitles = SubtitleMode::Remove;
         let p = plan(&s, VIDEO_JSON).unwrap();
         assert!(!has_pair(&p.args, "-map", "0:2") && has_pair(&p.args, "-map", "1:0"));
@@ -558,14 +563,9 @@ mod tests {
     #[test]
     fn paths_with_spaces_quotes_and_shell_characters_stay_a_single_argument() {
         let evil = "/tmp/a b/'x'; rm -rf ~ $(whoami).mkv";
-        let p = build_args(
-            Path::new(evil),
-            Path::new("/out/x.part"),
-            &profile("remux_mkv"),
-            &parse_ffprobe_json(VIDEO_JSON).unwrap(),
-            &caps(),
-        )
-        .unwrap();
+        let p =
+            build_args(Path::new(evil), Path::new("/out/x.part"), &profile("remux_mkv"), &parse_ffprobe_json(VIDEO_JSON).unwrap(), &caps())
+                .unwrap();
         assert_eq!(p.args.iter().filter(|a| a.as_str() == evil).count(), 1);
         assert!(has_pair(&p.args, "-i", evil));
     }

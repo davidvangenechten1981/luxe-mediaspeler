@@ -77,7 +77,9 @@ pub struct Diagnostics {
 
 pub fn diagnostics(st: &AppState, app_version: &str) -> Result<Diagnostics> {
     let caps = st.tasks.as_ref().map(|t| t.capabilities());
-    let mut encoders: Vec<String> = caps.map(|c| c.encoders.iter().filter(|e| e.starts_with("lib") || *e == "aac" || *e == "flac").cloned().collect()).unwrap_or_default();
+    let mut encoders: Vec<String> = caps
+        .map(|c| c.encoders.iter().filter(|e| e.starts_with("lib") || *e == "aac" || *e == "flac").cloned().collect())
+        .unwrap_or_default();
     encoders.sort();
     let containers = vu_core::convert::Container::ALL
         .iter()
@@ -148,12 +150,17 @@ mod tests {
         app.state.lock_db().unwrap().create_playlist("Na").unwrap();
         restore_database(&app.state, backup.to_str().unwrap()).unwrap();
         assert_eq!(app.state.lock_db().unwrap().list_playlists().unwrap().len(), 1);
-        let safety: Vec<_> = std::fs::read_dir(&app.state.dirs.backups).unwrap().flatten().filter(|e| e.file_name().to_string_lossy().starts_with("voor-herstel")).collect();
+        let safety: Vec<_> = std::fs::read_dir(&app.state.dirs.backups)
+            .unwrap()
+            .flatten()
+            .filter(|e| e.file_name().to_string_lossy().starts_with("voor-herstel"))
+            .collect();
         assert_eq!(safety.len(), 1);
         let garbage = app.dir.path().join("rommel.db");
         std::fs::write(&garbage, b"geen database").unwrap();
         assert!(restore_database(&app.state, garbage.to_str().unwrap()).is_err());
-        assert_eq!(app.state.lock_db().unwrap().list_playlists().unwrap().len(), 1); // huidige data intact
+        assert_eq!(app.state.lock_db().unwrap().list_playlists().unwrap().len(), 1);
+        // huidige data intact
     }
 
     #[test]

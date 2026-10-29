@@ -7,3 +7,7 @@ vlc/
 __pycache__/
 .superpowers/
 /target/
+/resources/vlc/*
+!/resources/vlc/.gitkeep
+/resources/ffmpeg/*
+!/resources/ffmpeg/.gitkeep

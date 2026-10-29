@@ -309,7 +309,12 @@ pub fn load(db: &Database) -> Result<(AppSettings, Option<String>)> {
         Ok(s) => Ok((s, None)),
         Err(e) => {
             db.set_setting(CORRUPT_BACKUP_KEY, &raw)?;
-            Ok((AppSettings::default(), Some(format!("De opgeslagen instellingen waren ongeldig ({e}). Standaardwaarden zijn geladen; de oude instellingen zijn bewaard."))))
+            Ok((
+                AppSettings::default(),
+                Some(format!(
+                    "De opgeslagen instellingen waren ongeldig ({e}). Standaardwaarden zijn geladen; de oude instellingen zijn bewaard."
+                )),
+            ))
         }
     }
 }

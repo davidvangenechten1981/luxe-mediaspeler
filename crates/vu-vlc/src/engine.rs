@@ -116,7 +116,8 @@ fn cstr(s: &str) -> Result<CString> {
 }
 
 fn is_url(s: &str) -> bool {
-    s.split_once("://").is_some_and(|(scheme, _)| !scheme.is_empty() && scheme.chars().all(|c| c.is_ascii_alphanumeric() || "+-.".contains(c)))
+    s.split_once("://")
+        .is_some_and(|(scheme, _)| !scheme.is_empty() && scheme.chars().all(|c| c.is_ascii_alphanumeric() || "+-.".contains(c)))
 }
 
 impl VlcEngine {
@@ -129,7 +130,8 @@ impl VlcEngine {
         }
         let api = Arc::new(Api::load(&lib_path).map_err(CoreError::Engine)?);
 
-        let mut args: Vec<String> = vec!["--quiet".into(), "--no-video-title-show".into(), "--no-osd".into(), "--no-snapshot-preview".into()];
+        let mut args: Vec<String> =
+            vec!["--quiet".into(), "--no-video-title-show".into(), "--no-osd".into(), "--no-snapshot-preview".into()];
         args.extend(cfg.extra_args.iter().cloned());
         let c_args: Vec<CString> = args.iter().map(|a| cstr(a)).collect::<Result<_>>()?;
         let ptrs: Vec<*const c_char> = c_args.iter().map(|a| a.as_ptr()).collect();
@@ -197,7 +199,9 @@ impl VlcEngine {
 
     /// Opnieuw openen op de huidige positie, zodat een mediaoptie (bijv. rotatie) van kracht wordt.
     fn reopen_here(&mut self) -> Result<()> {
-        let Some((loc, mut opts)) = self.last_open.clone() else { return Ok(()) };
+        let Some((loc, mut opts)) = self.last_open.clone() else {
+            return Ok(());
+        };
         let st = self.status();
         let was_paused = st.state == PlaybackState::Paused;
         opts.start_ms = st.time_ms;
@@ -376,7 +380,11 @@ impl Engine for VlcEngine {
         let c_loc = cstr(location)?;
         // SAFETY: instance is geldig; c_loc leeft tijdens de aanroep.
         let media = unsafe {
-            if url { (self.api.media_new_location)(self.instance, c_loc.as_ptr()) } else { (self.api.media_new_path)(self.instance, c_loc.as_ptr()) }
+            if url {
+                (self.api.media_new_location)(self.instance, c_loc.as_ptr())
+            } else {
+                (self.api.media_new_path)(self.instance, c_loc.as_ptr())
+            }
         };
         if media.is_null() {
             return Err(CoreError::Engine(format!("Media kon niet worden aangemaakt: {}", Self::errmsg(&self.api))));
@@ -550,7 +558,11 @@ impl Engine for VlcEngine {
             let raw = (self.api.player_get_state)(self.player);
             let state = match raw {
                 0 => {
-                    if self.opened { PlaybackState::Opening } else { PlaybackState::Idle }
+                    if self.opened {
+                        PlaybackState::Opening
+                    } else {
+                        PlaybackState::Idle
+                    }
                 }
                 1 => PlaybackState::Opening,
                 2 => PlaybackState::Buffering,

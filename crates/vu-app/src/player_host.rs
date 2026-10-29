@@ -70,7 +70,8 @@ impl PlayerHost {
 
     /// Voert een bewerking uit op de sessie.
     pub fn with<R>(&self, f: impl FnOnce(&mut Session<VlcEngine>) -> R) -> Result<R, vu_core::error::CoreError> {
-        let mut s = self.session.lock().map_err(|_| vu_core::error::CoreError::Engine("De speler is vergrendeld door een eerdere fout".into()))?;
+        let mut s =
+            self.session.lock().map_err(|_| vu_core::error::CoreError::Engine("De speler is vergrendeld door een eerdere fout".into()))?;
         Ok(f(&mut s))
     }
 

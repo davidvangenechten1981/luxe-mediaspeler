@@ -148,7 +148,11 @@ impl Settings {
             && self.audio_channels.is_none()
             && self.audio_bitrate_kbps.is_none()
             && !self.has_audio_filters();
-        if video_untouched && audio_untouched { Mode::Remux } else { Mode::Transcode }
+        if video_untouched && audio_untouched {
+            Mode::Remux
+        } else {
+            Mode::Transcode
+        }
     }
 
     pub fn has_audio_filters(&self) -> bool {
@@ -218,7 +222,15 @@ pub struct Profile {
     pub settings: Settings,
 }
 
-fn video_profile(id: &str, name: &str, desc: &str, container: Container, v: VideoCodec, a: AudioCodec, f: impl FnOnce(&mut Settings)) -> Profile {
+fn video_profile(
+    id: &str,
+    name: &str,
+    desc: &str,
+    container: Container,
+    v: VideoCodec,
+    a: AudioCodec,
+    f: impl FnOnce(&mut Settings),
+) -> Profile {
     let mut s = Settings {
         container,
         video: v,
@@ -245,8 +257,24 @@ pub fn builtin_profiles() -> Vec<Profile> {
     use Container as C;
     use VideoCodec as V;
     vec![
-        video_profile("remux_mkv", "Originele kwaliteit (remux naar MKV)", "Zet streams ongewijzigd over; snel en zonder kwaliteitsverlies.", C::Mkv, V::Copy, A::Copy, |_| {}),
-        video_profile("remux_mp4", "Originele kwaliteit (remux naar MP4)", "Zet streams ongewijzigd over naar MP4, indien compatibel.", C::Mp4, V::Copy, A::Copy, |_| {}),
+        video_profile(
+            "remux_mkv",
+            "Originele kwaliteit (remux naar MKV)",
+            "Zet streams ongewijzigd over; snel en zonder kwaliteitsverlies.",
+            C::Mkv,
+            V::Copy,
+            A::Copy,
+            |_| {},
+        ),
+        video_profile(
+            "remux_mp4",
+            "Originele kwaliteit (remux naar MP4)",
+            "Zet streams ongewijzigd over naar MP4, indien compatibel.",
+            C::Mp4,
+            V::Copy,
+            A::Copy,
+            |_| {},
+        ),
         video_profile("compact", "Compacte video", "Kleiner bestand: H.264, maximaal 720p.", C::Mp4, V::H264, A::Aac, |s| {
             s.max_height = Some(720);
             s.quality = Some(28);
@@ -266,12 +294,20 @@ pub fn builtin_profiles() -> Vec<Profile> {
             s.quality = Some(24);
             s.audio_bitrate_kbps = Some(192);
         }),
-        video_profile("web", "Webgeoptimaliseerde video", "MP4 met H.264 en AAC, klaar voor streamen (faststart).", C::Mp4, V::H264, A::Aac, |s| {
-            s.max_height = Some(1080);
-            s.quality = Some(23);
-            s.audio_bitrate_kbps = Some(128);
-            s.subtitles = SubtitleMode::Remove;
-        }),
+        video_profile(
+            "web",
+            "Webgeoptimaliseerde video",
+            "MP4 met H.264 en AAC, klaar voor streamen (faststart).",
+            C::Mp4,
+            V::H264,
+            A::Aac,
+            |s| {
+                s.max_height = Some(1080);
+                s.quality = Some(23);
+                s.audio_bitrate_kbps = Some(128);
+                s.subtitles = SubtitleMode::Remove;
+            },
+        ),
         video_profile("audio_only", "Alleen audio (MP3)", "Haalt het geluid uit een video als MP3.", C::Mp3, V::Copy, A::Mp3, |s| {
             s.audio_bitrate_kbps = Some(192);
             s.subtitles = SubtitleMode::Remove;

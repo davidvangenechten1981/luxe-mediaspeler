@@ -95,12 +95,7 @@ pub fn read_file(path: &Path) -> Result<Vec<M3uEntry>> {
 
 /// Welke lokale items bestaan niet (meer)? URL's tellen als aanwezig. Geeft de indexen terug.
 pub fn missing_indexes(entries: &[M3uEntry]) -> Vec<usize> {
-    entries
-        .iter()
-        .enumerate()
-        .filter(|(_, e)| !is_url(&e.location) && !Path::new(&e.location).exists())
-        .map(|(i, _)| i)
-        .collect()
+    entries.iter().enumerate().filter(|(_, e)| !is_url(&e.location) && !Path::new(&e.location).exists()).map(|(i, _)| i).collect()
 }
 
 #[cfg(test)]

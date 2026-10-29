@@ -77,11 +77,7 @@ impl MediaInfo {
 fn lower_tags(v: &Value) -> HashMap<String, String> {
     v.get("tags")
         .and_then(Value::as_object)
-        .map(|m| {
-            m.iter()
-                .filter_map(|(k, v)| v.as_str().map(|s| (k.to_ascii_lowercase(), s.trim().to_string())))
-                .collect()
-        })
+        .map(|m| m.iter().filter_map(|(k, v)| v.as_str().map(|s| (k.to_ascii_lowercase(), s.trim().to_string()))).collect())
         .unwrap_or_default()
 }
 
@@ -259,7 +255,9 @@ mod tests {
         let f = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/sample.mkv");
         match probe_file(Path::new("ffprobe"), &f) {
             Ok(info) => assert_eq!(info.count(StreamKind::Video), 1),
-            Err(CoreError::Probe(m)) if m.contains("kon niet worden gestart") => eprintln!("ffprobe ontbreekt: test overgeslagen"),
+            Err(CoreError::Probe(m)) if m.contains("kon niet worden gestart") => {
+                eprintln!("ffprobe ontbreekt: test overgeslagen")
+            }
             Err(e) => panic!("{e}"),
         }
     }

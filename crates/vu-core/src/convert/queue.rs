@@ -110,7 +110,9 @@ impl Shared {
     fn update(&self, id: u64, f: impl FnOnce(&mut JobSnapshot)) {
         let snap = {
             let mut st = self.state.lock().unwrap();
-            let Some(job) = st.jobs.iter_mut().find(|j| j.snap.id == id) else { return };
+            let Some(job) = st.jobs.iter_mut().find(|j| j.snap.id == id) else {
+                return;
+            };
             f(&mut job.snap);
             job.snap.clone()
         };
@@ -217,7 +219,13 @@ fn coordinator(shared: Arc<Shared>) {
 }
 
 impl TaskManager {
-    pub fn new(ffmpeg: PathBuf, ffprobe: PathBuf, max_parallel: usize, log_path: Option<PathBuf>, on_event: EventFn) -> Result<TaskManager> {
+    pub fn new(
+        ffmpeg: PathBuf,
+        ffprobe: PathBuf,
+        max_parallel: usize,
+        log_path: Option<PathBuf>,
+        on_event: EventFn,
+    ) -> Result<TaskManager> {
         let caps = Capabilities::detect(&ffmpeg)?;
         let shared = Arc::new(Shared {
             state: Mutex::new(State::default()),
@@ -389,7 +397,8 @@ mod tests {
     fn manager(parallel: usize, log: Option<PathBuf>) -> (TaskManager, Arc<Mutex<Vec<JobSnapshot>>>) {
         let events: Arc<Mutex<Vec<JobSnapshot>>> = Arc::new(Mutex::new(vec![]));
         let e2 = events.clone();
-        let m = TaskManager::new("ffmpeg".into(), "ffprobe".into(), parallel, log, Arc::new(move |s| e2.lock().unwrap().push(s.clone()))).unwrap();
+        let m = TaskManager::new("ffmpeg".into(), "ffprobe".into(), parallel, log, Arc::new(move |s| e2.lock().unwrap().push(s.clone())))
+            .unwrap();
         (m, events)
     }
 

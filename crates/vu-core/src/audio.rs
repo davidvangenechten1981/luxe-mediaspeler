@@ -109,7 +109,9 @@ pub fn builtin_presets() -> Vec<EqPreset> {
 /// Welke preset komt overeen met deze configuratie (op 0,05 dB nauwkeurig)?
 pub fn matching_preset<'a>(cfg: &EqConfig, presets: &'a [EqPreset]) -> Option<&'a EqPreset> {
     let close = |a: f32, b: f32| (a - b).abs() < 0.05;
-    presets.iter().find(|p| close(p.config.preamp_db, cfg.preamp_db) && p.config.bands_db.iter().zip(cfg.bands_db.iter()).all(|(a, b)| close(*a, *b)))
+    presets
+        .iter()
+        .find(|p| close(p.config.preamp_db, cfg.preamp_db) && p.config.bands_db.iter().zip(cfg.bands_db.iter()).all(|(a, b)| close(*a, *b)))
 }
 
 /// Gelijkvermogen-fade: `t` loopt van 0 (begin) tot 1 (einde). Geeft (uitgaand, inkomend) gain.
@@ -126,7 +128,11 @@ pub fn fade_gain(elapsed_ms: u64, duration_ms: u64, fade_in: bool) -> f32 {
         return if fade_in { 1.0 } else { 0.0 };
     }
     let t = (elapsed_ms as f32 / duration_ms as f32).clamp(0.0, 1.0);
-    if fade_in { t } else { 1.0 - t }
+    if fade_in {
+        t
+    } else {
+        1.0 - t
+    }
 }
 
 /// FFmpeg-filter voor volumenormalisatie (EBU R128, enkele doorgang).

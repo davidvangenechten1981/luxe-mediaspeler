@@ -367,7 +367,10 @@ fn all_eq_presets_lists_builtin_first_then_user_presets() {
 fn smart_collections_follow_the_live_library() {
     let mut d = db();
     let id = d
-        .create_collection("Lange films", &MediaQuery { kind: Some(MediaKind::Video), min_duration_ms: Some(3_600_000), ..Default::default() })
+        .create_collection(
+            "Lange films",
+            &MediaQuery { kind: Some(MediaKind::Video), min_duration_ms: Some(3_600_000), ..Default::default() },
+        )
         .unwrap();
     assert!(d.run_collection(id).unwrap().is_empty());
     let mut lang = media("/m/epos.mkv", MediaKind::Video);

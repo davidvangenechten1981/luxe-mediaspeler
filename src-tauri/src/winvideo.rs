@@ -1,18 +1,28 @@
-//! Een eigen Win32-venster voor de video (variant D2).
-//! De webinterface staat als eigendom-venster (owner) erboven, transparant.
+//! Windows: een eigen videovenster achter het transparante Tauri-venster.
+//!
+//! LibVLC tekent in het videovenster. Het Tauri-venster (met de transparante WebView) is eigenaar-gekoppeld
+//! en staat altijd direct erboven. Een synchronisatielus houdt positie, grootte, zichtbaarheid en
+//! "altijd op voorgrond" gelijk. Bewezen op een Windows-runner; zie docs/adr/0001-architectuur.md.
 
 #![cfg(windows)]
 
 use std::ffi::c_void;
 use std::ptr::{null, null_mut};
-use windows_sys::Win32::Foundation::{BOOL, HWND, LPARAM, RECT};
-use windows_sys::Win32::System::Threading::GetCurrentProcessId;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::thread::JoinHandle;
+use std::time::Duration;
+use windows_sys::Win32::Foundation::{HWND, RECT};
 use windows_sys::Win32::Graphics::Gdi::{GetStockObject, BLACK_BRUSH};
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
+fn hwnd(h: isize) -> HWND {
+    h as *mut c_void
 }
 
 pub fn create_video_window(x: i32, y: i32, w: i32, h: i32) -> Result<isize, String> {
@@ -33,7 +43,7 @@ pub fn create_video_window(x: i32, y: i32, w: i32, h: i32) -> Result<isize, Stri
             lpszClassName: class.as_ptr(),
         };
         RegisterClassW(&wc); // 0 bij "bestaat al": geen fout voor ons
-        let hwnd = CreateWindowExW(
+        let v = CreateWindowExW(
             WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
             class.as_ptr(),
             wide("VLC Ultimate video").as_ptr(),
@@ -47,68 +57,96 @@ pub fn create_video_window(x: i32, y: i32, w: i32, h: i32) -> Result<isize, Stri
             hinst,
             null(),
         );
-        if hwnd.is_null() {
-            return Err("Videovenster kon niet worden aangemaakt".into());
+        if v.is_null() {
+            return Err("Het videovenster kon niet worden aangemaakt".into());
         }
-        Ok(hwnd as isize)
+        Ok(v as isize)
     }
 }
 
-/// Zet `owner` als eigenaar van `ui`: het UI-venster blijft altijd boven het videovenster.
-pub fn set_owner(ui: HWND, owner: isize) {
-    // SAFETY: beide HWND's zijn geldige vensters van dit proces.
+/// Maakt het videovenster eigenaar van het UI-venster en zet het direct erachter.
+pub fn attach_below(ui: isize, video: isize) {
+    // SAFETY: beide vensters zijn van dit proces.
     unsafe {
-        SetWindowLongPtrW(ui, GWLP_HWNDPARENT, owner);
+        SetWindowLongPtrW(hwnd(ui), GWLP_HWNDPARENT, video);
+        SetWindowPos(hwnd(video), hwnd(ui), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     }
 }
 
-/// Zet het videovenster direct ACHTER het UI-venster in de z-volgorde.
-/// Alleen een eigenaar-relatie is niet genoeg zolang de vensters al zichtbaar zijn.
-pub fn place_below(video: isize, ui: HWND) {
-    // SAFETY: beide HWND's zijn geldige vensters van dit proces.
+#[derive(Default)]
+struct SyncState {
+    rect: (i32, i32, i32, i32),
+    visible: bool,
+    topmost: bool,
+    tick: u32,
+}
+
+fn sync_once(video: isize, ui: isize, last: &mut SyncState) {
+    // SAFETY: vensters van dit proces; alle aanroepen zijn thread-veilig (Windows stuurt berichten door).
     unsafe {
-        SetWindowPos(video as *mut c_void, ui, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-    }
-}
-
-pub fn move_window(hwnd: isize, x: i32, y: i32, w: i32, h: i32) {
-    // SAFETY: hwnd is een geldig venster van dit proces.
-    unsafe {
-        SetWindowPos(hwnd as *mut c_void, null_mut(), x, y, w, h, SWP_NOACTIVATE | SWP_NOZORDER);
-    }
-}
-
-unsafe extern "system" fn collect_window(hwnd: HWND, lparam: LPARAM) -> BOOL {
-    let out = &mut *(lparam as *mut Vec<String>);
-    let mut pid = 0u32;
-    GetWindowThreadProcessId(hwnd, &mut pid);
-    if pid == GetCurrentProcessId() {
-        let mut class = [0u16; 64];
-        let n = GetClassNameW(hwnd, class.as_mut_ptr(), 64) as usize;
+        let (ui_h, v_h) = (hwnd(ui), hwnd(video));
+        let visible = IsWindowVisible(ui_h) != 0 && IsIconic(ui_h) == 0;
+        if !visible {
+            if last.visible {
+                ShowWindow(v_h, SW_HIDE);
+                last.visible = false;
+            }
+            return;
+        }
         let mut r: RECT = std::mem::zeroed();
-        GetWindowRect(hwnd, &mut r);
-        let ex = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
-        out.push(format!(
-            "{} zichtbaar={} rect=({},{},{},{}) exstyle={:#x} layered={}",
-            String::from_utf16_lossy(&class[..n]),
-            IsWindowVisible(hwnd) != 0,
-            r.left,
-            r.top,
-            r.right,
-            r.bottom,
-            ex,
-            ex & WS_EX_LAYERED != 0
-        ));
+        GetWindowRect(ui_h, &mut r);
+        let rect = (r.left, r.top, r.right - r.left, r.bottom - r.top);
+        let topmost = GetWindowLongW(ui_h, GWL_EXSTYLE) as u32 & WS_EX_TOPMOST != 0;
+        last.tick = last.tick.wrapping_add(1);
+        // Bij wijziging meteen; verder elke ~0,5 s de z-volgorde herstellen.
+        if !last.visible || rect != last.rect || topmost != last.topmost || last.tick % 30 == 0 {
+            if topmost != last.topmost || !last.visible {
+                SetWindowPos(
+                    v_h,
+                    if topmost { HWND_TOPMOST } else { HWND_NOTOPMOST },
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+                );
+            }
+            SetWindowPos(v_h, ui_h, rect.0, rect.1, rect.2, rect.3, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+            last.rect = rect;
+            last.topmost = topmost;
+            last.visible = true;
+        }
     }
-    1
 }
 
-/// Alle bovenste vensters van dit proces, van voor naar achter (z-volgorde).
-pub fn describe_process_windows() -> Vec<String> {
-    let mut v: Vec<String> = vec![];
-    // SAFETY: de callback schrijft alleen in `v`, dat tijdens de aanroep leeft.
-    unsafe {
-        EnumWindows(Some(collect_window), &mut v as *mut _ as LPARAM);
+pub struct VideoSync {
+    pub video: isize,
+    stop: Arc<AtomicBool>,
+    thread: Option<JoinHandle<()>>,
+}
+
+impl VideoSync {
+    pub fn start(ui: isize, video: isize) -> VideoSync {
+        let stop = Arc::new(AtomicBool::new(false));
+        let stop2 = stop.clone();
+        let thread = std::thread::spawn(move || {
+            let mut state = SyncState::default();
+            while !stop2.load(Ordering::Relaxed) {
+                sync_once(video, ui, &mut state);
+                std::thread::sleep(Duration::from_millis(16));
+            }
+        });
+        VideoSync { video, stop, thread: Some(thread) }
     }
-    v
+
+    pub fn stop(&mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+        if let Some(t) = self.thread.take() {
+            let _ = t.join();
+        }
+        // SAFETY: het videovenster is van ons en wordt één keer vernietigd.
+        unsafe {
+            DestroyWindow(hwnd(self.video));
+        }
+    }
 }

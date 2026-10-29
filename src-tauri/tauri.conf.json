@@ -15,10 +15,12 @@
       {
         "label": "main",
         "title": "VLC Ultimate",
-        "width": 800,
-        "height": 450,
-        "x": 50,
-        "y": 50,
+        "width": 1280,
+        "height": 760,
+        "minWidth": 720,
+        "minHeight": 440,
+        "center": true,
+        "visible": false,
         "decorations": false,
         "transparent": true,
         "shadow": false,
@@ -26,12 +28,23 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset:"
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: http://asset.localhost; connect-src 'self' ipc: http://ipc.localhost",
+      "assetProtocol": { "enable": true, "scope": ["$APPDATA/cache/thumbnails/**", "$APPDATA/**/cache/thumbnails/**"] }
     }
   },
   "bundle": {
     "active": true,
     "targets": ["nsis"],
-    "icon": ["icons/icon.ico"]
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"],
+    "copyright": "GPL-3.0-or-later",
+    "licenseFile": "../LICENSE",
+    "resources": { "../resources/vlc/": "vlc/", "../resources/ffmpeg/": "ffmpeg/" },
+    "windows": {
+      "nsis": {
+        "installMode": "both",
+        "languages": ["Dutch", "English"],
+        "displayLanguageSelector": true
+      }
+    }
   }
 }

@@ -20,7 +20,8 @@ fn fnv1a(data: &[u8]) -> u64 {
 }
 
 fn run_with_timeout(mut cmd: Command, limit: Duration) -> Result<()> {
-    let mut child = cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped()).spawn().map_err(|e| CoreError::Ffmpeg(e.to_string()))?;
+    let mut child =
+        cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped()).spawn().map_err(|e| CoreError::Ffmpeg(e.to_string()))?;
     let start = Instant::now();
     loop {
         if let Some(status) = child.try_wait()? {
@@ -206,7 +207,9 @@ mod tests {
         std::fs::write(&kapot, b"geen video").unwrap();
         assert!(thumbnail(&app.state, kapot.to_str().unwrap(), 0, 160).is_err());
         assert!(thumbnail(&app.state, "/bestaat/niet.mkv", 0, 160).is_err());
-        assert!(std::fs::read_dir(app.state.dirs.thumbnails()).map(|d| d.flatten().all(|e| !e.file_name().to_string_lossy().contains("tmp"))).unwrap_or(true));
+        assert!(std::fs::read_dir(app.state.dirs.thumbnails())
+            .map(|d| d.flatten().all(|e| !e.file_name().to_string_lossy().contains("tmp")))
+            .unwrap_or(true));
         // audio heeft geen strip
         assert!(thumbnail_strip(&app.state, dir.join("sub/lied.mp3").to_str().unwrap(), 4, 120).is_err());
     }

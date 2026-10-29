@@ -27,7 +27,11 @@ pub struct EqView {
 
 fn view(st: &AppState, state: EqState) -> Result<EqView> {
     let presets = st.lock_db()?.all_eq_presets()?;
-    Ok(EqView { warning: state.config.clipping_warning(), matching_preset: matching_preset(&state.config, &presets).map(|p| p.name.clone()), state })
+    Ok(EqView {
+        warning: state.config.clipping_warning(),
+        matching_preset: matching_preset(&state.config, &presets).map(|p| p.name.clone()),
+        state,
+    })
 }
 
 pub fn load_state(st: &AppState) -> Result<EqState> {

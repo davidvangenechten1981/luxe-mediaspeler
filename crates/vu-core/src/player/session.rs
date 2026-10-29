@@ -314,7 +314,11 @@ impl<E: Engine> Session<E> {
         } else {
             None
         };
-        let opts = OpenOptions { start_ms: resume_ms.unwrap_or(0), network_caching_ms: self.network_caching_ms, audio_visual: is_audio_location(&item.location) };
+        let opts = OpenOptions {
+            start_ms: resume_ms.unwrap_or(0),
+            network_caching_ms: self.network_caching_ms,
+            audio_visual: is_audio_location(&item.location),
+        };
         if let Err(e) = self.engine.open(&item.location, &opts) {
             self.current_location = None;
             self.events.push(SessionEvent::OpenFailed { location: item.location.clone(), message: e.to_string() });
@@ -335,7 +339,9 @@ impl<E: Engine> Session<E> {
 
     /// Legt de huidige positie vast (of markeert voltooid vlak voor het einde).
     fn save_position(&mut self) {
-        let Some(loc) = self.current_location.clone() else { return };
+        let Some(loc) = self.current_location.clone() else {
+            return;
+        };
         let st = self.engine.status();
         if st.length_ms > 0 && matches!(st.state, PlaybackState::Playing | PlaybackState::Paused | PlaybackState::Buffering) {
             self.store.save_resume(&loc, st.time_ms, st.length_ms);
@@ -457,8 +463,12 @@ impl<E: Engine> Session<E> {
 
     /// Zoekt een ondertitelbestand naast de video (zelfde naam, andere extensie).
     pub fn find_sidecar_subtitles(video: &Path) -> Vec<std::path::PathBuf> {
-        let Some(stem) = video.file_stem().map(|s| s.to_string_lossy().to_lowercase()) else { return vec![] };
-        let Some(dir) = video.parent() else { return vec![] };
+        let Some(stem) = video.file_stem().map(|s| s.to_string_lossy().to_lowercase()) else {
+            return vec![];
+        };
+        let Some(dir) = video.parent() else {
+            return vec![];
+        };
         let mut found: Vec<std::path::PathBuf> = std::fs::read_dir(dir)
             .into_iter()
             .flatten()
@@ -467,7 +477,8 @@ impl<E: Engine> Session<E> {
             .filter(|p| {
                 let ext = p.extension().map(|e| e.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
                 let name = p.file_stem().map(|s| s.to_string_lossy().to_lowercase()).unwrap_or_default();
-                ["srt", "ass", "ssa", "vtt", "sub", "idx"].contains(&ext.as_str()) && (name == stem || name.starts_with(&format!("{stem}.")))
+                ["srt", "ass", "ssa", "vtt", "sub", "idx"].contains(&ext.as_str())
+                    && (name == stem || name.starts_with(&format!("{stem}.")))
             })
             .collect();
         found.sort();

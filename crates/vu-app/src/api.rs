@@ -126,7 +126,9 @@ fn unit() -> Result<Value> {
 pub fn handle(st: &AppState, req: Request) -> Result<Value> {
     use Request::*;
     match req {
-        AppInfo => Ok(json!({ "version": st.version, "player_available": st.player.is_ok(), "converter_available": st.tasks.is_some(), "warnings": st.warnings })),
+        AppInfo => Ok(
+            json!({ "version": st.version, "player_available": st.player.is_ok(), "converter_available": st.tasks.is_some(), "warnings": st.warnings }),
+        ),
         Diagnostics => json_of(settings::diagnostics(st, &st.version)?),
 
         LibraryAddFolder { path } => library::add_folder(st, &path).and_then(|_| unit()),
@@ -144,7 +146,13 @@ pub fn handle(st: &AppState, req: Request) -> Result<Value> {
             unit()
         }
         LibraryScanRunning => json_of(library::scan_running(st)),
-        CollectionsList => json_of(st.lock_db()?.list_collections()?.into_iter().map(|(id, name, query)| json!({ "id": id, "name": name, "query": query })).collect::<Vec<_>>()),
+        CollectionsList => json_of(
+            st.lock_db()?
+                .list_collections()?
+                .into_iter()
+                .map(|(id, name, query)| json!({ "id": id, "name": name, "query": query }))
+                .collect::<Vec<_>>(),
+        ),
         CollectionCreate { name, query } => json_of(st.lock_db()?.create_collection(&name, &query)?),
         CollectionDelete { id } => st.lock_db()?.delete_collection(id).and_then(|_| unit()),
         CollectionRun { id } => json_of(st.lock_db()?.run_collection(id)?),
@@ -288,7 +296,8 @@ mod tests {
         }
         let dir = media_dir(&app);
         call(&app, json!({"type": "library_scan_start", "folder": dir.to_str().unwrap()})).unwrap();
-        assert!(wait_until(30, || call(&app, json!({"type": "library_scan_running"})).unwrap() == json!(false) && !app.sink.named(crate::events::EV_SCAN_DONE).is_empty()));
+        assert!(wait_until(30, || call(&app, json!({"type": "library_scan_running"})).unwrap() == json!(false)
+            && !app.sink.named(crate::events::EV_SCAN_DONE).is_empty()));
         let n = call(&app, json!({"type": "library_count", "query": {}})).unwrap();
         assert_eq!(n, json!(2));
         let hits = call(&app, json!({"type": "library_query", "query": {"kind": "audio", "sort": "title"}})).unwrap();
@@ -321,7 +330,9 @@ mod tests {
         let app = app();
         let dir = media_dir(&app);
         let id = call(&app, json!({"type": "playlist_create", "name": "Test"})).unwrap();
-        let r = call(&app, json!({"type": "playlist_add_items", "id": id, "locations": [dir.join("film.mkv").to_str().unwrap(), "/weg.mkv"]})).unwrap();
+        let r =
+            call(&app, json!({"type": "playlist_add_items", "id": id, "locations": [dir.join("film.mkv").to_str().unwrap(), "/weg.mkv"]}))
+                .unwrap();
         assert_eq!((r["added"].as_u64(), r["rejected"].as_array().unwrap().len()), (Some(1), 1));
         let items = call(&app, json!({"type": "playlist_items", "id": id})).unwrap();
         assert_eq!(items[0]["title"], "film");
@@ -348,11 +359,15 @@ mod tests {
             assert!(caps["containers"].as_array().unwrap().iter().any(|c| c["id"] == "mp4" && c["available"] == true));
             let dir = media_dir(&app);
             let out = app.dir.path().join("uit");
-            let add = call(&app, json!({"type": "convert_add", "request": {
-                "inputs": [dir.join("film.mkv").to_str().unwrap()],
-                "profile_id": "remux_mp4",
-                "output": {"dir": out.to_str().unwrap(), "overwrite": "rename"}
-            }})).unwrap();
+            let add = call(
+                &app,
+                json!({"type": "convert_add", "request": {
+                    "inputs": [dir.join("film.mkv").to_str().unwrap()],
+                    "profile_id": "remux_mp4",
+                    "output": {"dir": out.to_str().unwrap(), "overwrite": "rename"}
+                }}),
+            )
+            .unwrap();
             let id = add["job_ids"][0].as_u64().unwrap();
             assert!(wait_until(60, || {
                 let list = call(&app, json!({"type": "convert_list"})).unwrap();

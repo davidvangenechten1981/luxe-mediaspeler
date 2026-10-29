@@ -151,7 +151,8 @@ pub fn play_library(st: &AppState, ids: Vec<i64>, start: usize) -> Result<PlayRe
 
 pub fn play_playlist(st: &AppState, playlist_id: i64, start: usize) -> Result<PlayResult> {
     let items = st.lock_db()?.playlist_items(playlist_id)?;
-    let (existing, missing): (Vec<_>, Vec<_>) = items.into_iter().partition(|i| i.location.contains("://") || Path::new(&i.location).exists());
+    let (existing, missing): (Vec<_>, Vec<_>) =
+        items.into_iter().partition(|i| i.location.contains("://") || Path::new(&i.location).exists());
     let mut r = play_locations(st, existing.into_iter().map(|i| i.location).collect(), start)?;
     r.rejected.extend(missing.into_iter().map(|i| (i.location, "bestand ontbreekt".to_string())));
     Ok(r)
@@ -185,7 +186,10 @@ pub fn snapshot(st: &AppState, dir: &str) -> Result<PathBuf> {
 /// Ondertitelbestanden naast de video, voor de keuzelijst.
 pub fn sidecar_subtitles(path: &str) -> Result<Vec<String>> {
     let p = validate_media_path(path)?;
-    Ok(vu_core::player::session::Session::<vu_vlc::VlcEngine>::find_sidecar_subtitles(&p).into_iter().map(|p| p.to_string_lossy().into_owned()).collect())
+    Ok(vu_core::player::session::Session::<vu_vlc::VlcEngine>::find_sidecar_subtitles(&p)
+        .into_iter()
+        .map(|p| p.to_string_lossy().into_owned())
+        .collect())
 }
 
 #[cfg(test)]

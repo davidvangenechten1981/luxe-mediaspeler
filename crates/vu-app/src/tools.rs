@@ -13,7 +13,11 @@ pub struct Tools {
 }
 
 fn exe_name(base: &str) -> String {
-    if cfg!(windows) { format!("{base}.exe") } else { base.to_string() }
+    if cfg!(windows) {
+        format!("{base}.exe")
+    } else {
+        base.to_string()
+    }
 }
 
 fn works(path: &Path) -> bool {

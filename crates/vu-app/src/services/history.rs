@@ -42,7 +42,14 @@ pub fn continue_watching(st: &AppState, limit: u32) -> Result<Vec<ContinueItem>>
         .map(|r| {
             let media = db.get_media_by_path(&r.location)?;
             let missing = !r.location.contains("://") && !std::path::Path::new(&r.location).exists();
-            Ok(ContinueItem { location: r.location, position_ms: r.position_ms, duration_ms: r.duration_ms, updated_at: r.updated_at, media, missing })
+            Ok(ContinueItem {
+                location: r.location,
+                position_ms: r.position_ms,
+                duration_ms: r.duration_ms,
+                updated_at: r.updated_at,
+                media,
+                missing,
+            })
         })
         .collect()
 }

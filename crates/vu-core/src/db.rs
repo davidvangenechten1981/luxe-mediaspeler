@@ -385,26 +385,34 @@ impl Database {
                 duration_ms=?9, width=?10, height=?11, codec=?12, container=?13, bitrate=?14, size=?15, mtime=?16,
                 missing=0",
             params![
-                m.path, m.kind.as_str(), m.title, m.artist, m.album, m.genre, m.year, m.track,
-                m.duration_ms as i64, m.width, m.height, m.codec, m.container, m.bitrate.map(|b| b as i64),
-                m.size as i64, m.mtime, now()
+                m.path,
+                m.kind.as_str(),
+                m.title,
+                m.artist,
+                m.album,
+                m.genre,
+                m.year,
+                m.track,
+                m.duration_ms as i64,
+                m.width,
+                m.height,
+                m.codec,
+                m.container,
+                m.bitrate.map(|b| b as i64),
+                m.size as i64,
+                m.mtime,
+                now()
             ],
         )?;
         Ok(self.conn.query_row("SELECT id FROM media WHERE path = ?1", [&m.path], |r| r.get(0))?)
     }
 
     pub fn get_media(&self, id: i64) -> Result<Option<Media>> {
-        Ok(self
-            .conn
-            .query_row(&format!("SELECT {MEDIA_COLS} FROM media WHERE id = ?1"), [id], media_from_row)
-            .optional()?)
+        Ok(self.conn.query_row(&format!("SELECT {MEDIA_COLS} FROM media WHERE id = ?1"), [id], media_from_row).optional()?)
     }
 
     pub fn get_media_by_path(&self, path: &str) -> Result<Option<Media>> {
-        Ok(self
-            .conn
-            .query_row(&format!("SELECT {MEDIA_COLS} FROM media WHERE path = ?1"), [path], media_from_row)
-            .optional()?)
+        Ok(self.conn.query_row(&format!("SELECT {MEDIA_COLS} FROM media WHERE path = ?1"), [path], media_from_row).optional()?)
     }
 
     fn where_clause(q: &MediaQuery) -> (String, Vec<rusqlite::types::Value>) {
@@ -422,8 +430,7 @@ impl Database {
             // elk woord moet voorkomen in pad, titel, artiest of album
             for word in t.split_whitespace() {
                 conds.push(
-                    "(path LIKE ? ESCAPE '\\' OR title LIKE ? ESCAPE '\\' OR artist LIKE ? ESCAPE '\\' OR album LIKE ? ESCAPE '\\')"
-                        .into(),
+                    "(path LIKE ? ESCAPE '\\' OR title LIKE ? ESCAPE '\\' OR artist LIKE ? ESCAPE '\\' OR album LIKE ? ESCAPE '\\')".into(),
                 );
                 let pat = Value::Text(format!("%{}%", escape_like(word)));
                 args.extend([pat.clone(), pat.clone(), pat.clone(), pat]);
@@ -481,11 +488,7 @@ impl Database {
 
     pub fn count_media(&self, q: &MediaQuery) -> Result<u64> {
         let (clause, args) = Self::where_clause(q);
-        let n: i64 = self.conn.query_row(
-            &format!("SELECT COUNT(*) FROM media{clause}"),
-            params_from_iter(args.iter()),
-            |r| r.get(0),
-        )?;
+        let n: i64 = self.conn.query_row(&format!("SELECT COUNT(*) FROM media{clause}"), params_from_iter(args.iter()), |r| r.get(0))?;
         Ok(n as u64)
     }
 
@@ -505,10 +508,8 @@ impl Database {
     // ---------- bibliotheekmappen, ontbrekende en dubbele bestanden ----------
 
     pub fn add_library_folder(&self, path: &str) -> Result<i64> {
-        self.conn.execute(
-            "INSERT INTO library_folders (path, added_at) VALUES (?1, ?2) ON CONFLICT(path) DO NOTHING",
-            params![path, now()],
-        )?;
+        self.conn
+            .execute("INSERT INTO library_folders (path, added_at) VALUES (?1, ?2) ON CONFLICT(path) DO NOTHING", params![path, now()])?;
         Ok(self.conn.query_row("SELECT id FROM library_folders WHERE path = ?1", [path], |r| r.get(0))?)
     }
 
@@ -632,8 +633,8 @@ impl Database {
         if !self.history_enabled()? {
             return Ok(());
         }
-        let completed = duration_ms > 0
-            && (position_ms >= duration_ms.saturating_sub(duration_ms / 20) || position_ms + 10_000 >= duration_ms);
+        let completed =
+            duration_ms > 0 && (position_ms >= duration_ms.saturating_sub(duration_ms / 20) || position_ms + 10_000 >= duration_ms);
         let stored_pos = if completed { 0 } else { position_ms };
         self.conn.execute(
             "INSERT INTO resume (location, position_ms, duration_ms, completed, updated_at) VALUES (?1,?2,?3,?4,?5)
@@ -683,7 +684,8 @@ impl Database {
     }
 
     pub fn rename_playlist(&self, id: i64, name: &str) -> Result<()> {
-        let n = self.conn.execute("UPDATE playlists SET name = ?2, updated_at = ?3 WHERE id = ?1", params![id, clean_name(name)?, now()])?;
+        let n =
+            self.conn.execute("UPDATE playlists SET name = ?2, updated_at = ?3 WHERE id = ?1", params![id, clean_name(name)?, now()])?;
         if n == 0 {
             return Err(CoreError::NotFound(format!("playlist {id}")));
         }
@@ -723,8 +725,10 @@ impl Database {
     }
 
     pub fn playlist_items(&self, id: i64) -> Result<Vec<PlaylistItem>> {
-        let mut stmt = self.conn.prepare("SELECT id, position, location, title FROM playlist_items WHERE playlist_id = ?1 ORDER BY position")?;
-        let rows = stmt.query_map([id], |r| Ok(PlaylistItem { id: r.get(0)?, position: r.get(1)?, location: r.get(2)?, title: r.get(3)? }))?;
+        let mut stmt =
+            self.conn.prepare("SELECT id, position, location, title FROM playlist_items WHERE playlist_id = ?1 ORDER BY position")?;
+        let rows =
+            stmt.query_map([id], |r| Ok(PlaylistItem { id: r.get(0)?, position: r.get(1)?, location: r.get(2)?, title: r.get(3)? }))?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
@@ -734,7 +738,8 @@ impl Database {
         if tx.query_row("SELECT COUNT(*) FROM playlists WHERE id = ?1", [id], |r| r.get::<_, i64>(0))? == 0 {
             return Err(CoreError::NotFound(format!("playlist {id}")));
         }
-        let start: u32 = tx.query_row("SELECT COALESCE(MAX(position) + 1, 0) FROM playlist_items WHERE playlist_id = ?1", [id], |r| r.get(0))?;
+        let start: u32 =
+            tx.query_row("SELECT COALESCE(MAX(position) + 1, 0) FROM playlist_items WHERE playlist_id = ?1", [id], |r| r.get(0))?;
         for (offset, (loc, title)) in items.iter().enumerate() {
             tx.execute(
                 "INSERT INTO playlist_items (playlist_id, position, location, title) VALUES (?1,?2,?3,?4)",
@@ -783,9 +788,17 @@ impl Database {
     }
 
     pub fn list_bookmarks(&self, location: &str) -> Result<Vec<Bookmark>> {
-        let mut stmt = self.conn.prepare("SELECT id, location, position_ms, label, created_at FROM bookmarks WHERE location = ?1 ORDER BY position_ms")?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, location, position_ms, label, created_at FROM bookmarks WHERE location = ?1 ORDER BY position_ms")?;
         let rows = stmt.query_map([location], |r| {
-            Ok(Bookmark { id: r.get(0)?, location: r.get(1)?, position_ms: r.get::<_, i64>(2)? as u64, label: r.get(3)?, created_at: r.get(4)? })
+            Ok(Bookmark {
+                id: r.get(0)?,
+                location: r.get(1)?,
+                position_ms: r.get::<_, i64>(2)? as u64,
+                label: r.get(3)?,
+                created_at: r.get(4)?,
+            })
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
@@ -838,12 +851,15 @@ impl Database {
     /// Alleen de eigen presets van de gebruiker.
     pub fn list_user_eq_presets(&self) -> Result<Vec<EqPreset>> {
         let mut stmt = self.conn.prepare("SELECT name, genre, preamp, bands FROM eq_presets ORDER BY name COLLATE NOCASE")?;
-        let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?, r.get::<_, f64>(2)?, r.get::<_, String>(3)?)))?;
+        let rows = stmt
+            .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?, r.get::<_, f64>(2)?, r.get::<_, String>(3)?)))?;
         let mut out = vec![];
         for row in rows {
             let (name, genre, preamp, bands) = row?;
             // een beschadigde rij slaan we over in plaats van de hele lijst te laten falen
-            let Ok(bands_db) = serde_json::from_str::<[f32; 10]>(&bands) else { continue };
+            let Ok(bands_db) = serde_json::from_str::<[f32; 10]>(&bands) else {
+                continue;
+            };
             out.push(EqPreset { name, genre, config: EqConfig { preamp_db: preamp as f32, bands_db }, builtin: false });
         }
         Ok(out)
@@ -861,14 +877,14 @@ impl Database {
     pub fn create_collection(&self, name: &str, query: &MediaQuery) -> Result<i64> {
         let name = clean_name(name)?;
         let json = serde_json::to_string(query).map_err(|e| CoreError::Invalid(e.to_string()))?;
-        self.conn
-            .execute("INSERT INTO collections (name, query, created_at) VALUES (?1, ?2, ?3)", params![name, json, now()])
-            .map_err(|e| match e {
+        self.conn.execute("INSERT INTO collections (name, query, created_at) VALUES (?1, ?2, ?3)", params![name, json, now()]).map_err(
+            |e| match e {
                 rusqlite::Error::SqliteFailure(f, _) if f.code == rusqlite::ErrorCode::ConstraintViolation => {
                     CoreError::Invalid("Er bestaat al een collectie met die naam".into())
                 }
                 other => other.into(),
-            })?;
+            },
+        )?;
         Ok(self.conn.last_insert_rowid())
     }
 
@@ -906,7 +922,8 @@ impl Database {
     }
 
     pub fn set_setting(&self, key: &str, value: &str) -> Result<()> {
-        self.conn.execute("INSERT INTO settings (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = ?2", params![key, value])?;
+        self.conn
+            .execute("INSERT INTO settings (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = ?2", params![key, value])?;
         Ok(())
     }
 

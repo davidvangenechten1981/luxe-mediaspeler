@@ -76,7 +76,10 @@ pub fn import_m3u(st: &AppState, file: &str, name: Option<&str>) -> Result<Impor
     let path = validate_media_path(file)?;
     let entries = m3u::read_file(&path)?;
     let missing: Vec<String> = m3u::missing_indexes(&entries).into_iter().map(|i| entries[i].location.clone()).collect();
-    let name = name.map(str::to_string).or_else(|| path.file_stem().map(|s| s.to_string_lossy().into_owned())).unwrap_or_else(|| "Geïmporteerd".into());
+    let name = name
+        .map(str::to_string)
+        .or_else(|| path.file_stem().map(|s| s.to_string_lossy().into_owned()))
+        .unwrap_or_else(|| "Geïmporteerd".into());
     let mut db = st.lock_db()?;
     let id = db.create_playlist(&name)?;
     let items: Vec<(String, Option<String>)> = entries.iter().map(|e| (e.location.clone(), e.title.clone())).collect();
@@ -117,7 +120,13 @@ mod tests {
         let r = add_items(
             &app.state,
             id,
-            &[film.clone(), "https://radio.example.com/stream".into(), "http://192.168.1.5/x".into(), "/bestaat/niet.mkv".into(), "file:///etc/passwd".into()],
+            &[
+                film.clone(),
+                "https://radio.example.com/stream".into(),
+                "http://192.168.1.5/x".into(),
+                "/bestaat/niet.mkv".into(),
+                "file:///etc/passwd".into(),
+            ],
         )
         .unwrap();
         assert_eq!(r.added, 2);
@@ -155,7 +164,7 @@ mod tests {
         assert_eq!((r.imported, r.missing.len()), (2, 0));
         let imported = items(&app.state, r.playlist_id).unwrap();
         assert_eq!(imported[0].location, film); // relatief pad weer absoluut
-        // bestand verdwijnt: wordt als ontbrekend herkend
+                                                // bestand verdwijnt: wordt als ontbrekend herkend
         std::fs::remove_file(dir.join("film.mkv")).unwrap();
         assert_eq!(missing_items(&app.state, r.playlist_id).unwrap().len(), 1);
         let again = import_m3u(&app.state, out.to_str().unwrap(), Some("Tweede")).unwrap();

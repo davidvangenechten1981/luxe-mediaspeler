@@ -16,7 +16,11 @@ fn fixture(name: &str) -> String {
 }
 
 fn engine() -> Option<VlcEngine> {
-    let cfg = VlcConfig { library_dir: None, extra_args: vec!["--aout=dummy".into(), "--vout=dummy".into(), "--no-xlib".into()] };
+    let mut args = vec!["--aout=dummy".to_string(), "--vout=dummy".to_string()];
+    #[cfg(not(windows))]
+    args.push("--no-xlib".into());
+    // In de Windows-CI wijst VU_VLC_DIR naar de map met libvlc.dll en plugins
+    let cfg = VlcConfig { library_dir: std::env::var_os("VU_VLC_DIR").map(PathBuf::from), extra_args: args };
     match VlcEngine::new(&cfg) {
         Ok(e) => Some(e),
         Err(e) => {
@@ -260,7 +264,11 @@ fn full_session_plays_a_queue_to_the_end_and_saves_history() {
     let mut s = Session::new(engine, Box::new(Store(db.clone())), 1);
     let a = fixture("sample_small_change.mkv");
     let b = fixture("sample.mp3");
-    s.play_items(vec![QueueItem { location: a.clone(), title: Some("A".into()) }, QueueItem { location: b.clone(), title: Some("B".into()) }], 0).unwrap();
+    s.play_items(
+        vec![QueueItem { location: a.clone(), title: Some("A".into()) }, QueueItem { location: b.clone(), title: Some("B".into()) }],
+        0,
+    )
+    .unwrap();
     s.engine_mut().set_rate(4.0).ok();
     let t = Instant::now();
     let mut events = vec![];

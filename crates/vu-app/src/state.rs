@@ -72,7 +72,13 @@ pub fn open_database_recovering(path: &Path) -> Result<(Database, Option<String>
                 }
             }
             let fresh = Database::open(path)?;
-            Ok((fresh, Some(format!("De database was beschadigd ({e}). Een nieuwe database is aangemaakt; het oude bestand is bewaard als {}.", aside.display()))))
+            Ok((
+                fresh,
+                Some(format!(
+                    "De database was beschadigd ({e}). Een nieuwe database is aangemaakt; het oude bestand is bewaard als {}.",
+                    aside.display()
+                )),
+            ))
         }
         Err(e) => Err(e),
     }
@@ -198,7 +204,8 @@ mod tests {
         let (db, warn) = open_database_recovering(&path).unwrap();
         assert!(warn.unwrap().contains("bewaard als"));
         db.integrity_check().unwrap();
-        let aside: Vec<_> = std::fs::read_dir(dir.path()).unwrap().flatten().filter(|e| e.file_name().to_string_lossy().contains("beschadigd")).collect();
+        let aside: Vec<_> =
+            std::fs::read_dir(dir.path()).unwrap().flatten().filter(|e| e.file_name().to_string_lossy().contains("beschadigd")).collect();
         assert_eq!(aside.len(), 1);
         assert_eq!(std::fs::read(aside[0].path()).unwrap(), b"dit is geen sqlite-database, maar wel kostbare gebruikersdata");
     }
@@ -218,7 +225,8 @@ mod tests {
         assert!(rotate_backups(&db, dir.path(), 7, 3).unwrap().is_some()); // eerste keer
         assert!(rotate_backups(&db, dir.path(), 7, 3).unwrap().is_none()); // nog vers
         for i in 0..5 {
-            std::fs::write(dir.path().join(format!("library-{}.db", 100 + i)), b"x").unwrap(); // oude exemplaren
+            std::fs::write(dir.path().join(format!("library-{}.db", 100 + i)), b"x").unwrap();
+            // oude exemplaren
         }
         rotate_backups(&db, dir.path(), 7, 3).unwrap();
         let n = std::fs::read_dir(dir.path()).unwrap().flatten().count();
