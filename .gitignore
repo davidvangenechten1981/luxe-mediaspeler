@@ -11,3 +11,5 @@ __pycache__/
 !/resources/vlc/.gitkeep
 /resources/ffmpeg/*
 !/resources/ffmpeg/.gitkeep
+*.egg-info/
+__pycache__/
