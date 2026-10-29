@@ -1,0 +1,6 @@
+PySide6
+python-mpv
+
+[dev]
+pytest
+pyinstaller
