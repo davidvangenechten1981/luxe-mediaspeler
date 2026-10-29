@@ -29,9 +29,13 @@ jobs:
       - name: VLC ophalen en controleren
         shell: pwsh
         run: |
-          $url = "https://get.videolan.org/vlc/$env:VLC_VERSION/win64/vlc-$env:VLC_VERSION-win64.7z"
+          $url = "https://download.videolan.org/pub/videolan/vlc/$env:VLC_VERSION/win64/vlc-$env:VLC_VERSION-win64.7z"
           Invoke-WebRequest $url -OutFile vlc.7z
+          $size = (Get-Item vlc.7z).Length
+          $magic = [System.BitConverter]::ToString([System.IO.File]::ReadAllBytes("vlc.7z")[0..5])
+          "bestand: $size bytes, eerste bytes: $magic"
           "sha256 vlc.7z: " + (Get-FileHash vlc.7z -Algorithm SHA256).Hash
+          if ($magic -ne "37-7A-BC-AF-27-1C") { throw "Geen geldig 7z-archief (waarschijnlijk een HTML-pagina): $url" }
           7z x vlc.7z -ovlc-extract -y | Out-Null
           New-Item -ItemType Directory -Force vlc | Out-Null
           $root = Get-ChildItem vlc-extract -Directory | Select-Object -First 1
