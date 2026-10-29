@@ -1,6 +1,7 @@
 //! SQLite-opslag: bibliotheek, playlists, geschiedenis, bladwijzers, instellingen.
 //! Schema-wijzigingen lopen via genummerde migraties (`PRAGMA user_version`).
 
+use crate::audio::{builtin_presets, EqConfig, EqPreset};
 use crate::error::{CoreError, Result};
 use rusqlite::{params, params_from_iter, Connection, OptionalExtension, Row};
 use serde::{Deserialize, Serialize};
@@ -83,6 +84,21 @@ const MIGRATIONS: &[&str] = &[
     CREATE TABLE settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
+    );
+    "#,
+    // 2: eigen equalizer-presets en slimme collecties
+    r#"
+    CREATE TABLE eq_presets (
+        name TEXT PRIMARY KEY COLLATE NOCASE,
+        genre TEXT,
+        preamp REAL NOT NULL,
+        bands TEXT NOT NULL
+    );
+    CREATE TABLE collections (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+        query TEXT NOT NULL,
+        created_at INTEGER NOT NULL
     );
     "#,
 ];
@@ -718,10 +734,12 @@ impl Database {
         if tx.query_row("SELECT COUNT(*) FROM playlists WHERE id = ?1", [id], |r| r.get::<_, i64>(0))? == 0 {
             return Err(CoreError::NotFound(format!("playlist {id}")));
         }
-        let mut pos: u32 = tx.query_row("SELECT COALESCE(MAX(position) + 1, 0) FROM playlist_items WHERE playlist_id = ?1", [id], |r| r.get(0))?;
-        for (loc, title) in items {
-            tx.execute("INSERT INTO playlist_items (playlist_id, position, location, title) VALUES (?1,?2,?3,?4)", params![id, pos, loc, title])?;
-            pos += 1;
+        let start: u32 = tx.query_row("SELECT COALESCE(MAX(position) + 1, 0) FROM playlist_items WHERE playlist_id = ?1", [id], |r| r.get(0))?;
+        for (offset, (loc, title)) in items.iter().enumerate() {
+            tx.execute(
+                "INSERT INTO playlist_items (playlist_id, position, location, title) VALUES (?1,?2,?3,?4)",
+                params![id, start + offset as u32, loc, title],
+            )?;
         }
         tx.execute("UPDATE playlists SET updated_at = ?2 WHERE id = ?1", params![id, now()])?;
         tx.commit()?;
@@ -775,6 +793,110 @@ impl Database {
     pub fn delete_bookmark(&self, id: i64) -> Result<()> {
         self.conn.execute("DELETE FROM bookmarks WHERE id = ?1", [id])?;
         Ok(())
+    }
+
+    // ---------- equalizer-presets ----------
+
+    /// Slaat een eigen preset op (of overschrijft er een met dezelfde naam). Ingebouwde namen zijn gereserveerd.
+    pub fn save_eq_preset(&self, name: &str, genre: Option<&str>, cfg: &EqConfig) -> Result<()> {
+        let name = clean_name(name)?;
+        cfg.validate()?;
+        if builtin_presets().iter().any(|p| p.name.eq_ignore_ascii_case(&name)) {
+            return Err(CoreError::Invalid("Deze naam is gereserveerd voor een ingebouwde preset".into()));
+        }
+        let bands = serde_json::to_string(&cfg.bands_db).map_err(|e| CoreError::Invalid(e.to_string()))?;
+        self.conn.execute(
+            "INSERT INTO eq_presets (name, genre, preamp, bands) VALUES (?1,?2,?3,?4)
+             ON CONFLICT(name) DO UPDATE SET genre=?2, preamp=?3, bands=?4",
+            params![name, genre, cfg.preamp_db as f64, bands],
+        )?;
+        Ok(())
+    }
+
+    pub fn rename_eq_preset(&self, old: &str, new: &str) -> Result<()> {
+        let new = clean_name(new)?;
+        if builtin_presets().iter().any(|p| p.name.eq_ignore_ascii_case(&new)) {
+            return Err(CoreError::Invalid("Deze naam is gereserveerd voor een ingebouwde preset".into()));
+        }
+        let n = self.conn.execute("UPDATE eq_presets SET name = ?2 WHERE name = ?1", params![old, new]).map_err(|e| match e {
+            rusqlite::Error::SqliteFailure(f, _) if f.code == rusqlite::ErrorCode::ConstraintViolation => {
+                CoreError::Invalid("Er bestaat al een preset met die naam".into())
+            }
+            other => other.into(),
+        })?;
+        if n == 0 {
+            return Err(CoreError::NotFound(format!("preset '{old}'")));
+        }
+        Ok(())
+    }
+
+    pub fn delete_eq_preset(&self, name: &str) -> Result<()> {
+        self.conn.execute("DELETE FROM eq_presets WHERE name = ?1", [name])?;
+        Ok(())
+    }
+
+    /// Alleen de eigen presets van de gebruiker.
+    pub fn list_user_eq_presets(&self) -> Result<Vec<EqPreset>> {
+        let mut stmt = self.conn.prepare("SELECT name, genre, preamp, bands FROM eq_presets ORDER BY name COLLATE NOCASE")?;
+        let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?, r.get::<_, f64>(2)?, r.get::<_, String>(3)?)))?;
+        let mut out = vec![];
+        for row in rows {
+            let (name, genre, preamp, bands) = row?;
+            // een beschadigde rij slaan we over in plaats van de hele lijst te laten falen
+            let Ok(bands_db) = serde_json::from_str::<[f32; 10]>(&bands) else { continue };
+            out.push(EqPreset { name, genre, config: EqConfig { preamp_db: preamp as f32, bands_db }, builtin: false });
+        }
+        Ok(out)
+    }
+
+    /// Ingebouwde presets gevolgd door de eigen presets.
+    pub fn all_eq_presets(&self) -> Result<Vec<EqPreset>> {
+        let mut all = builtin_presets();
+        all.extend(self.list_user_eq_presets()?);
+        Ok(all)
+    }
+
+    // ---------- slimme collecties ----------
+
+    pub fn create_collection(&self, name: &str, query: &MediaQuery) -> Result<i64> {
+        let name = clean_name(name)?;
+        let json = serde_json::to_string(query).map_err(|e| CoreError::Invalid(e.to_string()))?;
+        self.conn
+            .execute("INSERT INTO collections (name, query, created_at) VALUES (?1, ?2, ?3)", params![name, json, now()])
+            .map_err(|e| match e {
+                rusqlite::Error::SqliteFailure(f, _) if f.code == rusqlite::ErrorCode::ConstraintViolation => {
+                    CoreError::Invalid("Er bestaat al een collectie met die naam".into())
+                }
+                other => other.into(),
+            })?;
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    pub fn list_collections(&self) -> Result<Vec<(i64, String, MediaQuery)>> {
+        let mut stmt = self.conn.prepare("SELECT id, name, query FROM collections ORDER BY name COLLATE NOCASE")?;
+        let rows = stmt.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?)))?;
+        let mut out = vec![];
+        for row in rows {
+            let (id, name, q) = row?;
+            out.push((id, name, serde_json::from_str(&q).unwrap_or_default()));
+        }
+        Ok(out)
+    }
+
+    pub fn delete_collection(&self, id: i64) -> Result<()> {
+        self.conn.execute("DELETE FROM collections WHERE id = ?1", [id])?;
+        Ok(())
+    }
+
+    /// Voert de opgeslagen zoekregels uit; de uitkomst volgt altijd de actuele bibliotheek.
+    pub fn run_collection(&self, id: i64) -> Result<Vec<Media>> {
+        let q: String = self
+            .conn
+            .query_row("SELECT query FROM collections WHERE id = ?1", [id], |r| r.get(0))
+            .optional()?
+            .ok_or_else(|| CoreError::NotFound(format!("collectie {id}")))?;
+        let query: MediaQuery = serde_json::from_str(&q).map_err(|e| CoreError::Invalid(format!("Beschadigde collectie: {e}")))?;
+        self.query_media(&query)
     }
 
     // ---------- instellingen ----------

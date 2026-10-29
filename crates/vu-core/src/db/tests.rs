@@ -1,4 +1,5 @@
 use super::*;
+use crate::audio::EqConfig;
 use std::collections::HashSet;
 
 fn media(path: &str, kind: MediaKind) -> NewMedia {
@@ -316,4 +317,88 @@ fn unknown_ids_give_clear_errors() {
     let d = db();
     assert!(matches!(d.set_favorite(42, true), Err(CoreError::NotFound(_))));
     assert!(d.get_media(42).unwrap().is_none());
+}
+
+#[test]
+fn user_eq_presets_can_be_saved_renamed_edited_and_deleted() {
+    let d = db();
+    let mut cfg = EqConfig { preamp_db: -3.0, bands_db: [0.0; 10] };
+    cfg.bands_db[0] = 4.5;
+    d.save_eq_preset("Mijn bas", Some("Eigen"), &cfg).unwrap();
+    let list = d.list_user_eq_presets().unwrap();
+    assert_eq!(list.len(), 1);
+    assert_eq!((list[0].name.as_str(), list[0].config.clone(), list[0].builtin), ("Mijn bas", cfg.clone(), false));
+    // bewerken = opnieuw opslaan onder dezelfde naam (hoofdletterongevoelig)
+    cfg.bands_db[0] = 2.0;
+    d.save_eq_preset("MIJN BAS", None, &cfg).unwrap();
+    assert_eq!(d.list_user_eq_presets().unwrap().len(), 1);
+    assert_eq!(d.list_user_eq_presets().unwrap()[0].config.bands_db[0], 2.0);
+    d.rename_eq_preset("Mijn bas", "Diepe bas").unwrap();
+    assert_eq!(d.list_user_eq_presets().unwrap()[0].name, "Diepe bas");
+    assert!(d.rename_eq_preset("bestaat niet", "x").is_err());
+    d.save_eq_preset("Tweede", None, &cfg).unwrap();
+    assert!(d.rename_eq_preset("Tweede", "diepe bas").is_err()); // naamconflict
+    d.delete_eq_preset("Diepe bas").unwrap();
+    assert_eq!(d.list_user_eq_presets().unwrap().len(), 1);
+}
+
+#[test]
+fn eq_preset_names_and_values_are_validated() {
+    let d = db();
+    let ok = EqConfig::default();
+    assert!(d.save_eq_preset("Rock", None, &ok).is_err()); // gereserveerd, ook in andere schrijfwijze
+    assert!(d.save_eq_preset("rock", None, &ok).is_err());
+    assert!(d.save_eq_preset("  ", None, &ok).is_err());
+    assert!(d.save_eq_preset("Te hard", None, &EqConfig { preamp_db: 50.0, bands_db: [0.0; 10] }).is_err());
+    assert!(d.rename_eq_preset("x", "Pop").is_err());
+    assert!(d.list_user_eq_presets().unwrap().is_empty());
+}
+
+#[test]
+fn all_eq_presets_lists_builtin_first_then_user_presets() {
+    let d = db();
+    d.save_eq_preset("Eigen", None, &EqConfig::default()).unwrap();
+    let all = d.all_eq_presets().unwrap();
+    assert!(all.first().unwrap().builtin && !all.last().unwrap().builtin);
+    assert_eq!(all.last().unwrap().name, "Eigen");
+}
+
+#[test]
+fn smart_collections_follow_the_live_library() {
+    let mut d = db();
+    let id = d
+        .create_collection("Lange films", &MediaQuery { kind: Some(MediaKind::Video), min_duration_ms: Some(3_600_000), ..Default::default() })
+        .unwrap();
+    assert!(d.run_collection(id).unwrap().is_empty());
+    let mut lang = media("/m/epos.mkv", MediaKind::Video);
+    lang.duration_ms = 7_200_000;
+    d.upsert_media(&lang).unwrap();
+    d.upsert_media(&media("/m/clip.mkv", MediaKind::Video)).unwrap();
+    let hits = d.run_collection(id).unwrap();
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0].path, "/m/epos.mkv");
+    assert!(d.create_collection("lange FILMS", &MediaQuery::default()).is_err()); // naam bestaat al
+    assert_eq!(d.list_collections().unwrap().len(), 1);
+    d.delete_collection(id).unwrap();
+    assert!(matches!(d.run_collection(id), Err(CoreError::NotFound(_))));
+}
+
+#[test]
+fn upgrading_a_version_1_database_keeps_data_and_adds_new_tables() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = dir.path().join("oud.db");
+    {
+        // maak een echte schema-v1-database met data
+        let c = Connection::open(&p).unwrap();
+        c.execute_batch(MIGRATIONS[0]).unwrap();
+        c.pragma_update(None, "user_version", 1).unwrap();
+        c.execute("INSERT INTO settings (key, value) VALUES ('thema', 'licht')", []).unwrap();
+        c.execute("INSERT INTO playlists (name, created_at, updated_at) VALUES ('oud', 1, 1)", []).unwrap();
+    }
+    let d = Database::open(&p).unwrap();
+    assert_eq!(d.schema_version().unwrap() as usize, MIGRATIONS.len());
+    assert_eq!(d.get_setting("thema").unwrap().as_deref(), Some("licht"));
+    assert_eq!(d.list_playlists().unwrap()[0].name, "oud");
+    d.save_eq_preset("Nieuw", None, &EqConfig::default()).unwrap(); // nieuwe tabel werkt
+    d.integrity_check().unwrap();
 }

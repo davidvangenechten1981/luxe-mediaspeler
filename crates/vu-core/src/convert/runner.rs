@@ -420,6 +420,62 @@ mod tests {
         }
     }
 
+    fn mean_volume_db(file: &Path) -> f64 {
+        let out = Command::new("ffmpeg")
+            .args(["-hide_banner", "-nostats", "-i"])
+            .arg(file)
+            .args(["-af", "volumedetect", "-f", "null", "-"])
+            .output()
+            .unwrap();
+        let text = String::from_utf8_lossy(&out.stderr).into_owned();
+        text.lines()
+            .find_map(|l| l.split("mean_volume:").nth(1))
+            .and_then(|v| v.trim().trim_end_matches("dB").trim().parse().ok())
+            .unwrap_or_else(|| panic!("geen mean_volume in: {text}"))
+    }
+
+    #[test]
+    fn equalizer_really_changes_the_audio_signal() {
+        if !have_ffmpeg() {
+            return;
+        }
+        let env = Env::new();
+        let dir = tempfile::tempdir().unwrap();
+        // 1 kHz-toon: valt precies op de band van 1000 Hz
+        let input = dir.path().join("toon.wav");
+        let st = Command::new("ffmpeg")
+            .args(["-loglevel", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=1000:sample_rate=48000", "-t", "2"])
+            .arg(&input)
+            .status()
+            .unwrap();
+        assert!(st.success());
+        let render = |name: &str, eq: Option<crate::audio::EqConfig>, normalize: bool| {
+            let mut s = settings("music_hq");
+            s.equalizer = eq;
+            s.normalize_audio = normalize;
+            let out = dir.path().join(name);
+            convert(&env, &input, &out, &s, &AtomicBool::new(false)).0.unwrap();
+            mean_volume_db(&out)
+        };
+        let flat = render("vlak.flac", None, false);
+        let mut boost = crate::audio::EqConfig::default();
+        boost.bands_db[4] = 6.0; // 1000 Hz +6 dB
+        let boosted = render("boost.flac", Some(boost.clone()), false);
+        let mut cut = crate::audio::EqConfig::default();
+        cut.bands_db[4] = -6.0;
+        let lowered = render("cut.flac", Some(cut), false);
+        assert!(boosted - flat > 3.0, "boost: {flat} -> {boosted}");
+        assert!(flat - lowered > 3.0, "cut: {flat} -> {lowered}");
+        // een band ver van 1 kHz (60 Hz) verandert de 1 kHz-toon nauwelijks
+        let mut far = crate::audio::EqConfig::default();
+        far.bands_db[0] = 6.0;
+        let unaffected = render("ver.flac", Some(far), false);
+        assert!((unaffected - flat).abs() < 1.0, "{flat} vs {unaffected}");
+        // normalisatie trekt een zachte toon omhoog richting -16 LUFS
+        let normalized = render("norm.flac", None, true);
+        assert!(normalized > flat + 3.0, "{flat} -> {normalized}");
+    }
+
     #[test]
     fn webm_vp9_opus_transcode_works_when_available() {
         if !have_ffmpeg() {

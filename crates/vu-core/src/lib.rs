@@ -1,7 +1,10 @@
+pub mod audio;
 pub mod convert;
 pub mod db;
 pub mod error;
 pub mod m3u;
+pub mod player;
 pub mod probe;
 pub mod scanner;
+pub mod settings;
 pub mod validate;

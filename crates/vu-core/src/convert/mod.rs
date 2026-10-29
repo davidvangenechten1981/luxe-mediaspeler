@@ -5,6 +5,7 @@ pub mod args;
 pub mod queue;
 pub mod runner;
 
+use crate::audio::EqConfig;
 use crate::error::{CoreError, Result};
 use serde::{Deserialize, Serialize};
 
@@ -125,19 +126,38 @@ pub struct Settings {
     pub audio_channels: Option<u8>,
     pub subtitles: SubtitleMode,
     pub keep_metadata: bool,
+    /// Permanente equalizer-bewerking (vereist opnieuw coderen van de audio).
+    #[serde(default)]
+    pub equalizer: Option<EqConfig>,
+    /// Volumenormalisatie (EBU R128); vereist opnieuw coderen van de audio.
+    #[serde(default)]
+    pub normalize_audio: bool,
 }
 
 impl Settings {
     pub fn mode(&self) -> Mode {
         let video_untouched = self.container.is_audio_only()
             || (self.video == VideoCodec::Copy && self.max_height.is_none() && self.fps.is_none() && self.video_bitrate_kbps.is_none());
-        let audio_untouched = self.audio == AudioCodec::Copy && self.audio_channels.is_none() && self.audio_bitrate_kbps.is_none();
+        let audio_untouched = self.audio == AudioCodec::Copy
+            && self.audio_channels.is_none()
+            && self.audio_bitrate_kbps.is_none()
+            && !self.has_audio_filters();
         if video_untouched && audio_untouched { Mode::Remux } else { Mode::Transcode }
+    }
+
+    pub fn has_audio_filters(&self) -> bool {
+        self.normalize_audio || self.equalizer.as_ref().is_some_and(|e| !e.is_flat())
     }
 
     /// Controleert waarden op onzinnige of gevaarlijke bereiken.
     pub fn validate(&self) -> Result<()> {
         let bad = |m: &str| Err(CoreError::Invalid(m.to_string()));
+        if let Some(eq) = &self.equalizer {
+            eq.validate()?;
+        }
+        if self.has_audio_filters() && self.audio == AudioCodec::Copy {
+            return bad("Equalizer en normalisatie vereisen dat de audio opnieuw wordt gecodeerd");
+        }
         if let Some(h) = self.max_height {
             if !(120..=4320).contains(&h) {
                 return bad("De maximale hoogte moet tussen 120 en 4320 pixels liggen");
@@ -190,6 +210,8 @@ fn video_profile(id: &str, name: &str, desc: &str, container: Container, v: Vide
         audio_channels: None,
         subtitles: SubtitleMode::Keep,
         keep_metadata: true,
+        equalizer: None,
+        normalize_audio: false,
     };
     f(&mut s);
     Profile { id: id.into(), name: name.into(), description: desc.into(), settings: s }
@@ -294,6 +316,26 @@ mod tests {
         s.audio_channels = Some(0);
         assert!(s.validate().is_err());
         assert!(base().validate().is_ok());
+    }
+
+    #[test]
+    fn audio_filters_require_reencoding_and_count_as_transcode() {
+        let mut s = base();
+        s.equalizer = Some(EqConfig { preamp_db: -3.0, bands_db: [3.0; 10] });
+        assert!(s.validate().is_err()); // audio staat op kopiëren
+        s.audio = AudioCodec::Aac;
+        assert!(s.validate().is_ok());
+        assert_eq!(s.mode(), Mode::Transcode);
+        let mut flat = base();
+        flat.equalizer = Some(EqConfig::default()); // vlakke EQ doet niets
+        assert!(flat.validate().is_ok() && flat.mode() == Mode::Remux);
+        let mut n = base();
+        n.normalize_audio = true;
+        assert!(n.validate().is_err());
+        let mut bad = base();
+        bad.audio = AudioCodec::Aac;
+        bad.equalizer = Some(EqConfig { preamp_db: 99.0, bands_db: [0.0; 10] });
+        assert!(bad.validate().is_err());
     }
 
     #[test]

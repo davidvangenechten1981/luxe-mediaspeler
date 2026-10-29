@@ -311,6 +311,20 @@ pub fn build_args(input: &Path, output: &Path, s: &Settings, info: &MediaInfo, c
             if let Some(c) = s.audio_channels {
                 push(&mut args, &["-ac", &c.to_string()]);
             }
+            // Volgorde: equalizer eerst, daarna normalisatie
+            let mut chain: Vec<String> = vec![];
+            if let Some(eq) = &s.equalizer {
+                let f = eq.ffmpeg_filter()?;
+                if !f.is_empty() {
+                    chain.push(f);
+                }
+            }
+            if s.normalize_audio {
+                chain.push(crate::audio::LOUDNORM_FILTER.to_string());
+            }
+            if !chain.is_empty() {
+                push(&mut args, &["-af", &chain.join(",")]);
+            }
         }
     }
 
@@ -505,6 +519,19 @@ mod tests {
         .unwrap();
         assert_eq!(p.args.iter().filter(|a| a.as_str() == evil).count(), 1);
         assert!(has_pair(&p.args, "-i", evil));
+    }
+
+    #[test]
+    fn audio_filters_are_added_in_order_equalizer_then_normalization() {
+        let mut s = profile("high_quality");
+        s.equalizer = Some(crate::audio::EqConfig { preamp_db: -2.0, bands_db: [0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 0.0, 0.0] });
+        s.normalize_audio = true;
+        let p = plan(&s, VIDEO_JSON).unwrap();
+        let af = p.args.windows(2).find(|w| w[0] == "-af").map(|w| w[1].clone()).unwrap();
+        assert!(af.starts_with("volume=-2.00dB,equalizer=f=1000:t=o:w=1:g=4.00,alimiter"), "{af}");
+        assert!(af.ends_with("loudnorm=I=-16:TP=-1.5:LRA=11"), "{af}");
+        // zonder filters geen -af
+        assert!(!plan(&profile("high_quality"), VIDEO_JSON).unwrap().args.contains(&"-af".to_string()));
     }
 
     #[test]
