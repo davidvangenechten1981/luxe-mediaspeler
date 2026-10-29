@@ -1,0 +1,37 @@
+{
+  "ab_a_ms": 1000,
+  "ab_b_ms": null,
+  "location": "/m/a.mp3",
+  "queue_index": 0,
+  "queue_len": 3,
+  "repeat": "all",
+  "shuffle": true,
+  "status": {
+    "audio_delay_ms": 0,
+    "audio_tracks": [
+      {
+        "id": 1,
+        "language": "nld",
+        "name": "Nederlands"
+      }
+    ],
+    "buffering_percent": null,
+    "current_audio": 1,
+    "current_subtitle": null,
+    "error": null,
+    "length_ms": 100000,
+    "muted": false,
+    "rate": 1.0,
+    "state": "playing",
+    "subtitle_delay_ms": -250,
+    "subtitle_tracks": [
+      {
+        "id": 5,
+        "language": null,
+        "name": "Engels"
+      }
+    ],
+    "time_ms": 12000,
+    "volume": 80
+  }
+}

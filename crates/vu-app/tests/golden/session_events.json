@@ -1,0 +1,23 @@
+[
+  {
+    "index": 1,
+    "location": "/m/b.mp3",
+    "type": "track_changed"
+  },
+  {
+    "position_ms": 30000,
+    "type": "resume_applied"
+  },
+  {
+    "to_ms": 5000,
+    "type": "ab_loop_jump"
+  },
+  {
+    "location": "/m/x.mp3",
+    "message": "kapot",
+    "type": "open_failed"
+  },
+  {
+    "type": "queue_ended"
+  }
+]

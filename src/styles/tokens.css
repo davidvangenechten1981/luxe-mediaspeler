@@ -1,0 +1,90 @@
+/* Ontwerptokens. Donker is de standaard; accentkleur en schaal komen uit de instellingen. */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #090a0e;
+  --bg-elev: #0f1117;
+  --surface: #151822;
+  --surface-2: #1c202c;
+  --surface-3: #262b3a;
+  --border: #252a38;
+  --border-strong: #353c4f;
+  --text: #eceef5;
+  --text-dim: #a7aec2;
+  --text-faint: #717a8f;
+  --accent: #6d5dfc;
+  --accent-contrast: #ffffff;
+  --accent-soft: color-mix(in srgb, var(--accent) 18%, transparent);
+  --accent-strong: color-mix(in srgb, var(--accent) 82%, white);
+  --danger: #f0616f;
+  --warning: #e8ab40;
+  --success: #4fc88e;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-2: 0 10px 32px rgba(0, 0, 0, 0.5);
+  --overlay: rgba(4, 5, 8, 0.72);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f2f3f7;
+  --bg-elev: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #eef0f5;
+  --surface-3: #e2e5ed;
+  --border: #dde0e9;
+  --border-strong: #c6cbd8;
+  --text: #14161d;
+  --text-dim: #4a5163;
+  --text-faint: #7b8296;
+  --accent-contrast: #ffffff;
+  --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+  --accent-strong: color-mix(in srgb, var(--accent) 88%, black);
+  --danger: #d03a4a;
+  --warning: #b97a10;
+  --success: #1f9d63;
+  --shadow-1: 0 1px 2px rgba(20, 22, 29, 0.12);
+  --shadow-2: 0 10px 28px rgba(20, 22, 29, 0.18);
+  --overlay: rgba(20, 22, 29, 0.45);
+}
+
+:root {
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --density: 1;
+  --s-1: calc(4px * var(--density));
+  --s-2: calc(8px * var(--density));
+  --s-3: calc(12px * var(--density));
+  --s-4: calc(16px * var(--density));
+  --s-5: calc(24px * var(--density));
+  --s-6: calc(32px * var(--density));
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-md: 0.9375rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.5rem;
+  --fs-2xl: 2rem;
+  --titlebar-h: 38px;
+  --playerbar-h: 84px;
+  --sidebar-w: 236px;
+  --sidebar-w-collapsed: 62px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --t-fast: 120ms;
+  --t-med: 200ms;
+}
+
+:root[data-compact="true"] {
+  --density: 0.78;
+  --titlebar-h: 32px;
+  --playerbar-h: 70px;
+  --sidebar-w: 208px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --t-fast: 0ms;
+    --t-med: 0ms;
+  }
+}

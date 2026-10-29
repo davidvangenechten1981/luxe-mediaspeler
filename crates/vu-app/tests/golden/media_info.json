@@ -1,0 +1,67 @@
+{
+  "bitrate": 107441,
+  "chapters": [
+    {
+      "end_ms": 2000,
+      "start_ms": 0,
+      "title": "Begin"
+    },
+    {
+      "end_ms": 4000,
+      "start_ms": 2000,
+      "title": "Einde"
+    }
+  ],
+  "duration_ms": 4021,
+  "format": "matroska,webm",
+  "size": 54003,
+  "streams": [
+    {
+      "bitrate": null,
+      "channels": null,
+      "codec": "h264",
+      "fps": 25.0,
+      "height": 180,
+      "index": 0,
+      "kind": "video",
+      "language": null,
+      "sample_rate": null,
+      "title": null,
+      "width": 320
+    },
+    {
+      "bitrate": null,
+      "channels": 1,
+      "codec": "aac",
+      "fps": null,
+      "height": null,
+      "index": 1,
+      "kind": "audio",
+      "language": "nld",
+      "sample_rate": 48000,
+      "title": null,
+      "width": null
+    },
+    {
+      "bitrate": null,
+      "channels": null,
+      "codec": "subrip",
+      "fps": null,
+      "height": null,
+      "index": 2,
+      "kind": "subtitle",
+      "language": "eng",
+      "sample_rate": null,
+      "title": null,
+      "width": null
+    }
+  ],
+  "tags": {
+    "album": "Test Album",
+    "artist": "Test Artiest",
+    "genre": "Test",
+    "title": "Testfilm",
+    "track": 3,
+    "year": 2024
+  }
+}
