@@ -142,9 +142,10 @@ fn worker(shared: Arc<Shared>, id: u64, request: JobRequest, cancel: Arc<AtomicB
     })();
 
     let finished = now();
+    // Eerst de uitkomst vastleggen en melden, en pas daarna de plek vrijgeven: zo komt de
+    // melding "klaar" van deze taak altijd vóór de melding "gestart" van de volgende.
     let snap = {
         let mut st = shared.state.lock().unwrap();
-        st.running = st.running.saturating_sub(1);
         let job = st.jobs.iter_mut().find(|j| j.snap.id == id);
         match job {
             None => None,
@@ -179,11 +180,15 @@ fn worker(shared: Arc<Shared>, id: u64, request: JobRequest, cancel: Arc<AtomicB
             }
         }
     };
-    shared.cv.notify_all();
     if let Some(s) = snap {
         shared.log(&s);
         shared.emit(&s);
     }
+    {
+        let mut st = shared.state.lock().unwrap();
+        st.running = st.running.saturating_sub(1);
+    }
+    shared.cv.notify_all();
 }
 
 fn coordinator(shared: Arc<Shared>) {

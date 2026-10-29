@@ -32,7 +32,7 @@ pub mod testutil {
         let dir = tempfile::tempdir().unwrap();
         let sink = Arc::new(RecordingSink::default());
         let dirs = AppDirs::new(dir.path()).unwrap();
-        let state = AppState::init(dirs, Tools::discover(None), sink.clone(), vec!["--aout=dummy".into(), "--vout=dummy".into(), "--no-xlib".into()]).unwrap();
+        let state = AppState::init("0.0.0-test", dirs, Tools::discover(None), sink.clone(), vec!["--aout=dummy".into(), "--vout=dummy".into(), "--no-xlib".into()]).unwrap();
         TestApp { state, sink, dir }
     }
 

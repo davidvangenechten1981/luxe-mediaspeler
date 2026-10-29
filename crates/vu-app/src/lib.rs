@@ -1,5 +1,6 @@
 //! Applicatielaag: alle functionaliteit achter de interface, testbaar zonder Tauri.
 
+pub mod api;
 pub mod events;
 pub mod player_host;
 pub mod services;

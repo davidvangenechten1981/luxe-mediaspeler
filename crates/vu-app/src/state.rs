@@ -43,6 +43,7 @@ pub struct ScanRun {
 }
 
 pub struct AppState {
+    pub version: String,
     pub dirs: AppDirs,
     pub tools: Tools,
     pub sink: Arc<dyn EventSink>,
@@ -102,7 +103,7 @@ pub fn rotate_backups(db: &Database, dir: &Path, max_age_days: i64, keep: usize)
 
 impl AppState {
     /// Start alle onderdelen. Ontbrekende tools geven een duidelijke melding in plaats van een crash.
-    pub fn init(dirs: AppDirs, tools: Tools, sink: Arc<dyn EventSink>, vlc_args: Vec<String>) -> Result<AppState> {
+    pub fn init(version: &str, dirs: AppDirs, tools: Tools, sink: Arc<dyn EventSink>, vlc_args: Vec<String>) -> Result<AppState> {
         let mut warnings = vec![];
         let (db, warn) = open_database_recovering(&dirs.db_path())?;
         warnings.extend(warn);
@@ -138,7 +139,10 @@ impl AppState {
         if let Err(e) = &player {
             warnings.push(format!("De speler is niet beschikbaar: {e}"));
         }
-        Ok(AppState { dirs, tools, sink, db, tasks, player, scan: Mutex::new(None), warnings })
+        let state = AppState { version: version.to_string(), dirs, tools, sink, db, tasks, player, scan: Mutex::new(None), warnings };
+        // een eerder ingestelde equalizer meteen weer toepassen
+        let _ = crate::services::audio::restore_on_startup(&state);
+        Ok(state)
     }
 
     pub fn lock_db(&self) -> Result<std::sync::MutexGuard<'_, Database>> {
