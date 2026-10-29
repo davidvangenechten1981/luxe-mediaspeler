@@ -62,6 +62,15 @@ pub fn set_owner(ui: HWND, owner: isize) {
     }
 }
 
+/// Zet het videovenster direct ACHTER het UI-venster in de z-volgorde.
+/// Alleen een eigenaar-relatie is niet genoeg zolang de vensters al zichtbaar zijn.
+pub fn place_below(video: isize, ui: HWND) {
+    // SAFETY: beide HWND's zijn geldige vensters van dit proces.
+    unsafe {
+        SetWindowPos(video as *mut c_void, ui, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    }
+}
+
 pub fn move_window(hwnd: isize, x: i32, y: i32, w: i32, h: i32) {
     // SAFETY: hwnd is een geldig venster van dit proces.
     unsafe {

@@ -109,6 +109,21 @@ impl Persistence for Mutex<Database> {
     }
 }
 
+impl<T: Persistence + ?Sized> Persistence for std::sync::Arc<T> {
+    fn resume(&self, location: &str) -> Option<ResumePoint> {
+        (**self).resume(location)
+    }
+    fn save_resume(&self, location: &str, position_ms: u64, duration_ms: u64) {
+        (**self).save_resume(location, position_ms, duration_ms)
+    }
+    fn mark_completed(&self, location: &str) {
+        (**self).mark_completed(location)
+    }
+    fn record_play(&self, location: &str, title: Option<&str>) {
+        (**self).record_play(location, title)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SessionEvent {

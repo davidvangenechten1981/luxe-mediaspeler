@@ -3795,6 +3795,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "vu-app"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
+ "vu-core",
+ "vu-vlc",
+]
+
+[[package]]
 name = "vu-core"
 version = "0.1.0"
 dependencies = [

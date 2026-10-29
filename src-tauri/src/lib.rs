@@ -48,6 +48,7 @@ pub fn run() {
                     let size = win.inner_size()?;
                     let v = winvideo::create_video_window(pos.x, pos.y, size.width as i32, size.height as i32)?;
                     winvideo::set_owner(ui_hwnd.0 as _, v);
+                    winvideo::place_below(v, ui_hwnd.0 as _);
                     v
                 };
                 let vlc = vlc::Vlc::load(&dir, &["--quiet", "--no-video-title-show", "--no-osd"])?;

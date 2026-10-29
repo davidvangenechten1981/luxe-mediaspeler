@@ -5,6 +5,10 @@ on:
     branches: [studio]
   workflow_dispatch:
 
+concurrency:
+  group: spike-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   VLC_VERSION: "3.0.21"
 
