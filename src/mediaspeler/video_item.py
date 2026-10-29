@@ -5,12 +5,30 @@ op een echte pc worden gecontroleerd (zie docs/TESTLIJST-LAAG-0.md).
 """
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtGui import QOpenGLContext
-from PySide6.QtOpenGL import QOpenGLFramebufferObject
 from PySide6.QtQml import QmlElement
 from PySide6.QtQuick import QQuickFramebufferObject, QQuickOpenGLUtils
 
 QML_IMPORT_NAME = "Mediaspeler"
 QML_IMPORT_MAJOR_VERSION = 1
+
+
+def _render_frame(ctx, width: int, height: int, fbo: int) -> None:
+    """Tekent één frame in de FBO.
+
+    python-mpv's ctx.render() maakt de parameters tijdelijk aan en geeft ze
+    meteen vrij, terwijl mpv er nog naar wijst. Hier blijven ze leven tot na
+    de aanroep.
+    """
+    import mpv
+
+    params = [
+        mpv.MpvRenderParam("opengl_fbo", {"w": width, "h": height, "fbo": fbo}),
+        mpv.MpvRenderParam("flip_y", False),
+        mpv.MpvRenderParam("invalid"),
+    ]
+    array = (mpv.MpvRenderParam * len(params))(*params)
+    mpv._mpv_render_context_render(ctx.handle, array)
+    del params
 
 
 class _MpvRenderer(QQuickFramebufferObject.Renderer):
@@ -19,7 +37,9 @@ class _MpvRenderer(QQuickFramebufferObject.Renderer):
         self._item = item
 
     def createFramebufferObject(self, size):
-        return QOpenGLFramebufferObject(size)
+        # Qt maakt de FBO zelf: zo blijft het eigendom bij Qt en ruimt
+        # Python hem niet per ongeluk op terwijl Qt hem nog gebruikt
+        return super().createFramebufferObject(size)
 
     @staticmethod
     def _create_context(item: "MpvVideo"):
@@ -29,10 +49,12 @@ class _MpvRenderer(QQuickFramebufferObject.Renderer):
             address = QOpenGLContext.currentContext().getProcAddress(name)
             return int(address) if address else 0
 
+        # De ctypes-callback moet blijven leven: mpv roept hem ook later aan
+        MpvVideo.proc_address_fn = mpv.MpvGlGetProcAddressFn(get_proc_address)
         ctx = mpv.MpvRenderContext(
             MpvVideo.backend,
             "opengl",
-            opengl_init_params={"get_proc_address": mpv.MpvGlGetProcAddressFn(get_proc_address)},
+            opengl_init_params={"get_proc_address": MpvVideo.proc_address_fn},
         )
         ctx.update_cb = item.frameRequested.emit
         return ctx
@@ -43,11 +65,9 @@ class _MpvRenderer(QQuickFramebufferObject.Renderer):
         # Eén render-context per mpv-handle: mpv weigert een tweede
         if MpvVideo.render_context is None:
             MpvVideo.render_context = self._create_context(self._item)
+            self._item.contextReady.emit()
         fbo = self.framebufferObject()
-        MpvVideo.render_context.render(
-            flip_y=False,
-            opengl_fbo={"w": fbo.width(), "h": fbo.height(), "fbo": fbo.handle()},
-        )
+        _render_frame(MpvVideo.render_context, fbo.width(), fbo.height(), fbo.handle())
         # mpv laat de OpenGL-toestand vuil achter; Qt moet die herstellen
         QQuickOpenGLUtils.resetOpenGLState()
 
@@ -57,8 +77,10 @@ class MpvVideo(QQuickFramebufferObject):
     # Door app.py gezet vóór het QML wordt geladen
     backend = None
     render_context = None
+    proc_address_fn = None
 
     frameRequested = Signal()
+    contextReady = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)

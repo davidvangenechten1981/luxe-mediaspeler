@@ -57,3 +57,31 @@ def test_bridge_forwards_end_file_errors():
     bridge.errorOccurred.connect(meldingen.append)
     backend.fire_end_file(reason=b"error", file_error=b"unrecognized file format")
     assert len(meldingen) == 1 and "unrecognized" in meldingen[0]
+
+
+def test_open_waits_until_video_surface_is_ready(tmp_path):
+    film = tmp_path / "film.mkv"
+    film.write_bytes(b"x")
+    backend = FakeMpv()
+    bridge = PlayerBridge(Engine(backend_factory=lambda: backend), wait_for_video=True)
+    bridge.open(str(film))
+    assert backend.played == []
+    bridge.videoReady()
+    assert backend.played == [str(film)]
+
+
+def test_open_after_video_ready_plays_immediately(tmp_path):
+    film = tmp_path / "film.mkv"
+    film.write_bytes(b"x")
+    backend = FakeMpv()
+    bridge = PlayerBridge(Engine(backend_factory=lambda: backend), wait_for_video=True)
+    bridge.videoReady()
+    bridge.open(str(film))
+    assert backend.played == [str(film)]
+
+
+def test_video_ready_without_pending_file_does_nothing():
+    backend = FakeMpv()
+    bridge = PlayerBridge(Engine(backend_factory=lambda: backend), wait_for_video=True)
+    bridge.videoReady()
+    assert backend.played == []

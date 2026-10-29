@@ -58,3 +58,21 @@ def test_main_qml_failure_shows_fatal_dialog_instead_of_crashing(tmp_path, monke
 def test_configure_graphics_selects_opengl():
     app.configure_graphics()
     assert QQuickWindow.graphicsApi() == QSGRendererInterface.GraphicsApi.OpenGL
+
+
+def test_crash_log_is_created_in_user_data_dir(tmp_path):
+    path = app.setup_crash_log()
+    assert path.name == "crash.log"
+    assert path.exists()
+    assert "Mediaspeler" in str(path)
+
+
+def test_uncaught_exception_is_written_to_crash_log():
+    import sys
+
+    path = app.setup_crash_log()
+    try:
+        raise ValueError("testfout")
+    except ValueError:
+        sys.excepthook(*sys.exc_info())
+    assert "testfout" in path.read_text()

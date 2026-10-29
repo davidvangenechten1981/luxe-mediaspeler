@@ -13,6 +13,7 @@ ApplicationWindow {
     MpvVideo {
         objectName: "videoSurface"
         anchors.fill: parent
+        onContextReady: player.videoReady()
     }
 
     // Knop over het beeld: bewijst dat overlays werken

@@ -1,4 +1,5 @@
 import os
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -19,7 +20,14 @@ class HwdecReport:
 def _default_backend() -> Any:
     import mpv  # pas hier importeren: laadt libmpv
 
-    return mpv.MPV(vo="libmpv", hwdec="auto-copy")
+    options: dict[str, Any] = {"vo": "libmpv", "hwdec": "auto-copy"}
+    if os.environ.get("MEDIASPELER_DEBUG"):
+        # mpv-log naar stderr, voor het opsporen van crashes
+        options["log_handler"] = lambda level, prefix, text: print(
+            f"[mpv {level}] {prefix}: {text}", end="", file=sys.stderr
+        )
+        options["loglevel"] = "debug"
+    return mpv.MPV(**options)
 
 
 class Engine:

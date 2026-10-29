@@ -13,6 +13,10 @@ Noteer bij elk punt: gelukt / mislukt / opmerking.
 - [ ] g. Hernoem `libmpv-2.dll` tijdelijk (staat in de map `_internal`): bij starten komt een foutvenster in plaats van een crash.
 - [ ] h. Upload `mediaspeler.exe` naar VirusTotal en noteer het resultaat. Noteer ook of Windows SmartScreen een waarschuwing toont.
 
+## Als het crasht
+
+Stuur het bestand `%LOCALAPPDATA%\Mediaspeler\crash.log` mee (typ dat pad in de adresbalk van Verkenner). Daar staat in wat er misging.
+
 ## Beslispunt
 
 Zijn b, c en d in orde: door naar laag 1.
@@ -20,8 +24,9 @@ Falen ze (overlay werkt niet, beeld blijft zwart of de exe start niet): overstap
 
 ## Wat ik zelf al heb getest (alleen Linux)
 
-- Alle 29 unit-tests (met nep-backend) slagen.
+- Alle 34 unit-tests (met nep-backend) slagen.
 - Selftest met echte libmpv op Linux slaagt, ook in de PyInstaller-bundel.
 - Het QML-scherm laadt, ook vanuit de bundel.
 - Een tekstbestand openen geeft met echte libmpv de melding "unrecognized file format".
+- Op Linux (virtueel scherm, software-OpenGL) draait de echte app: testvideo wordt getekend, knop staat eroverheen, decoder-melding verschijnt.
 - NIET getest: het echte beeld (OpenGL-render via `video_item.py`), hardwaredecodering, Windows en de CI. Het renderen van beeld is het grootste risico.
