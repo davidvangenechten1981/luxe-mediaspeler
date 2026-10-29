@@ -70,7 +70,10 @@ export function MediaBrowser(p: BrowserProps) {
     const q: MediaQuery = { ...p.base, text: debounced || null, sort, descending: desc, limit: limit + 1 };
     if (minHeight) q.min_height = Number(minHeight);
     if (duration === "short") q.max_duration_ms = 15 * 60_000;
-    if (duration === "medium") (q.min_duration_ms = 15 * 60_000), (q.max_duration_ms = 60 * 60_000);
+    if (duration === "medium") {
+      q.min_duration_ms = 15 * 60_000;
+      q.max_duration_ms = 60 * 60_000;
+    }
     if (duration === "long") q.min_duration_ms = 60 * 60_000;
     if (added) q.added_since = Math.floor(Date.now() / 1000) - Number(added) * 86_400;
     return q;
