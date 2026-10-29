@@ -1,4 +1,15 @@
 // SPIKE: bewijst dat interface en LibVLC-video samen op Windows werken
+import { useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+
 export function App() {
-  return <div className="spike-box" data-testid="ui-box">Interface zichtbaar</div>;
+  useEffect(() => {
+    void invoke("ui_ready", { note: `${window.innerWidth}x${window.innerHeight}` });
+  }, []);
+  return (
+    <>
+      <div className="spike-side">Zijbalk</div>
+      <div className="spike-box" data-testid="ui-box">Interface zichtbaar</div>
+    </>
+  );
 }

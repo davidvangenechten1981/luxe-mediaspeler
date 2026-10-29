@@ -26,9 +26,16 @@ fn parse_args() -> SpikeArgs {
     a
 }
 
+/// De pagina meldt zichzelf zodra React draait: bewijst dat de interface echt geladen is.
+#[tauri::command]
+fn ui_ready(note: String) {
+    eprintln!("ui_ready: {note}");
+}
+
 pub fn run() {
     let args = parse_args();
     tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![ui_ready])
         .setup(move |app| {
             #[cfg(windows)]
             if let (Some(media), Some(dir)) = (args.media.clone(), args.vlc_dir.clone()) {
@@ -47,6 +54,12 @@ pub fn run() {
                 eprintln!("libvlc versie: {}", vlc.version());
                 let player = vlc.play_in_window(&media, target as *mut _)?;
                 app.manage(std::sync::Mutex::new(Some((vlc, player))));
+                std::thread::spawn(|| {
+                    std::thread::sleep(std::time::Duration::from_secs(8));
+                    for w in winvideo::describe_process_windows() {
+                        eprintln!("venster: {w}");
+                    }
+                });
             }
             #[cfg(not(windows))]
             let _ = (&args, app);

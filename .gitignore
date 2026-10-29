@@ -6,3 +6,4 @@ vlc/
 *.log
 __pycache__/
 .superpowers/
+/target/

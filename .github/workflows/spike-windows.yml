@@ -24,7 +24,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri
+          workspaces: ". -> target"
 
       - name: VLC ophalen en controleren
         shell: pwsh
@@ -52,12 +52,12 @@ jobs:
       - name: Test D1 - video in het hoofdvenster
         shell: pwsh
         run: |
-          ./scripts/ci/screenshot-check.ps1 -Exe "$PWD\src-tauri\target\release\vlc-ultimate.exe" -Mode d1 -Media "$PWD\assets\test\red.mp4" -VlcDir "$PWD\vlc"
+          ./scripts/ci/screenshot-check.ps1 -Exe "$PWD\target\release\vlc-ultimate.exe" -Mode d1 -Media "$PWD\assets\test\red.mp4" -VlcDir "$PWD\vlc"
 
       - name: Test D2 - eigen videovenster onder transparante interface
         shell: pwsh
         run: |
-          ./scripts/ci/screenshot-check.ps1 -Exe "$PWD\src-tauri\target\release\vlc-ultimate.exe" -Mode d2 -Media "$PWD\assets\test\red.mp4" -VlcDir "$PWD\vlc"
+          ./scripts/ci/screenshot-check.ps1 -Exe "$PWD\target\release\vlc-ultimate.exe" -Mode d2 -Media "$PWD\assets\test\red.mp4" -VlcDir "$PWD\vlc"
 
       - uses: actions/upload-artifact@v4
         if: always()

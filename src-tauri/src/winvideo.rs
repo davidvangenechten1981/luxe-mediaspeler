@@ -5,7 +5,8 @@
 
 use std::ffi::c_void;
 use std::ptr::{null, null_mut};
-use windows_sys::Win32::Foundation::HWND;
+use windows_sys::Win32::Foundation::{BOOL, HWND, LPARAM, RECT};
+use windows_sys::Win32::System::Threading::GetCurrentProcessId;
 use windows_sys::Win32::Graphics::Gdi::{GetStockObject, BLACK_BRUSH};
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
@@ -66,4 +67,39 @@ pub fn move_window(hwnd: isize, x: i32, y: i32, w: i32, h: i32) {
     unsafe {
         SetWindowPos(hwnd as *mut c_void, null_mut(), x, y, w, h, SWP_NOACTIVATE | SWP_NOZORDER);
     }
+}
+
+unsafe extern "system" fn collect_window(hwnd: HWND, lparam: LPARAM) -> BOOL {
+    let out = &mut *(lparam as *mut Vec<String>);
+    let mut pid = 0u32;
+    GetWindowThreadProcessId(hwnd, &mut pid);
+    if pid == GetCurrentProcessId() {
+        let mut class = [0u16; 64];
+        let n = GetClassNameW(hwnd, class.as_mut_ptr(), 64) as usize;
+        let mut r: RECT = std::mem::zeroed();
+        GetWindowRect(hwnd, &mut r);
+        let ex = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
+        out.push(format!(
+            "{} zichtbaar={} rect=({},{},{},{}) exstyle={:#x} layered={}",
+            String::from_utf16_lossy(&class[..n]),
+            IsWindowVisible(hwnd) != 0,
+            r.left,
+            r.top,
+            r.right,
+            r.bottom,
+            ex,
+            ex & WS_EX_LAYERED != 0
+        ));
+    }
+    1
+}
+
+/// Alle bovenste vensters van dit proces, van voor naar achter (z-volgorde).
+pub fn describe_process_windows() -> Vec<String> {
+    let mut v: Vec<String> = vec![];
+    // SAFETY: de callback schrijft alleen in `v`, dat tijdens de aanroep leeft.
+    unsafe {
+        EnumWindows(Some(collect_window), &mut v as *mut _ as LPARAM);
+    }
+    v
 }
