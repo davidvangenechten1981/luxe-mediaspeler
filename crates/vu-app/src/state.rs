@@ -87,7 +87,7 @@ pub fn rotate_backups(db: &Database, dir: &Path, max_age_days: i64, keep: usize)
     existing.sort_by_key(|(_, t)| *t);
     let newest_age_secs = existing.last().and_then(|(_, t)| t.elapsed().ok()).map(|d| d.as_secs());
     let mut created = None;
-    if newest_age_secs.map_or(true, |s| s as i64 >= max_age_days * 86_400) {
+    if newest_age_secs.is_none_or(|s| s as i64 >= max_age_days * 86_400) {
         let target = dir.join(format!("library-{}.db", vu_core::db::now()));
         db.backup_to(&target)?;
         existing.push((target.clone(), std::time::SystemTime::now()));

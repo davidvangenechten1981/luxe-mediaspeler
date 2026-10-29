@@ -226,6 +226,9 @@ pub fn build_args(input: &Path, output: &Path, s: &Settings, info: &MediaInfo, c
     let mut args: Vec<String> = vec![];
     push(&mut args, &["-hide_banner", "-nostdin", "-loglevel", "error", "-progress", "pipe:1", "-nostats", "-i"]);
     args.push(input.to_string_lossy().into_owned());
+    if let Some(sub) = &s.external_subtitle {
+        push(&mut args, &["-i", sub]);
+    }
 
     // Stream-selectie, altijd expliciet op index.
     if let Some(v) = video {
@@ -249,6 +252,18 @@ pub fn build_args(input: &Path, output: &Path, s: &Settings, info: &MediaInfo, c
                 warnings.push(format!("Ondertiteltrack {} ({}) past niet in {} en wordt overgeslagen", st.index, st.codec, s.container.ext().to_uppercase()));
             }
         }
+    }
+
+    // Extern ondertitelbestand als tweede invoer
+    if s.external_subtitle.is_some() {
+        if !matches!(s.container, Container::Mkv | Container::Mp4 | Container::Mov | Container::Webm) {
+            return Err(CoreError::Invalid("Dit containerformaat kan geen ondertitels bevatten".into()));
+        }
+        push(&mut args, &["-map", "1:0"]);
+        if let Some(lang) = &s.external_subtitle_language {
+            push(&mut args, &[&format!("-metadata:s:s:{kept_subs}"), &format!("language={lang}")]);
+        }
+        kept_subs += 1;
     }
 
     // Video
@@ -496,6 +511,40 @@ mod tests {
         // in MKV mogen bitmapondertitels wel mee
         let p = plan(&profile("remux_mkv"), &bitmap).unwrap();
         assert!(has_pair(&p.args, "-map", "0:2") && has_pair(&p.args, "-c:s", "copy"));
+    }
+
+    #[test]
+    fn external_subtitle_becomes_a_second_input_and_is_mapped_after_embedded_ones() {
+        let mut s = profile("remux_mp4");
+        s.external_subtitle = Some("/sub/film.nl.srt".into());
+        s.external_subtitle_language = Some("nld".into());
+        let p = plan(&s, VIDEO_JSON).unwrap();
+        let first_i = p.args.iter().position(|a| a == "-i").unwrap();
+        assert_eq!(p.args[first_i + 3], "/sub/film.nl.srt"); // tweede -i
+        assert!(has_pair(&p.args, "-map", "1:0") && has_pair(&p.args, "-c:s", "mov_text"));
+        assert!(has_pair(&p.args, "-metadata:s:s:1", "language=nld")); // na het ingebedde spoor
+        assert_eq!(p.mode, Mode::Remux); // video en audio blijven ongewijzigd
+        // alleen het externe spoor als de ingebedde worden verwijderd
+        s.subtitles = SubtitleMode::Remove;
+        let p = plan(&s, VIDEO_JSON).unwrap();
+        assert!(!has_pair(&p.args, "-map", "0:2") && has_pair(&p.args, "-map", "1:0"));
+        assert!(has_pair(&p.args, "-metadata:s:s:0", "language=nld"));
+    }
+
+    #[test]
+    fn external_subtitle_is_validated() {
+        let mut s = profile("remux_mkv");
+        for bad in ["/sub/x.txt", "/sub/x", "relatief/x.srt"] {
+            s.external_subtitle = Some(bad.into());
+            assert!(s.validate().is_err(), "{bad}");
+        }
+        s.external_subtitle = Some("/sub/x.SRT".into());
+        assert!(s.validate().is_ok());
+        s.external_subtitle_language = Some("Nederlands".into());
+        assert!(s.validate().is_err());
+        let mut audio = profile("music_hq");
+        audio.external_subtitle = Some("/sub/x.srt".into());
+        assert!(audio.validate().is_err()); // audiocontainer heeft geen ondertitels
     }
 
     #[test]

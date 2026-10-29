@@ -2,7 +2,7 @@
 name = "vu-app"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.80"
+rust-version = "1.85"
 description = "Applicatielaag van VLC Ultimate: diensten en staat, zonder UI-framework"
 
 [dependencies]
@@ -10,6 +10,7 @@ vu-core = { path = "../vu-core" }
 vu-vlc = { path = "../vu-vlc" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+walkdir = "2"
 
 [dev-dependencies]
 tempfile = "3"

@@ -3,7 +3,7 @@ name = "vlc-ultimate"
 version = "0.1.0"
 description = "VLC Ultimate - Ultimate Studio Edition"
 edition = "2021"
-rust-version = "1.80"
+rust-version = "1.85"
 
 [features]
 default = ["core"]

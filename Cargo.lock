@@ -3803,6 +3803,7 @@ dependencies = [
  "tempfile",
  "vu-core",
  "vu-vlc",
+ "walkdir",
 ]
 
 [[package]]

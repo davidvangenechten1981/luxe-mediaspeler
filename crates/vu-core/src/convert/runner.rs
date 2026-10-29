@@ -403,6 +403,34 @@ mod tests {
     }
 
     #[test]
+    fn external_subtitle_is_really_muxed_into_the_output() {
+        if !have_ffmpeg() {
+            return;
+        }
+        let env = Env::new();
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("in.mkv");
+        make_video(&input, 2, "160x90");
+        let srt = dir.path().join("film.nl.srt");
+        std::fs::write(&srt, "1\n00:00:00,000 --> 00:00:01,500\nHallo\n").unwrap();
+        let mut s = settings("remux_mp4");
+        s.external_subtitle = Some(srt.to_string_lossy().into_owned());
+        s.external_subtitle_language = Some("nld".into());
+        let out = dir.path().join("met-ondertitel.mp4");
+        convert(&env, &input, &out, &s, &AtomicBool::new(false)).0.unwrap();
+        let info = probe_file(Path::new("ffprobe"), &out).unwrap();
+        let sub = info.streams.iter().find(|s| s.kind == StreamKind::Subtitle).expect("ondertitelspoor ontbreekt");
+        assert_eq!((sub.codec.as_str(), sub.language.as_deref()), ("mov_text", Some("nld")));
+        assert_eq!(info.first_video().unwrap().codec, "h264"); // video niet opnieuw gecodeerd
+        // ondertitel in mkv blijft srt
+        let mut m = settings("remux_mkv");
+        m.external_subtitle = s.external_subtitle.clone();
+        let out2 = dir.path().join("met-ondertitel.mkv");
+        convert(&env, &input, &out2, &m, &AtomicBool::new(false)).0.unwrap();
+        assert!(probe_file(Path::new("ffprobe"), &out2).unwrap().streams.iter().any(|s| s.kind == StreamKind::Subtitle));
+    }
+
+    #[test]
     fn audio_extraction_to_mp3_and_flac_works() {
         if !have_ffmpeg() {
             return;

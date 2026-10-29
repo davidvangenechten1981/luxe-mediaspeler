@@ -1,9 +1,13 @@
 //! Alle bewerkingen die de interface kan aanroepen. Elke dienst valideert zijn invoer.
 
+pub mod audio;
+pub mod converter;
 pub mod history;
 pub mod library;
 pub mod playlists;
+pub mod player;
 pub mod settings;
+pub mod video;
 
 #[cfg(test)]
 pub mod testutil {

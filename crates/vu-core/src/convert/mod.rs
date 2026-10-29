@@ -132,6 +132,12 @@ pub struct Settings {
     /// Volumenormalisatie (EBU R128); vereist opnieuw coderen van de audio.
     #[serde(default)]
     pub normalize_audio: bool,
+    /// Extern ondertitelbestand (srt/ass/ssa/vtt) dat in de container wordt opgenomen.
+    #[serde(default)]
+    pub external_subtitle: Option<String>,
+    /// Taalcode (bv. "nld") voor het externe ondertitelspoor.
+    #[serde(default)]
+    pub external_subtitle_language: Option<String>,
 }
 
 impl Settings {
@@ -154,6 +160,21 @@ impl Settings {
         let bad = |m: &str| Err(CoreError::Invalid(m.to_string()));
         if let Some(eq) = &self.equalizer {
             eq.validate()?;
+        }
+        if let Some(sub) = &self.external_subtitle {
+            let ext = std::path::Path::new(sub).extension().map(|e| e.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
+            if !["srt", "ass", "ssa", "vtt"].contains(&ext.as_str()) {
+                return bad("Een extern ondertitelbestand moet .srt, .ass, .ssa of .vtt zijn");
+            }
+            crate::validate::validate_path_shape(sub)?;
+            if self.container.is_audio_only() {
+                return bad("Dit containerformaat kan geen ondertitels bevatten");
+            }
+        }
+        if let Some(l) = &self.external_subtitle_language {
+            if !(2..=3).contains(&l.len()) || !l.chars().all(|c| c.is_ascii_lowercase()) {
+                return bad("Gebruik een taalcode van 2 of 3 kleine letters, bv. nld");
+            }
         }
         if self.has_audio_filters() && self.audio == AudioCodec::Copy {
             return bad("Equalizer en normalisatie vereisen dat de audio opnieuw wordt gecodeerd");
@@ -212,6 +233,8 @@ fn video_profile(id: &str, name: &str, desc: &str, container: Container, v: Vide
         keep_metadata: true,
         equalizer: None,
         normalize_audio: false,
+        external_subtitle: None,
+        external_subtitle_language: None,
     };
     f(&mut s);
     Profile { id: id.into(), name: name.into(), description: desc.into(), settings: s }

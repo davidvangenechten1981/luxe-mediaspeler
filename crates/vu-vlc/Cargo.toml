@@ -2,7 +2,7 @@
 name = "vu-vlc"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.80"
+rust-version = "1.85"
 description = "Dynamisch geladen LibVLC-koppeling die de Engine-trait van vu-core implementeert"
 
 [dependencies]

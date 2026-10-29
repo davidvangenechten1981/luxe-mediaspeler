@@ -268,6 +268,39 @@ impl<E: Engine> Session<E> {
         self.queue.append(items)
     }
 
+    /// Haalt een item uit de wachtrij. Verwijder je het spelende item, dan gaat het volgende
+    /// meteen spelen (of de speler stopt als de lijst leeg is).
+    pub fn queue_remove(&mut self, index: usize) -> Result<()> {
+        let was_current = self.queue.current_index() == Some(index);
+        if was_current {
+            self.save_position();
+        }
+        self.queue.remove(index)?;
+        if !was_current {
+            return Ok(());
+        }
+        self.current_location = None;
+        if self.queue.is_empty() {
+            self.ab.clear();
+            return self.engine.stop();
+        }
+        self.queue.jump_to(index.min(self.queue.len() - 1))?;
+        self.open_current(false)
+    }
+
+    pub fn queue_move(&mut self, from: usize, to: usize) -> Result<()> {
+        self.queue.move_item(from, to)
+    }
+
+    /// Leegt de wachtrij en stopt het afspelen.
+    pub fn queue_clear(&mut self) -> Result<()> {
+        self.save_position();
+        self.queue.clear();
+        self.current_location = None;
+        self.ab.clear();
+        self.engine.stop()
+    }
+
     pub fn play_index(&mut self, index: usize) -> Result<()> {
         self.queue.jump_to(index)?;
         self.open_current(true)

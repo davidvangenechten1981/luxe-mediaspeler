@@ -135,7 +135,7 @@ mod tests {
         assert_eq!(add_items(&app.state, id, &["http://192.168.1.5/x".into()]).unwrap().added, 0);
         let mut s = app.state.settings().unwrap();
         s.allow_local_streams = true;
-        vu_core::settings::save(&*app.state.lock_db().unwrap(), &s).unwrap();
+        vu_core::settings::save(&app.state.lock_db().unwrap(), &s).unwrap();
         assert_eq!(add_items(&app.state, id, &["http://192.168.1.5/x".into()]).unwrap().added, 1);
     }
 

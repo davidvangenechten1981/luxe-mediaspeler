@@ -495,3 +495,41 @@ fn next_track_helper_handles_edge_cases() {
     assert_eq!(next_track(&t, Some(1), true), None);
     assert_eq!(next_track(&t, Some(99), false), Some(1)); // onbekend huidig spoor: begin opnieuw
 }
+
+#[test]
+fn removing_the_playing_item_plays_the_next_one_and_removing_others_does_not_interrupt() {
+    let (mut s, engine, _) = setup(&["a", "b", "c"]);
+    let opens_before = engine.with(|i| i.opened.len());
+    s.queue_remove(2).unwrap(); // niet het spelende item
+    assert_eq!(engine.with(|i| i.opened.len()), opens_before);
+    assert_eq!(s.queue().len(), 2);
+    s.queue_remove(0).unwrap(); // het spelende item: b neemt het over
+    assert_eq!(engine.with(|i| i.opened.last().unwrap().0.clone()), "/m/b.mp3");
+    assert_eq!(s.queue().current().unwrap().location, "/m/b.mp3");
+    s.queue_remove(0).unwrap(); // laatste item: speler stopt
+    assert!(s.queue().is_empty());
+    assert_eq!(engine.with(|i| i.status.state), PlaybackState::Stopped);
+    assert!(s.queue_remove(5).is_err());
+}
+
+#[test]
+fn removing_the_last_playing_item_of_a_longer_list_falls_back_to_the_new_last() {
+    let (mut s, engine, _) = setup(&["a", "b", "c"]);
+    s.play_index(2).unwrap();
+    s.queue_remove(2).unwrap();
+    assert_eq!(engine.with(|i| i.opened.last().unwrap().0.clone()), "/m/b.mp3");
+}
+
+#[test]
+fn queue_move_and_clear_work_and_clear_stops_playback() {
+    let (mut s, engine, store) = setup(&["a", "b", "c"]);
+    s.queue_move(0, 2).unwrap();
+    assert_eq!(s.queue().items()[2].location, "/m/a.mp3");
+    assert_eq!(s.queue().current().unwrap().location, "/m/a.mp3"); // het spelende nummer blijft hetzelfde
+    engine.set_state(PlaybackState::Playing, 12_000, 100_000);
+    s.queue_clear().unwrap();
+    assert!(s.queue().is_empty());
+    assert_eq!(engine.with(|i| i.status.state), PlaybackState::Stopped);
+    assert!(store.0.lock().unwrap().saves.iter().any(|x| x.1 == 12_000));
+    assert!(s.queue_move(0, 1).is_err());
+}
