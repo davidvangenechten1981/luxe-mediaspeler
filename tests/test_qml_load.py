@@ -31,3 +31,16 @@ def test_qml_loads_and_has_overlay_button():
     assert root.findChild(QObject, "errorBanner") is not None
     assert root.findChild(QObject, "hwdecLabel") is not None
     del qt_app
+
+
+def test_qml_has_open_button_file_dialog_and_drop_area():
+    qt_app = QGuiApplication.instance() or QGuiApplication([])
+    bridge = PlayerBridge(Engine(backend_factory=lambda: FakeMpv()))
+    qml = QQmlApplicationEngine()
+    qml.rootContext().setContextProperty("player", bridge)
+    qml.load(QUrl.fromLocalFile(str(QML_PATH)))
+    root = qml.rootObjects()[0]
+    assert root.findChild(QObject, "openButton") is not None
+    assert root.findChild(QObject, "fileDialog") is not None
+    assert root.findChild(QObject, "dropArea") is not None
+    del qt_app
