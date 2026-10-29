@@ -1,3 +1,5 @@
+import os
+
 from PySide6.QtCore import QObject, QUrl, Signal, Slot
 
 from mediaspeler.engine import Engine
@@ -14,7 +16,8 @@ class PlayerBridge(QObject):
     @Slot(str)
     def open(self, url: str) -> None:
         qurl = QUrl(url)
-        path = qurl.toLocalFile() if qurl.isLocalFile() else url
+        # Qt geeft op Windows 'C:/map/x'; normpath maakt er 'C:\\map\\x' van
+        path = os.path.normpath(qurl.toLocalFile()) if qurl.isLocalFile() else url
         try:
             self.engine.load(path)
         except MediaError as e:
