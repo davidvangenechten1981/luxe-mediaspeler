@@ -45,3 +45,20 @@ def test_missing_libmpv_raises_engine_unavailable():
 
     with pytest.raises(EngineUnavailableError):
         Engine(backend_factory=factory)
+
+
+def test_end_file_error_event_is_reported():
+    engine, backend = make_engine()
+    meldingen = []
+    engine.on_error = meldingen.append
+    backend.fire_end_file(reason=b"error", file_error=b"unrecognized file format")
+    assert len(meldingen) == 1
+    assert "unrecognized file format" in meldingen[0]
+
+
+def test_end_file_normal_end_is_not_an_error():
+    engine, backend = make_engine()
+    meldingen = []
+    engine.on_error = meldingen.append
+    backend.fire_end_file(reason=b"eof", file_error=b"")
+    assert meldingen == []

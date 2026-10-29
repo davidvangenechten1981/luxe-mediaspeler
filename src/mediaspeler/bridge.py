@@ -12,6 +12,7 @@ class PlayerBridge(QObject):
     def __init__(self, engine: Engine, parent: QObject | None = None):
         super().__init__(parent)
         self.engine = engine
+        self.engine.on_error = self.errorOccurred.emit
 
     @Slot(str)
     def open(self, url: str) -> None:

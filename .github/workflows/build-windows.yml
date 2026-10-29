@@ -28,9 +28,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p libs mpvdl
-          gh release download --repo shinchiro/mpv-winbuild-cmake --pattern "mpv-dev-x86_64-*.7z" --dir mpvdl
-          7z x mpvdl/*.7z -ompvdl/uit -y
-          find mpvdl/uit -iname "libmpv*.dll" -o -iname "mpv-2.dll" | head
+          # '-2*' sluit de v3-variant (alleen nieuwere CPU's) uit
+          gh release download --repo shinchiro/mpv-winbuild-cmake --pattern "mpv-dev-x86_64-2*.7z" --dir mpvdl
+          test "$(ls mpvdl/*.7z | wc -l)" -eq 1
+          ARCHIEF="$(ls mpvdl/*.7z)"
+          7z l "$ARCHIEF" | tail -15
+          7z x "$ARCHIEF" -o"mpvdl/uit" -y
+          find mpvdl/uit -iname "*.dll"
           cp "$(find mpvdl/uit -iname 'libmpv-2.dll' | head -n 1)" libs/libmpv-2.dll
 
       - name: Exe bouwen
@@ -39,8 +43,10 @@ jobs:
       - name: Selftest van de exe
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath dist\mediaspeler\mediaspeler.exe -ArgumentList "--selftest" -Wait -PassThru
+          $p = Start-Process -FilePath dist\mediaspeler\mediaspeler.exe -ArgumentList "--selftest","--selftest-log=selftest.log" -Wait -PassThru
+          if (Test-Path selftest.log) { Get-Content selftest.log }
           if ($p.ExitCode -ne 0) { throw "Selftest faalde met exitcode $($p.ExitCode)" }
+          if (-not (Select-String -Path selftest.log -Pattern "selftest ok" -Quiet)) { throw "selftest.log mist 'selftest ok'" }
 
       - uses: actions/upload-artifact@v4
         with:

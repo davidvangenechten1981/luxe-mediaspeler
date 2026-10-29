@@ -40,9 +40,20 @@ def test_toggle_pause_delegates_to_engine():
     assert backend.pause is True
 
 
-def test_bridge_hwdec_text_mentions_fallback():
+def test_bridge_hwdec_text_mentions_fallback(tmp_path):
     bridge, backend = make_bridge()
+    film = tmp_path / "film.mkv"
+    film.write_bytes(b"x")
+    bridge.open(str(film))
     backend.hwdec_current = "no"
     assert "terugval" in bridge.hwdecInfo()
-    backend.hwdec_current = "d3d11va"
-    assert "d3d11va" in bridge.hwdecInfo()
+    backend.hwdec_current = "d3d11va-copy"
+    assert "d3d11va-copy" in bridge.hwdecInfo()
+
+
+def test_bridge_forwards_end_file_errors():
+    bridge, backend = make_bridge()
+    meldingen = []
+    bridge.errorOccurred.connect(meldingen.append)
+    backend.fire_end_file(reason=b"error", file_error=b"unrecognized file format")
+    assert len(meldingen) == 1 and "unrecognized" in meldingen[0]
