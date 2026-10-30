@@ -4,6 +4,7 @@ import { api } from "./api/client";
 import { system } from "./api/client";
 import { onConvertJob, onOpenFiles, onPlayerEvent, onPlayerState, onScanDone, onScanProgress } from "./api/events";
 import { openLocations } from "./lib/actions";
+import { startAutoSync } from "./lib/autoSync";
 import { useJobs } from "./state/jobs";
 import { useLibrary } from "./state/library";
 import { usePlayer } from "./state/player";
@@ -13,6 +14,7 @@ import { reportError, toast, useUi } from "./state/ui";
 export async function bootstrap(): Promise<() => void> {
   const offs: (() => void)[] = [];
   let timer: ReturnType<typeof setInterval> | undefined;
+  let stopSync: (() => void) | undefined;
 
   offs.push(
     await onPlayerState((v) => {
@@ -80,8 +82,16 @@ export async function bootstrap(): Promise<() => void> {
     }, s.periodic_scan_minutes * 60_000);
   }
 
+  // Kijkstatus delen met een andere pc: meteen en daarna elke 10 minuten, zolang er een map is gekozen.
+  stopSync = startAutoSync({
+    folder: () => useSettings.getState().settings.sync_folder,
+    run: () => api.syncRun(),
+    onFirstError: (e) => toast.warning(`Synchroniseren van de kijkstatus mislukte: ${e instanceof Error ? e.message : String(e)}`),
+  });
+
   return () => {
     offs.forEach((o) => o());
     if (timer) clearInterval(timer);
+    stopSync?.();
   };
 }
