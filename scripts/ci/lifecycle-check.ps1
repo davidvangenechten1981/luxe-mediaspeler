@@ -35,7 +35,13 @@ function Wait-Until([scriptblock] $Cond, [int] $Seconds, [string] $What) {
 }
 function Close-Gracefully($proc, [IntPtr] $hwnd) {
   [void][Win.Api]::PostMessage($hwnd, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)  # WM_CLOSE
-  if (-not $proc.WaitForExit(20000)) { $proc.Kill(); throw "App sloot niet op verzoek af" }
+  # Een zwaar belaste CI-runner kan het afsluiten van LibVLC traag maken; geef ruim de tijd en toon bij falen het logboek.
+  if (-not $proc.WaitForExit(60000)) {
+    $log = Join-Path $env:APPDATA "nl.vlcultimate.studio\logs\app.log"
+    if (Test-Path $log) { Write-Host "--- app.log ---"; Get-Content $log -Tail 30 | Write-Host }
+    $proc.Kill()
+    throw "App sloot niet op verzoek af (60 s)"
+  }
 }
 
 Start-Process $Setup -ArgumentList "/S" -Wait
