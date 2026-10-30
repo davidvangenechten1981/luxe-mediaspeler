@@ -528,14 +528,23 @@ mod tests {
         assert!(has_pair(&p.args, "-map", "0:2") && has_pair(&p.args, "-c:s", "copy"));
     }
 
+    /// Een absoluut pad dat op elk platform als absoluut geldt (Windows heeft een stationsletter nodig).
+    fn abs(p: &str) -> String {
+        if cfg!(windows) {
+            format!("C:{p}")
+        } else {
+            p.to_string()
+        }
+    }
+
     #[test]
     fn external_subtitle_becomes_a_second_input_and_is_mapped_after_embedded_ones() {
         let mut s = profile("remux_mp4");
-        s.external_subtitle = Some("/sub/film.nl.srt".into());
+        s.external_subtitle = Some(abs("/sub/film.nl.srt"));
         s.external_subtitle_language = Some("nld".into());
         let p = plan(&s, VIDEO_JSON).unwrap();
         let first_i = p.args.iter().position(|a| a == "-i").unwrap();
-        assert_eq!(p.args[first_i + 3], "/sub/film.nl.srt"); // tweede -i
+        assert_eq!(p.args[first_i + 3], abs("/sub/film.nl.srt")); // tweede -i
         assert!(has_pair(&p.args, "-map", "1:0") && has_pair(&p.args, "-c:s", "mov_text"));
         assert!(has_pair(&p.args, "-metadata:s:s:1", "language=nld")); // na het ingebedde spoor
         assert_eq!(p.mode, Mode::Remux); // video en audio blijven ongewijzigd
@@ -549,16 +558,16 @@ mod tests {
     #[test]
     fn external_subtitle_is_validated() {
         let mut s = profile("remux_mkv");
-        for bad in ["/sub/x.txt", "/sub/x", "relatief/x.srt"] {
-            s.external_subtitle = Some(bad.into());
+        for bad in [abs("/sub/x.txt"), abs("/sub/x"), "relatief/x.srt".to_string()] {
+            s.external_subtitle = Some(bad.clone());
             assert!(s.validate().is_err(), "{bad}");
         }
-        s.external_subtitle = Some("/sub/x.SRT".into());
+        s.external_subtitle = Some(abs("/sub/x.SRT"));
         assert!(s.validate().is_ok());
         s.external_subtitle_language = Some("Nederlands".into());
         assert!(s.validate().is_err());
         let mut audio = profile("music_hq");
-        audio.external_subtitle = Some("/sub/x.srt".into());
+        audio.external_subtitle = Some(abs("/sub/x.srt"));
         assert!(audio.validate().is_err()); // audiocontainer heeft geen ondertitels
     }
 

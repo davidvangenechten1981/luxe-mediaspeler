@@ -461,6 +461,9 @@ mod tests {
 
     #[test]
     fn invalid_requests_are_rejected_immediately() {
+        if !have_ffmpeg() {
+            return;
+        }
         let dir = tempfile::tempdir().unwrap();
         let (m, _) = manager(1, None);
         let mut r = request(&dir.path().join("bestaat-niet.mkv"), dir.path(), "remux_mkv");

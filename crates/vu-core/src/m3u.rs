@@ -115,8 +115,9 @@ mod tests {
     #[test]
     fn resolves_relative_paths_including_windows_separators() {
         let e = parse("sub\\a.mp3\n../b.mp3\nC:\\Muziek\\c.mp3\n", Path::new("/lijsten"));
-        assert_eq!(e[0].location, "/lijsten/sub/a.mp3");
-        assert_eq!(e[1].location, "/lijsten/../b.mp3"); // pad blijft zichtbaar; validatie gebeurt bij openen
+        // Padvergelijking per onderdeel: op Windows mag de scheiding \ of / zijn
+        assert_eq!(Path::new(&e[0].location), Path::new("/lijsten/sub/a.mp3"));
+        assert_eq!(Path::new(&e[1].location), Path::new("/lijsten/../b.mp3")); // pad blijft zichtbaar; validatie gebeurt bij openen
         assert_eq!(e[2].location, "C:\\Muziek\\c.mp3");
     }
 
@@ -133,7 +134,7 @@ mod tests {
         assert!(!text.contains("Stream\nmet")); // newline in titel kan de structuur niet breken
         let back = parse(&text, Path::new("/muziek"));
         assert_eq!(back.len(), 3);
-        assert_eq!(back[0].location, "/muziek/rock/a.mp3");
+        assert_eq!(Path::new(&back[0].location), Path::new("/muziek/rock/a.mp3"));
         assert_eq!(back[0].duration_s, Some(200));
     }
 

@@ -89,6 +89,8 @@ jobs:
           $env:VU_FFPROBE = (Resolve-Path resources/ffmpeg/ffprobe.exe).Path
           $env:VU_VLC_DIR = (Resolve-Path resources/vlc).Path
           $env:VLC_PLUGIN_PATH = (Resolve-Path resources/vlc/plugins).Path
+          # ffmpeg ook op PATH, anders slaan de tests in vu-core de echte-conversietests over
+          $env:PATH = (Resolve-Path resources/ffmpeg).Path + ";" + $env:PATH
           cargo test --workspace
 
       - name: Installer bouwen (NSIS)
