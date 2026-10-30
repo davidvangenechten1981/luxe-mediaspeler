@@ -98,7 +98,7 @@ mod tests {
         let a = app();
         let Some(ffmpeg) = a.state.require_ffmpeg().ok() else { return };
         let img = a.dir.path().join("src.png");
-        let ok = Command::new(&ffmpeg)
+        let ok = Command::new(ffmpeg)
             .args(["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=red:s=64x64", "-frames:v", "1", "-y"])
             .arg(&img)
             .status()
@@ -108,7 +108,7 @@ mod tests {
         let sub = a.dir.path().join("muziek");
         std::fs::create_dir(&sub).unwrap();
         let song = sub.join("met-hoes.mp3");
-        let ok = Command::new(&ffmpeg)
+        let ok = Command::new(ffmpeg)
             .args(["-hide_banner", "-loglevel", "error", "-i"])
             .arg(fixture("sample.mp3"))
             .arg("-i")
