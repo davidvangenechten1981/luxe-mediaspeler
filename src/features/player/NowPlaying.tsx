@@ -12,6 +12,7 @@ import { useSettings } from "../../state/settings";
 import { reportError, toast, useUi } from "../../state/ui";
 import { SeekBar } from "../shell/SeekBar";
 import { useCurrentInfo } from "../shell/useCurrentInfo";
+import { MediaInfoOverlay } from "./MediaInfoOverlay";
 import { QueueList } from "./QueueList";
 
 type DrawerTab = "queue" | "info" | "chapters" | "bookmarks";
@@ -45,7 +46,8 @@ export function NowPlayingPage() {
   const queue = usePlayer((s) => s.queue);
   const settings = useSettings((s) => s.settings);
   const { fullscreen, theater, queueOpen, setFullscreen, setTheater, setQueueOpen, go } = useUi();
-  const { info } = useCurrentInfo();
+  const { info, loading: infoLoading } = useCurrentInfo();
+  const [infoOpen, setInfoOpen] = useState(false);
   const [hud, setHud] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const hudTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -60,6 +62,19 @@ export function NowPlayingPage() {
     setHud(text);
     clearTimeout(hudTimer.current);
     hudTimer.current = setTimeout(() => setHud(null), 900);
+  }, []);
+
+  // Toets I: mediagegevens tonen/verbergen (niet tijdens het typen of met een dialoog open)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "i" || e.ctrlKey || e.altKey || e.metaKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      if (document.querySelector("[role=dialog]")) return;
+      setInfoOpen((v) => !v);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   const toggleFullscreen = async () => {
@@ -82,6 +97,7 @@ export function NowPlayingPage() {
     { id: "pp", label: st.state === "playing" ? "Pauzeren" : "Afspelen", icon: st.state === "playing" ? "pause" : "play", onSelect: () => void send({ type: "toggle_pause" }) },
     { id: "fs", label: fullscreen ? "Volledig scherm verlaten" : "Volledig scherm", icon: "fullscreen", onSelect: () => void toggleFullscreen() },
     { id: "th", label: theater ? "Theatermodus uit" : "Theatermodus", icon: "theater", onSelect: () => setTheater(!theater) },
+    { id: "inf", label: infoOpen ? "Mediagegevens verbergen" : "Mediagegevens tonen (I)", icon: "info", onSelect: () => setInfoOpen(!infoOpen) },
     { id: "s1", label: "", separator: true },
     { id: "ab", label: "A-B-herhaling", icon: "loop", onSelect: () => void send({ type: "ab_press" }) },
     { id: "fr", label: "Frame vooruit", icon: "frame", onSelect: () => void send({ type: "frame_step" }) },
@@ -126,6 +142,7 @@ export function NowPlayingPage() {
                 {[info?.tags.artist, info?.tags.album, hasVideo && info?.streams.find((s) => s.kind === "video")?.height ? `${info.streams.find((s) => s.kind === "video")!.height}p` : null].filter(Boolean).join(" · ")}
               </div>
             </div>
+            <IconButton icon="info" label="Mediagegevens (I)" pressed={infoOpen} style={{ color: "#fff" }} onClick={() => setInfoOpen(!infoOpen)} />
             <IconButton icon="theater" label="Theatermodus" pressed={theater} style={{ color: "#fff" }} onClick={() => setTheater(!theater)} />
             <IconButton icon="queue" label="Zijpaneel" pressed={queueOpen} style={{ color: "#fff" }} onClick={() => setQueueOpen(!queueOpen)} />
           </div>
@@ -145,6 +162,7 @@ export function NowPlayingPage() {
           )}
         </div>
 
+        {infoOpen && <MediaInfoOverlay info={info} loading={infoLoading} onClose={() => setInfoOpen(false)} />}
         {hud && <div className="video-zone__hud" role="status">{hud}</div>}
         {(st.state === "opening" || st.state === "buffering") && (
           <div className="video-zone__status" role="status">

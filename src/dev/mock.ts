@@ -310,9 +310,9 @@ async function handle(request: Record<string, unknown>): Promise<unknown> {
       return {
         duration_ms: m?.duration_ms ?? 0, format: video ? "matroska,webm" : "flac", size: m?.size ?? 0, bitrate: m?.bitrate ?? null,
         streams: [
-          ...(video ? [{ index: 0, kind: "video", codec: m!.codec!, language: null, title: null, width: m!.width, height: m!.height, fps: 25, channels: null, sample_rate: null, bitrate: m!.bitrate }] : []),
-          { index: 1, kind: "audio", codec: video ? "aac" : "flac", language: "nld", title: null, width: null, height: null, fps: null, channels: 2, sample_rate: 48000, bitrate: 192000 },
-          ...(video ? [{ index: 2, kind: "subtitle", codec: "subrip", language: "nld", title: null, width: null, height: null, fps: null, channels: null, sample_rate: null, bitrate: null }] : []),
+          ...(video ? [{ index: 0, kind: "video", codec: m!.codec!, language: null, title: null, width: m!.width, height: m!.height, fps: 25, channels: null, sample_rate: null, bitrate: m!.bitrate, codec_long: "H.264 / AVC / MPEG-4 AVC", profile: "High", pix_fmt: "yuv420p10le", bit_depth: 10, color_space: "bt2020nc", color_transfer: "smpte2084", channel_layout: null }] : []),
+          { index: 1, kind: "audio", codec: video ? "aac" : "flac", language: "nld", title: null, width: null, height: null, fps: null, channels: 2, sample_rate: 48000, bitrate: 192000, codec_long: "AAC (Advanced Audio Coding)", profile: "LC", pix_fmt: null, bit_depth: null, color_space: null, color_transfer: null, channel_layout: "stereo" },
+          ...(video ? [{ index: 2, kind: "subtitle", codec: "subrip", language: "nld", title: null, width: null, height: null, fps: null, channels: null, sample_rate: null, bitrate: null, codec_long: "SubRip subtitle", profile: null, pix_fmt: null, bit_depth: null, color_space: null, color_transfer: null, channel_layout: null }] : []),
         ],
         chapters: video ? [0, 1, 2, 3].map((i) => ({ start_ms: i * (m!.duration_ms / 4), end_ms: (i + 1) * (m!.duration_ms / 4), title: ["Begin", "Het Midden", "De Wending", "Einde"][i]! })) : [],
         tags: { title: m?.title ?? null, artist: m?.artist ?? null, album: m?.album ?? null, genre: m?.genre ?? null, year: m?.year ?? null, track: m?.track ?? null },

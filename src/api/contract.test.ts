@@ -82,7 +82,8 @@ const settingsShape: Shape<AppSettings> = {
 };
 const streamShape: Shape<StreamInfo> = {
   index: true, kind: true, codec: true, language: true, title: true, width: true, height: true, fps: true, channels: true,
-  sample_rate: true, bitrate: true,
+  sample_rate: true, bitrate: true, codec_long: true, profile: true, pix_fmt: true, bit_depth: true, color_space: true,
+  color_transfer: true, channel_layout: true,
 };
 
 describe("contract met de Rust-backend", () => {

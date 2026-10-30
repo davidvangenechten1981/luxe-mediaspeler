@@ -217,6 +217,14 @@ export interface StreamInfo {
   channels: number | null;
   sample_rate: number | null;
   bitrate: number | null;
+  codec_long: string | null;
+  profile: string | null;
+  pix_fmt: string | null;
+  bit_depth: number | null;
+  color_space: string | null;
+  /** `smpte2084` = HDR10, `arib-std-b67` = HLG */
+  color_transfer: string | null;
+  channel_layout: string | null;
 }
 export interface Chapter {
   start_ms: number;

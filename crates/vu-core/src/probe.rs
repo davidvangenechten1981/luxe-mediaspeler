@@ -22,6 +22,23 @@ pub struct StreamInfo {
     pub channels: Option<u32>,
     pub sample_rate: Option<u32>,
     pub bitrate: Option<u64>,
+    /// Volledige codecnaam ("H.264 / AVC / ..."), voor het infopaneel.
+    #[serde(default)]
+    pub codec_long: Option<String>,
+    #[serde(default)]
+    pub profile: Option<String>,
+    #[serde(default)]
+    pub pix_fmt: Option<String>,
+    /// Bits per kleurkanaal (video) of per sample (audio); `None` als onbekend.
+    #[serde(default)]
+    pub bit_depth: Option<u32>,
+    #[serde(default)]
+    pub color_space: Option<String>,
+    /// Overdrachtskarakteristiek; `smpte2084` betekent HDR10, `arib-std-b67` HLG.
+    #[serde(default)]
+    pub color_transfer: Option<String>,
+    #[serde(default)]
+    pub channel_layout: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -89,6 +106,11 @@ fn num<T: std::str::FromStr>(v: &Value, key: &str) -> Option<T> {
     }
 }
 
+/// Tekstveld uit ffprobe; lege waarden en "unknown" tellen als afwezig.
+fn text(v: &Value, key: &str) -> Option<String> {
+    v.get(key).and_then(Value::as_str).map(str::trim).filter(|t| !t.is_empty() && *t != "unknown").map(str::to_string)
+}
+
 fn parse_fraction(s: &str) -> Option<f64> {
     let (a, b) = s.split_once('/')?;
     let (a, b): (f64, f64) = (a.parse().ok()?, b.parse().ok()?);
@@ -132,6 +154,15 @@ pub fn parse_ffprobe_json(json: &str) -> Result<MediaInfo> {
                         channels: num(s, "channels"),
                         sample_rate: num(s, "sample_rate"),
                         bitrate: num(s, "bit_rate"),
+                        codec_long: text(s, "codec_long_name"),
+                        profile: text(s, "profile"),
+                        pix_fmt: text(s, "pix_fmt"),
+                        bit_depth: num::<u32>(s, "bits_per_raw_sample")
+                            .filter(|b| *b > 0)
+                            .or_else(|| num::<u32>(s, "bits_per_sample").filter(|b| *b > 0)),
+                        color_space: text(s, "color_space"),
+                        color_transfer: text(s, "color_transfer"),
+                        channel_layout: text(s, "channel_layout"),
                     }
                 })
                 .collect()
@@ -214,6 +245,26 @@ mod tests {
         assert_eq!(info.chapters.len(), 2);
         assert_eq!((info.chapters[0].start_ms, info.chapters[0].end_ms), (0, 2000));
         assert_eq!(info.chapters[1].title.as_deref(), Some("Einde"));
+    }
+
+    #[test]
+    fn reads_technical_details_for_the_info_panel() {
+        let info = parse_ffprobe_json(VIDEO_JSON).unwrap();
+        let v = info.first_video().unwrap();
+        assert_eq!(v.codec_long.as_deref(), Some("H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10"));
+        assert_eq!((v.profile.as_deref(), v.pix_fmt.as_deref(), v.bit_depth), (Some("High"), Some("yuv420p"), Some(8)));
+        let a = &info.streams[1];
+        assert_eq!((a.channel_layout.as_deref(), a.profile.as_deref()), (Some("mono"), Some("LC")));
+        assert_eq!(a.bit_depth, None); // bits_per_sample 0 = onbekend, geen "0 bit"
+                                       // HDR-gegevens ontbreken in dit voorbeeld: dan blijven ze leeg
+        assert_eq!((v.color_space.as_deref(), v.color_transfer.as_deref()), (None, None));
+    }
+
+    #[test]
+    fn hdr_transfer_characteristics_are_passed_through() {
+        let json = r#"{"format":{"duration":"1.0","format_name":"matroska"},"streams":[{"index":0,"codec_type":"video","codec_name":"hevc","width":3840,"height":2160,"pix_fmt":"yuv420p10le","bits_per_raw_sample":"10","color_space":"bt2020nc","color_transfer":"smpte2084"}]}"#;
+        let v = parse_ffprobe_json(json).unwrap().streams[0].clone();
+        assert_eq!((v.bit_depth, v.color_space.as_deref(), v.color_transfer.as_deref()), (Some(10), Some("bt2020nc"), Some("smpte2084")));
     }
 
     #[test]

@@ -11,6 +11,7 @@ Legenda: **Getest** = geautomatiseerde test met echte ffmpeg/libvlc (Linux) en/o
 | Playlists (maken, bewerken, M3U import/export), favorieten, geschiedenis | Getest |
 | Equalizer (10 banden, presets, A/B), normalisatie | Filterketen getest; hoorbaar resultaat: nog niet beoordeeld |
 | Converter (remux/transcode, voortgang, annuleren, batch, ondertitels inbranden/muxen, schijfruimte, tijdelijk bestand) | Getest met echte ffmpeg |
+| Mediagegevens tijdens afspelen (toets I): codec, profiel, resolutie, fps, bitrate, kleurdiepte, HDR, kanalen, samplefrequentie | Parser en paneel getest; echte bestanden: door jou te proberen |
 | Video Studio (rotatie, aanpassingen, snijden, screenshot) | Gedeeltelijk getest |
 | Instellingen, sneltoetsen met conflictdetectie, import/export | Getest |
 | Back-up/herstel van de database, beschadigde database wordt opzijgezet | Getest |
