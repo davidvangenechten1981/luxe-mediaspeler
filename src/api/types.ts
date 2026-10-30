@@ -465,3 +465,12 @@ export interface SyncReport {
   exported: number;
   imported: number;
 }
+
+export interface TagFields {
+  title: string | null;
+  artist: string | null;
+  album: string | null;
+  genre: string | null;
+  year: number | null;
+  track: number | null;
+}

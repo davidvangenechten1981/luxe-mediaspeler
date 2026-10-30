@@ -8,8 +8,9 @@ import { useLibrary } from "../../state/library";
 import { usePlayer } from "../../state/player";
 import { reportError, toast } from "../../state/ui";
 import { useAsync } from "../../lib/useAsync";
+import { TagEditDialog } from "./TagEditDialog";
 
-export type Overlay = { kind: "playlist"; items: Media[] } | { kind: "info"; item: Media } | { kind: "remove"; items: Media[] } | null;
+export type Overlay = { kind: "playlist"; items: Media[] } | { kind: "info"; item: Media } | { kind: "remove"; items: Media[] } | { kind: "tags"; item: Media } | null;
 
 /** Gedeelde acties op mediabestanden: afspelen, wachtrij, favoriet, playlist, info, verwijderen. */
 export function useMediaActions() {
@@ -36,6 +37,7 @@ export function useMediaActions() {
       { id: "sep1", label: "", separator: true },
       ...(one ? [{ id: "fav", label: one.favorite ? "Verwijderen uit favorieten" : "Toevoegen aan favorieten", icon: (one.favorite ? "heart" : "heart") as "heart", onSelect: () => void toggleFavorite(one) }] : []),
       ...(one ? [{ id: "info", label: "Mediainformatie", icon: "info" as const, onSelect: () => setOverlay({ kind: "info", item: one }) }] : []),
+      ...(one && one.kind === "audio" && !one.missing ? [{ id: "tags", label: "Tags bewerken…", icon: "tune" as const, onSelect: () => setOverlay({ kind: "tags", item: one }) }] : []),
       ...(one ? [{ id: "reveal", label: "Tonen in Verkenner", icon: "folder" as const, onSelect: () => void revealInFolder(one.path).catch(reportError) }] : []),
       { id: "sep2", label: "", separator: true },
       { id: "remove", label: "Verwijderen uit bibliotheek", icon: "trash", onSelect: () => setOverlay({ kind: "remove", items }) },
@@ -49,6 +51,10 @@ export function MediaOverlays({ overlay, onClose }: { overlay: Overlay; onClose:
   const bump = useLibrary((s) => s.bump);
   if (!overlay) return null;
   if (overlay.kind === "info") return <MediaInfoDialog media={overlay.item} onClose={onClose} />;
+  if (overlay.kind === "tags") {
+    const folder = overlay.item.path.replace(/[\\/][^\\/]*$/, "");
+    return <TagEditDialog media={overlay.item} onClose={onClose} onSaved={() => void api.libraryScanStart(folder).catch(() => undefined).then(bump)} />;
+  }
   if (overlay.kind === "playlist") return <PlaylistPicker items={overlay.items} onClose={onClose} />;
   return (
     <ConfirmDialog

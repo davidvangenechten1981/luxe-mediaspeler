@@ -11,6 +11,7 @@ pub mod playlists;
 pub mod series;
 pub mod settings;
 pub mod sync;
+pub mod tags;
 pub mod video;
 
 #[cfg(test)]

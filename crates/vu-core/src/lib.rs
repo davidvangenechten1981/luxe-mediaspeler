@@ -12,4 +12,5 @@ pub mod scanner;
 pub mod series;
 pub mod settings;
 pub mod sync;
+pub mod tags;
 pub mod validate;

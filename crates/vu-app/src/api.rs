@@ -4,7 +4,7 @@
 //! verkeerd getypeerde velden, en elke dienst valideert zijn invoer opnieuw.
 //! Er bestaat geen manier om een shellcommando of een vrij FFmpeg-argument mee te geven.
 
-use crate::services::{audio, converter, cover, history, library, lyrics, player, playlists, series, settings, sync, video};
+use crate::services::{audio, converter, cover, history, library, lyrics, player, playlists, series, settings, sync, tags, video};
 use crate::state::AppState;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -36,6 +36,8 @@ pub enum Request {
     LibraryScanRunning,
     SeriesList,
     SyncRun,
+    TagsGet { path: String },
+    TagsSet { path: String, update: vu_core::tags::TagUpdate },
     CollectionsList,
     CollectionCreate { name: String, query: MediaQuery },
     CollectionDelete { id: i64 },
@@ -167,6 +169,8 @@ pub fn handle(st: &AppState, req: Request) -> Result<Value> {
         CollectionDelete { id } => st.lock_db()?.delete_collection(id).and_then(|_| unit()),
         CollectionRun { id } => json_of(st.lock_db()?.run_collection(id)?),
 
+        TagsGet { path } => json_of(tags::get(st, &path)?),
+        TagsSet { path, update } => tags::set(st, &path, &update).and_then(|_| unit()),
         SyncRun => json_of(sync::run(st)?),
         SeriesList => json_of(series::list(st)?),
         PlaylistList => json_of(playlists::list(st)?),
