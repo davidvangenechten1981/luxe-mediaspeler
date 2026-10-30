@@ -13,7 +13,15 @@ $err = Join-Path $OutDir "$Mode.stderr.txt"
 # Vaste gegevensmap, zodat de CI de logbestanden van de app kan afdrukken
 $env:VU_DATA_DIR = Join-Path (Resolve-Path $OutDir).Path "appdata"
 $p = Start-Process -FilePath $Exe -ArgumentList "`"$Media`"" -PassThru -RedirectStandardError $err
-Start-Sleep -Seconds 18
+# Wacht tot de speler echt speelt (max. 90 s): de eerste start op een kale machine is traag door virusscan
+$appLog = Join-Path $env:VU_DATA_DIR "logs\app.log"
+$deadline = (Get-Date).AddSeconds(90)
+while ((Get-Date) -lt $deadline) {
+  Start-Sleep -Seconds 2
+  if ((Test-Path $appLog) -and (Select-String -Path $appLog -Pattern "speler: playing" -Quiet)) { break }
+}
+"Gewacht tot afspelen: $([int]((Get-Date) - $deadline.AddSeconds(-90)).TotalSeconds) s"
+Start-Sleep -Seconds 4
 $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
 # BitBlt met CAPTUREBLT: neemt ook "layered" (transparante) vensters mee
 Add-Type -Namespace Win -Name Cap -MemberDefinition @"

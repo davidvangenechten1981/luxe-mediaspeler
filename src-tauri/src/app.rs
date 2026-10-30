@@ -67,7 +67,7 @@ pub fn run() {
             logging::init(&dirs.logs);
             let tools = Tools::discover(app.path().resource_dir().ok().as_deref());
             logging::info(&format!("tools: ffmpeg={:?} ffprobe={:?} vlc={:?}", tools.ffmpeg, tools.ffprobe, tools.vlc_dir));
-            let sink = Arc::new(TauriSink(app.handle().clone()));
+            let sink = Arc::new(TauriSink::new(app.handle().clone()));
             let state = Arc::new(AppState::init(env!("CARGO_PKG_VERSION"), dirs, tools, sink, vec![])?);
             for w in &state.warnings {
                 logging::info(&format!("waarschuwing: {w}"));
