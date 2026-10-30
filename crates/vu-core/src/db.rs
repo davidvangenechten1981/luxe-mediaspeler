@@ -685,6 +685,13 @@ impl Database {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    /// Alle bestanden die als "gezien" zijn gemarkeerd.
+    pub fn completed_locations(&self) -> Result<std::collections::HashSet<String>> {
+        let mut st = self.conn.prepare("SELECT location FROM resume WHERE completed = 1")?;
+        let rows = st.query_map([], |r| r.get::<_, String>(0))?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
     pub fn mark_completed(&self, location: &str, completed: bool) -> Result<()> {
         self.conn.execute(
             "INSERT INTO resume (location, position_ms, duration_ms, completed, updated_at) VALUES (?1,0,0,?2,?3)

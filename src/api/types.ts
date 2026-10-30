@@ -409,3 +409,17 @@ export interface LaunchRequest {
   files: string[];
   enqueue: boolean;
 }
+
+export interface SeriesEpisode {
+  media: Media;
+  season: number;
+  episode: number;
+  watched: boolean;
+}
+
+export interface Series {
+  show: string;
+  episodes: SeriesEpisode[];
+  watched: number;
+  next_media_id: number | null;
+}

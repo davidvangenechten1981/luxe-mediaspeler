@@ -4,7 +4,7 @@
 //! verkeerd getypeerde velden, en elke dienst valideert zijn invoer opnieuw.
 //! Er bestaat geen manier om een shellcommando of een vrij FFmpeg-argument mee te geven.
 
-use crate::services::{audio, converter, history, library, player, playlists, settings, video};
+use crate::services::{audio, converter, history, library, player, playlists, series, settings, video};
 use crate::state::AppState;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -32,6 +32,7 @@ pub enum Request {
     LibraryScanStart { folder: Option<String> },
     LibraryScanCancel,
     LibraryScanRunning,
+    SeriesList,
     CollectionsList,
     CollectionCreate { name: String, query: MediaQuery },
     CollectionDelete { id: i64 },
@@ -158,6 +159,7 @@ pub fn handle(st: &AppState, req: Request) -> Result<Value> {
         CollectionDelete { id } => st.lock_db()?.delete_collection(id).and_then(|_| unit()),
         CollectionRun { id } => json_of(st.lock_db()?.run_collection(id)?),
 
+        SeriesList => json_of(series::list(st)?),
         PlaylistList => json_of(playlists::list(st)?),
         PlaylistCreate { name } => json_of(playlists::create(st, &name)?),
         PlaylistRename { id, name } => playlists::rename(st, id, &name).and_then(|_| unit()),

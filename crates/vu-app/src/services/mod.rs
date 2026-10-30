@@ -6,6 +6,7 @@ pub mod history;
 pub mod library;
 pub mod player;
 pub mod playlists;
+pub mod series;
 pub mod settings;
 pub mod video;
 
