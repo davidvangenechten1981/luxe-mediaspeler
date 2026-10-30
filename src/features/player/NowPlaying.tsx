@@ -12,6 +12,7 @@ import { useSettings } from "../../state/settings";
 import { reportError, toast, useUi } from "../../state/ui";
 import { SeekBar } from "../shell/SeekBar";
 import { useCurrentInfo } from "../shell/useCurrentInfo";
+import { SkipButton } from "./SkipButton";
 import { LyricsPanel } from "./LyricsPanel";
 import { MediaInfoOverlay } from "./MediaInfoOverlay";
 import { NextUpCard } from "./NextUpCard";
@@ -102,6 +103,11 @@ export function NowPlayingPage() {
     { id: "th", label: theater ? "Theatermodus uit" : "Theatermodus", icon: "theater", onSelect: () => setTheater(!theater) },
     { id: "inf", label: infoOpen ? "Mediagegevens verbergen" : "Mediagegevens tonen (I)", icon: "info", onSelect: () => setInfoOpen(!infoOpen) },
     { id: "s1", label: "", separator: true },
+    { id: "mi1", label: "Hier begint de intro", icon: "bookmark", onSelect: () => void send({ type: "mark_intro_start" }).then(() => flash("Begin intro gemarkeerd")) },
+    { id: "mi2", label: "Hier eindigt de intro", icon: "bookmark", onSelect: () => void send({ type: "mark_intro_end" }).then(() => flash("Einde intro gemarkeerd"), reportError) },
+    { id: "mc", label: "Hier begint de aftiteling", icon: "bookmark", onSelect: () => void send({ type: "mark_credits_start" }).then(() => flash("Begin aftiteling gemarkeerd")) },
+    { id: "mx", label: "Markeringen wissen", icon: "trash", onSelect: () => void send({ type: "clear_skip_marks" }).then(() => flash("Markeringen gewist")) },
+    { id: "s2", label: "", separator: true },
     { id: "ab", label: "A-B-herhaling", icon: "loop", onSelect: () => void send({ type: "ab_press" }) },
     { id: "fr", label: "Frame vooruit", icon: "frame", onSelect: () => void send({ type: "frame_step" }) },
     { id: "ss", label: "Screenshot maken", icon: "camera", onSelect: () => void screenshot() },
@@ -165,6 +171,7 @@ export function NowPlayingPage() {
           )}
         </div>
 
+        <SkipButton offer={view.skip_offer} onSkip={() => void send({ type: "skip_now" })} />
         {nextUp && <NextUpCard title={title} remainingMs={view.next_in_ms!} onNow={() => void send({ type: "next" })} onCancel={() => void send({ type: "cancel_autoplay" })} />}
         {infoOpen && <MediaInfoOverlay info={info} loading={infoLoading} onClose={() => setInfoOpen(false)} />}
         {!hasVideo && <LyricsPanel location={view.location} positionMs={st.time_ms} />}

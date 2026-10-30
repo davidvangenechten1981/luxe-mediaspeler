@@ -109,6 +109,7 @@ fn golden_json_shapes_are_stable() {
             ab_b_ms: None,
             location: Some("/m/a.mp3".into()),
             next_in_ms: Some(7_500),
+            skip_offer: Some(vu_core::player::session::SkipOffer::Intro),
         })
         .unwrap(),
     );

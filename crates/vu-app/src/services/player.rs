@@ -38,6 +38,11 @@ pub enum PlayerCommand {
     MoveInQueue { from: usize, to: usize },
     ClearQueue,
     CancelAutoplay,
+    SkipNow,
+    MarkIntroStart,
+    MarkIntroEnd,
+    MarkCreditsStart,
+    ClearSkipMarks,
 }
 
 pub fn command(st: &AppState, cmd: PlayerCommand) -> Result<SessionView> {
@@ -70,6 +75,11 @@ pub fn command(st: &AppState, cmd: PlayerCommand) -> Result<SessionView> {
             PlayerCommand::AbPress => s.ab_press()?,
             PlayerCommand::FrameStep => s.frame_step()?,
             PlayerCommand::CancelAutoplay => s.cancel_autoplay()?,
+            PlayerCommand::SkipNow => s.skip_now()?,
+            PlayerCommand::MarkIntroStart => s.mark_intro_start()?,
+            PlayerCommand::MarkIntroEnd => s.mark_intro_end()?,
+            PlayerCommand::MarkCreditsStart => s.mark_credits_start()?,
+            PlayerCommand::ClearSkipMarks => s.clear_skip_marks(),
             PlayerCommand::Repeat { mode } => s.set_repeat(mode),
             PlayerCommand::Shuffle { on } => s.set_shuffle(on),
             PlayerCommand::JumpTo { index } => s.play_index(index)?,

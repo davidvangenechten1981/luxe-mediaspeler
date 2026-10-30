@@ -123,6 +123,7 @@ export interface SessionView {
   ab_b_ms: number | null;
   /** Resterende milliseconden van de aftelling voor het volgende item (na een video), anders null. */
   next_in_ms: number | null;
+  skip_offer: "intro" | "credits" | null;
   location: string | null;
 }
 export interface QueueItem {
@@ -163,7 +164,12 @@ export type PlayerCommand =
   | { type: "remove_from_queue"; index: number }
   | { type: "move_in_queue"; from: number; to: number }
   | { type: "clear_queue" }
-  | { type: "cancel_autoplay" };
+  | { type: "cancel_autoplay" }
+  | { type: "skip_now" }
+  | { type: "mark_intro_start" }
+  | { type: "mark_intro_end" }
+  | { type: "mark_credits_start" }
+  | { type: "clear_skip_marks" };
 
 export interface PlayResult {
   queued: number;

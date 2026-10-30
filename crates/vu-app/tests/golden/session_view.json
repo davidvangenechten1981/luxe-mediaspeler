@@ -7,6 +7,7 @@
   "queue_len": 3,
   "repeat": "all",
   "shuffle": true,
+  "skip_offer": "intro",
   "status": {
     "audio_delay_ms": 0,
     "audio_tracks": [

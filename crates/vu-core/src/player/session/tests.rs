@@ -131,6 +131,7 @@ struct StoreInner {
     completed: Vec<String>,
     plays: Vec<String>,
     prefs: HashMap<String, TrackPref>,
+    marks: HashMap<String, SkipMarks>,
 }
 
 #[derive(Clone, Default)]
@@ -154,6 +155,12 @@ impl Persistence for FakeStore {
     }
     fn save_track_pref(&self, l: &str, p: &TrackPref) {
         self.0.lock().unwrap().prefs.insert(l.into(), p.clone());
+    }
+    fn skip_marks(&self, l: &str) -> Option<SkipMarks> {
+        self.0.lock().unwrap().marks.get(l).cloned()
+    }
+    fn save_skip_marks(&self, l: &str, m: &SkipMarks) {
+        self.0.lock().unwrap().marks.insert(l.into(), m.clone());
     }
 }
 
@@ -716,4 +723,73 @@ fn choices_are_matched_by_language_or_by_name_when_the_language_is_unknown() {
     });
     s.tick(1_000);
     assert_eq!(engine.with(|i| i.status.current_audio), Some(8), "gevonden op naam, ook al zijn de nummers anders");
+}
+
+fn at(engine: &FakeEngine, ms: u64) {
+    engine.with(|i| {
+        i.status.state = PlaybackState::Playing;
+        i.status.time_ms = ms;
+        i.status.length_ms = 100_000;
+    });
+}
+
+#[test]
+fn intro_marks_are_saved_per_file_and_offer_a_skip_only_inside_the_intro() {
+    let (mut s, engine, store) = setup(&["a"]);
+    at(&engine, 5_000);
+    s.mark_intro_start().unwrap();
+    at(&engine, 35_000);
+    s.mark_intro_end().unwrap();
+    assert_eq!(
+        store.0.lock().unwrap().marks["/m/a.mp3"],
+        SkipMarks { intro_start_ms: Some(5_000), intro_end_ms: Some(35_000), credits_start_ms: None }
+    );
+    at(&engine, 10_000);
+    assert_eq!(s.view().skip_offer, Some(SkipOffer::Intro));
+    at(&engine, 4_000);
+    assert_eq!(s.view().skip_offer, None);
+    at(&engine, 35_000);
+    assert_eq!(s.view().skip_offer, None);
+}
+
+#[test]
+fn skipping_the_intro_seeks_to_its_end_and_remembered_marks_return_for_the_same_file() {
+    let (mut s, engine, _) = setup(&["a"]);
+    at(&engine, 0);
+    s.mark_intro_start().unwrap();
+    at(&engine, 40_000);
+    s.mark_intro_end().unwrap();
+    s.play_items(items(&["a"]), 0).unwrap();
+    at(&engine, 12_000);
+    s.skip_now().unwrap();
+    assert!(
+        engine.with(|i| i.calls.iter().any(|c| c.contains("40000"))),
+        "gesprongen naar het einde van de intro: {:?}",
+        engine.with(|i| i.calls.clone())
+    );
+}
+
+#[test]
+fn credits_offer_next_and_skipping_goes_to_the_next_item() {
+    let (mut s, engine, _) = setup(&["a", "b"]);
+    at(&engine, 90_000);
+    s.mark_credits_start().unwrap();
+    at(&engine, 80_000);
+    assert_eq!(s.view().skip_offer, None);
+    at(&engine, 91_000);
+    assert_eq!(s.view().skip_offer, Some(SkipOffer::Credits));
+    s.skip_now().unwrap();
+    assert_eq!(s.view().location.as_deref(), Some("/m/b.mp3"));
+}
+
+#[test]
+fn an_end_before_the_start_is_refused_and_marks_can_be_cleared() {
+    let (mut s, engine, store) = setup(&["a"]);
+    at(&engine, 30_000);
+    s.mark_intro_start().unwrap();
+    at(&engine, 10_000);
+    assert!(s.mark_intro_end().is_err());
+    s.clear_skip_marks();
+    assert_eq!(store.0.lock().unwrap().marks["/m/a.mp3"], SkipMarks::default());
+    assert_eq!(s.view().skip_offer, None);
 }

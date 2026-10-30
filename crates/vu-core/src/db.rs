@@ -111,6 +111,15 @@ const MIGRATIONS: &[&str] = &[
         updated_at INTEGER NOT NULL
     );
     "#,
+    // 4: handmatig gemarkeerde intro en aftiteling per bestand
+    r#"
+    CREATE TABLE skip_marks (
+        location TEXT PRIMARY KEY,
+        intro_start_ms INTEGER,
+        intro_end_ms INTEGER,
+        credits_start_ms INTEGER
+    );
+    "#,
 ];
 
 pub fn now() -> i64 {
@@ -312,6 +321,14 @@ pub struct LibraryStats {
     pub audio_count: u64,
     pub total_duration_ms: u64,
     pub total_plays: u64,
+}
+
+/// Handmatig gemarkeerde intro en aftiteling van één bestand.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct SkipMarks {
+    pub intro_start_ms: Option<u64>,
+    pub intro_end_ms: Option<u64>,
+    pub credits_start_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -858,6 +875,27 @@ impl Database {
                 })
             },
         )?)
+    }
+
+    // ---------- intro en aftiteling overslaan ----------
+
+    pub fn get_skip_marks(&self, location: &str) -> Result<Option<SkipMarks>> {
+        Ok(self
+            .conn
+            .query_row("SELECT intro_start_ms, intro_end_ms, credits_start_ms FROM skip_marks WHERE location = ?1", [location], |r| {
+                let g = |i: usize| r.get::<_, Option<i64>>(i).map(|v| v.map(|x| x as u64));
+                Ok(SkipMarks { intro_start_ms: g(0)?, intro_end_ms: g(1)?, credits_start_ms: g(2)? })
+            })
+            .optional()?)
+    }
+
+    pub fn save_skip_marks(&self, location: &str, m: &SkipMarks) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO skip_marks (location, intro_start_ms, intro_end_ms, credits_start_ms) VALUES (?1,?2,?3,?4)
+             ON CONFLICT(location) DO UPDATE SET intro_start_ms=?2, intro_end_ms=?3, credits_start_ms=?4",
+            params![location, m.intro_start_ms.map(|v| v as i64), m.intro_end_ms.map(|v| v as i64), m.credits_start_ms.map(|v| v as i64)],
+        )?;
+        Ok(())
     }
 
     // ---------- spoorkeuze per bestand ----------

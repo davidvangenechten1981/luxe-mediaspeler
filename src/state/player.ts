@@ -27,6 +27,7 @@ export const IDLE_VIEW: SessionView = {
   ab_a_ms: null,
   ab_b_ms: null,
   next_in_ms: null,
+  skip_offer: null,
   location: null,
 };
 

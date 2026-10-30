@@ -5,7 +5,7 @@
 use super::ab::AbLoop;
 use super::queue::{Queue, QueueItem, RepeatMode};
 use crate::audio::EqConfig;
-use crate::db::{Database, ResumePoint, TrackPref};
+use crate::db::{Database, ResumePoint, SkipMarks, TrackPref};
 use crate::error::{CoreError, Result};
 use serde::Serialize;
 use std::path::Path;
@@ -91,6 +91,10 @@ pub trait Persistence: Send + Sync {
         None
     }
     fn save_track_pref(&self, _location: &str, _pref: &TrackPref) {}
+    fn skip_marks(&self, _location: &str) -> Option<SkipMarks> {
+        None
+    }
+    fn save_skip_marks(&self, _location: &str, _marks: &SkipMarks) {}
 }
 
 impl Persistence for Mutex<Database> {
@@ -120,6 +124,14 @@ impl Persistence for Mutex<Database> {
             let _ = db.save_track_pref(location, pref);
         }
     }
+    fn skip_marks(&self, location: &str) -> Option<SkipMarks> {
+        self.lock().ok()?.get_skip_marks(location).ok().flatten()
+    }
+    fn save_skip_marks(&self, location: &str, marks: &SkipMarks) {
+        if let Ok(db) = self.lock() {
+            let _ = db.save_skip_marks(location, marks);
+        }
+    }
 }
 
 impl<T: Persistence + ?Sized> Persistence for std::sync::Arc<T> {
@@ -141,6 +153,12 @@ impl<T: Persistence + ?Sized> Persistence for std::sync::Arc<T> {
     fn save_track_pref(&self, location: &str, pref: &TrackPref) {
         (**self).save_track_pref(location, pref)
     }
+    fn skip_marks(&self, location: &str) -> Option<SkipMarks> {
+        (**self).skip_marks(location)
+    }
+    fn save_skip_marks(&self, location: &str, marks: &SkipMarks) {
+        (**self).save_skip_marks(location, marks)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -151,6 +169,14 @@ pub enum SessionEvent {
     AbLoopJump { to_ms: u64 },
     OpenFailed { location: String, message: String },
     QueueEnded,
+}
+
+/// Wat de knop "overslaan" nu kan doen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SkipOffer {
+    Intro,
+    Credits,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -165,6 +191,8 @@ pub struct SessionView {
     pub location: Option<String>,
     /// Resterende milliseconden van de aftelling voor het volgende item (alleen na een video).
     pub next_in_ms: Option<u64>,
+    /// Staat de speler in een gemarkeerde intro of aftiteling? Dan kan die worden overgeslagen.
+    pub skip_offer: Option<SkipOffer>,
 }
 
 pub const RATE_STEPS: [f32; 9] = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0];
@@ -228,6 +256,7 @@ pub struct Session<E: Engine> {
     /// Tijdstip (klok van `tick`) waarop het wachtende volgende item start.
     pending_next: Option<u64>,
     next_in_ms: Option<u64>,
+    skip_marks: SkipMarks,
     /// Wachttijd na een afgelopen video voordat het volgende item start; 0 = direct.
     pub next_delay_ms: u64,
     pub resume_enabled: bool,
@@ -256,6 +285,7 @@ impl<E: Engine> Session<E> {
             fail_streak: 0,
             pending_next: None,
             next_in_ms: None,
+            skip_marks: SkipMarks::default(),
             next_delay_ms: 0,
             resume_enabled: true,
             network_caching_ms: None,
@@ -288,6 +318,63 @@ impl<E: Engine> Session<E> {
             ab_b_ms: self.ab.b(),
             location: self.current_location.clone(),
             next_in_ms: self.next_in_ms,
+            skip_offer: self.skip_offer(),
+        }
+    }
+
+    fn skip_offer(&self) -> Option<SkipOffer> {
+        self.current_location.as_ref()?;
+        let t = self.engine.status().time_ms;
+        let m = &self.skip_marks;
+        if let (Some(a), Some(b)) = (m.intro_start_ms, m.intro_end_ms) {
+            if (a..b).contains(&t) {
+                return Some(SkipOffer::Intro);
+            }
+        }
+        m.credits_start_ms.filter(|c| t >= *c).map(|_| SkipOffer::Credits)
+    }
+
+    fn save_marks(&mut self) {
+        if let Some(loc) = &self.current_location {
+            self.store.save_skip_marks(loc, &self.skip_marks);
+        }
+    }
+
+    /// Markeert de huidige positie als begin van de intro.
+    pub fn mark_intro_start(&mut self) -> Result<()> {
+        self.skip_marks.intro_start_ms = Some(self.engine.status().time_ms);
+        self.save_marks();
+        Ok(())
+    }
+
+    /// Markeert de huidige positie als einde van de intro; moet na het begin liggen.
+    pub fn mark_intro_end(&mut self) -> Result<()> {
+        let t = self.engine.status().time_ms;
+        if self.skip_marks.intro_start_ms.is_some_and(|a| t <= a) {
+            return Err(CoreError::Invalid("Het einde van de intro moet na het begin liggen".into()));
+        }
+        self.skip_marks.intro_end_ms = Some(t);
+        self.save_marks();
+        Ok(())
+    }
+
+    pub fn mark_credits_start(&mut self) -> Result<()> {
+        self.skip_marks.credits_start_ms = Some(self.engine.status().time_ms);
+        self.save_marks();
+        Ok(())
+    }
+
+    pub fn clear_skip_marks(&mut self) {
+        self.skip_marks = SkipMarks::default();
+        self.save_marks();
+    }
+
+    /// Slaat de intro over (spring naar het einde) of gaat bij de aftiteling naar het volgende item.
+    pub fn skip_now(&mut self) -> Result<()> {
+        match self.skip_offer() {
+            Some(SkipOffer::Intro) => self.seek_to(self.skip_marks.intro_end_ms.unwrap_or(0)),
+            Some(SkipOffer::Credits) => self.skip_next(),
+            None => Ok(()),
         }
     }
 
@@ -367,6 +454,7 @@ impl<E: Engine> Session<E> {
         self.prefs_pending = true;
         self.last_resume_save_ms = 0;
         self.current_location = Some(item.location.clone());
+        self.skip_marks = self.store.skip_marks(&item.location).unwrap_or_default();
         self.events.push(SessionEvent::TrackChanged { index: self.queue.current_index().unwrap_or(0), location: item.location });
         if let Some(p) = resume_ms {
             self.events.push(SessionEvent::ResumeApplied { position_ms: p });

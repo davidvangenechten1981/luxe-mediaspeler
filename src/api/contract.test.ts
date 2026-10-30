@@ -61,7 +61,7 @@ const statusShape: Shape<EngineStatus> = {
   subtitle_tracks: true, current_subtitle: true, audio_delay_ms: true, subtitle_delay_ms: true, buffering_percent: true, error: true,
 };
 const viewShape: Shape<SessionView> = {
-  status: true, queue_index: true, queue_len: true, repeat: true, shuffle: true, ab_a_ms: true, ab_b_ms: true, location: true, next_in_ms: true,
+  status: true, queue_index: true, queue_len: true, repeat: true, shuffle: true, ab_a_ms: true, ab_b_ms: true, location: true, skip_offer: true, next_in_ms: true,
 };
 const convertShape: Shape<ConvertSettings> = {
   container: true, video: true, audio: true, max_height: true, fps: true, video_bitrate_kbps: true, audio_bitrate_kbps: true,
