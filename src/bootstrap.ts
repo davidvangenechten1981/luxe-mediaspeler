@@ -7,6 +7,7 @@ import { openLocations } from "./lib/actions";
 import { startAutoSync } from "./lib/autoSync";
 import { useJobs } from "./state/jobs";
 import { useLibrary } from "./state/library";
+import { useLock } from "./state/lock";
 import { usePlayer } from "./state/player";
 import { useSettings } from "./state/settings";
 import { reportError, toast, useUi } from "./state/ui";
@@ -50,6 +51,7 @@ export async function bootstrap(): Promise<() => void> {
   );
 
   await useSettings.getState().load();
+  await useLock.getState().init();
   void useJobs.getState().loadStatic();
   void useJobs.getState().refresh();
   void usePlayer.getState().refreshQueue();

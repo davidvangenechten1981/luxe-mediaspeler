@@ -15,6 +15,9 @@ library_scan_start
 library_scan_cancel
 library_scan_running
 series_list
+pin_status
+pin_verify
+pin_set
 sync_run
 system_action
 tags_get

@@ -5,6 +5,8 @@ import { bootstrap } from "./bootstrap";
 import { Button, Modal, Spinner, TextInput, Toasts } from "./components/ui";
 import { ConverterPage } from "./features/converter/ConverterPage";
 import { ContinuePage } from "./features/pages/ContinuePage";
+import { PinGate } from "./features/shell/PinGate";
+import { isBlocked, useLock } from "./state/lock";
 import { SmartListsPage } from "./features/pages/SmartListsPage";
 import { SeriesPage } from "./features/pages/SeriesPage";
 import { HistoryPage } from "./features/pages/HistoryPage";
@@ -75,6 +77,7 @@ export function App() {
   const { page, fullscreen, theater, mini, dialog, setDialog, crashText, setCrashText } = useUi();
   const loaded = useSettings((s) => s.loaded);
   const view = usePlayer((s) => s.view);
+  const lock = useLock();
   const normalSize = useRef<{ w: number; h: number } | null>(null);
 
   useEffect(() => {
@@ -221,7 +224,7 @@ export function App() {
       <div className="app__body">
         <Sidebar />
         <main className={`content ${isVideoPage ? "is-video" : ""}`} id="main" tabIndex={-1}>
-          <Page />
+          {isBlocked(page, lock) ? <PinGate /> : <Page />}
         </main>
       </div>
       <PlayerBar />

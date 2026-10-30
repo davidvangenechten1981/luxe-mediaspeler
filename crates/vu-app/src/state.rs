@@ -53,6 +53,8 @@ pub struct AppState {
     pub scan: Mutex<Option<ScanRun>>,
     /// Meldingen van het opstarten (bijv. een beschadigde database die is hersteld).
     pub warnings: Vec<String>,
+    /// Telt foute PIN-pogingen voor de bibliotheekvergrendeling.
+    pub pin_guard: Mutex<crate::services::pin::PinGuard>,
 }
 
 /// Opent de database. Een beschadigd bestand wordt hernoemd (niet verwijderd) en er komt een nieuwe.
@@ -149,7 +151,18 @@ impl AppState {
         if let Err(e) = &player {
             warnings.push(format!("De speler is niet beschikbaar: {e}"));
         }
-        let state = AppState { version: version.to_string(), dirs, tools, sink, db, tasks, player, scan: Mutex::new(None), warnings };
+        let state = AppState {
+            version: version.to_string(),
+            dirs,
+            tools,
+            sink,
+            db,
+            tasks,
+            player,
+            scan: Mutex::new(None),
+            warnings,
+            pin_guard: Mutex::new(Default::default()),
+        };
         // een eerder ingestelde equalizer meteen weer toepassen
         let _ = crate::services::audio::restore_on_startup(&state);
         Ok(state)

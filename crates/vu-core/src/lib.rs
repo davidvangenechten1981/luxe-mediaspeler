@@ -6,6 +6,7 @@ pub mod error;
 pub mod lyrics;
 pub mod m3u;
 pub mod nfo;
+pub mod pin;
 pub mod player;
 pub mod probe;
 pub mod proc;
