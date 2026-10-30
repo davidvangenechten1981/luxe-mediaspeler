@@ -568,7 +568,7 @@ fn a_saved_smart_list_with_the_new_rules_roundtrips_and_runs() {
     let q = MediaQuery { unplayed_only: true, added_within_days: Some(30), kind: Some(MediaKind::Video), ..Default::default() };
     let id = d.create_collection("Nog te kijken", &q).unwrap();
     let list = d.list_collections().unwrap();
-    assert_eq!(list[0].2.unplayed_only, true);
+    assert!(list[0].2.unplayed_only);
     assert_eq!(list[0].2.added_within_days, Some(30));
     assert_eq!(d.run_collection(id).unwrap().len(), 1);
     d.record_play("/m/a.mkv", None).unwrap();
