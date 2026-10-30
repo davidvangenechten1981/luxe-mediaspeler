@@ -123,13 +123,13 @@ function Equalizer() {
         <div className="eq" role="group" aria-label="Equalizerbanden">
           <div className="eq__band">
             <div className="eq__gain">{sign(cfg.preamp_db)}</div>
-            <Slider vertical label="Voorversterking" value={cfg.preamp_db} min={-20} max={20} step={0.5} bigStep={3} format={(v) => `${sign(v)} dB`} onChange={(v) => apply({ ...cfg, preamp_db: v })} />
+            <Slider vertical label="Voorversterking" value={cfg.preamp_db} min={-20} max={20} origin={0} step={0.5} bigStep={3} format={(v) => `${sign(v)} dB`} onChange={(v) => apply({ ...cfg, preamp_db: v })} />
             <span>Pre</span>
           </div>
           {BAND_FREQS_HZ.map((f, i) => (
             <div key={f} className="eq__band">
               <div className="eq__gain">{sign(cfg.bands_db[i]!)}</div>
-              <Slider vertical label={`${f} Hz`} value={cfg.bands_db[i]!} min={-20} max={20} step={0.5} bigStep={3} format={(v) => `${sign(v)} dB`} onChange={(v) => setBand(i, v)} />
+              <Slider vertical label={`${f} Hz`} value={cfg.bands_db[i]!} min={-20} max={20} origin={0} step={0.5} bigStep={3} format={(v) => `${sign(v)} dB`} onChange={(v) => setBand(i, v)} />
               <span>{hz(f)}</span>
             </div>
           ))}

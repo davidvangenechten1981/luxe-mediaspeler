@@ -37,6 +37,7 @@ pub enum PlayerCommand {
     RemoveFromQueue { index: usize },
     MoveInQueue { from: usize, to: usize },
     ClearQueue,
+    CancelAutoplay,
 }
 
 pub fn command(st: &AppState, cmd: PlayerCommand) -> Result<SessionView> {
@@ -68,6 +69,7 @@ pub fn command(st: &AppState, cmd: PlayerCommand) -> Result<SessionView> {
             PlayerCommand::SubtitleDelay { ms } => s.engine_mut().set_subtitle_delay_ms(ms.clamp(-60_000, 60_000))?,
             PlayerCommand::AbPress => s.ab_press()?,
             PlayerCommand::FrameStep => s.frame_step()?,
+            PlayerCommand::CancelAutoplay => s.cancel_autoplay()?,
             PlayerCommand::Repeat { mode } => s.set_repeat(mode),
             PlayerCommand::Shuffle { on } => s.set_shuffle(on),
             PlayerCommand::JumpTo { index } => s.play_index(index)?,

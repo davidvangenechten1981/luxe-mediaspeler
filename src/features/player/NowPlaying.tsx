@@ -13,6 +13,7 @@ import { reportError, toast, useUi } from "../../state/ui";
 import { SeekBar } from "../shell/SeekBar";
 import { useCurrentInfo } from "../shell/useCurrentInfo";
 import { MediaInfoOverlay } from "./MediaInfoOverlay";
+import { NextUpCard } from "./NextUpCard";
 import { QueueList } from "./QueueList";
 
 type DrawerTab = "queue" | "info" | "chapters" | "bookmarks";
@@ -55,6 +56,7 @@ export function NowPlayingPage() {
   const idle = useIdle(2600, immersive);
   const st = view.status;
   const active = view.location !== null && st.state !== "idle";
+  const nextUp = view.next_in_ms !== null;
   const hasVideo = !!info?.streams.some((s) => s.kind === "video" && !["mjpeg", "png"].includes(s.codec));
   const title = (view.queue_index !== null ? queue[view.queue_index]?.title : null) || (view.location ? stem(view.location) : "");
 
@@ -162,6 +164,7 @@ export function NowPlayingPage() {
           )}
         </div>
 
+        {nextUp && <NextUpCard title={title} remainingMs={view.next_in_ms!} onNow={() => void send({ type: "next" })} onCancel={() => void send({ type: "cancel_autoplay" })} />}
         {infoOpen && <MediaInfoOverlay info={info} loading={infoLoading} onClose={() => setInfoOpen(false)} />}
         {hud && <div className="video-zone__hud" role="status">{hud}</div>}
         {(st.state === "opening" || st.state === "buffering") && (

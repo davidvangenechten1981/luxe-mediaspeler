@@ -12,6 +12,9 @@ Legenda: **Getest** = geautomatiseerde test met echte ffmpeg/libvlc (Linux) en/o
 | Equalizer (10 banden, presets, A/B), normalisatie | Filterketen getest; hoorbaar resultaat: nog niet beoordeeld |
 | Converter (remux/transcode, voortgang, annuleren, batch, ondertitels inbranden/muxen, schijfruimte, tijdelijk bestand) | Getest met echte ffmpeg |
 | Mediagegevens tijdens afspelen (toets I): codec, profiel, resolutie, fps, bitrate, kleurdiepte, HDR, kanalen, samplefrequentie | Parser en paneel getest; echte bestanden: door jou te proberen |
+| Ondertitelgrootte en -kleur (instelling → LibVLC-opties, geldt na herstart) | Vertaling getest, echte LibVLC accepteert de opties (test); uiterlijk in beeld: door jou te proberen |
+| Volgende aflevering: aftelling na een video (standaard 10 s, instelbaar, Nu afspelen/Annuleren) | Sessielogica getest met neppe engine; in de echte app: door jou te proberen |
+| Licenties en broncode in de app (Instellingen → Over) | Getest |
 | Video Studio (rotatie, aanpassingen, snijden, screenshot) | Gedeeltelijk getest |
 | Instellingen, sneltoetsen met conflictdetectie, import/export | Getest |
 | Back-up/herstel van de database, beschadigde database wordt opzijgezet | Getest |
@@ -30,5 +33,4 @@ Legenda: **Getest** = geautomatiseerde test met echte ffmpeg/libvlc (Linux) en/o
 - Beeld-in-beeld, uitlezen van de gebruikte hardwaredecoder, HDR/GPU-verificatie
 - Hoesafbeelding uit audiobestanden halen
 - Transcriptiemodule
-- Ondertitelgrootte/-kleur: instelling bestaat; wordt nog niet aan LibVLC doorgegeven
 - Code-signing van de installer

@@ -536,3 +536,96 @@ fn queue_move_and_clear_work_and_clear_stops_playback() {
     assert!(store.0.lock().unwrap().saves.iter().any(|x| x.1 == 12_000));
     assert!(s.queue_move(0, 1).is_err());
 }
+
+// ---------- automatisch volgende aflevering met aftelling ----------
+
+fn video_setup(names: &[&str], delay_ms: u64) -> (Session<FakeEngine>, FakeEngine, FakeStore) {
+    let engine = FakeEngine::default();
+    let store = FakeStore::default();
+    let mut s = Session::new(engine.clone(), Box::new(store.clone()), 1);
+    s.next_delay_ms = delay_ms;
+    let list = names.iter().map(|n| QueueItem { location: format!("/m/{n}.mkv"), title: None }).collect();
+    s.play_items(list, 0).unwrap();
+    s.take_events();
+    (s, engine, store)
+}
+
+fn opened(engine: &FakeEngine) -> Vec<String> {
+    engine.with(|i| i.opened.iter().map(|o| o.0.clone()).collect())
+}
+
+#[test]
+fn a_finished_video_counts_down_before_the_next_item_starts() {
+    let (mut s, engine, store) = video_setup(&["a", "b"], 10_000);
+    engine.set_state(PlaybackState::Ended, 100_000, 100_000);
+    s.tick(1_000);
+    assert_eq!(opened(&engine), ["/m/a.mkv"], "tijdens het aftellen start er niets");
+    assert_eq!(store.0.lock().unwrap().completed, ["/m/a.mkv"]);
+    let v = s.view();
+    assert_eq!((v.next_in_ms, v.queue_index, v.location.as_deref()), (Some(10_000), Some(1), Some("/m/b.mkv")));
+    s.tick(6_000);
+    assert_eq!(s.view().next_in_ms, Some(5_000));
+    assert_eq!(opened(&engine), ["/m/a.mkv"]);
+    s.tick(11_000);
+    assert_eq!(opened(&engine), ["/m/a.mkv", "/m/b.mkv"]);
+    assert_eq!(s.view().next_in_ms, None);
+    assert!(matches!(s.take_events().last(), Some(SessionEvent::TrackChanged { index: 1, .. })));
+}
+
+#[test]
+fn music_and_a_zero_delay_advance_immediately() {
+    let (mut s, engine, _) = setup(&["a", "b"]); // muziek
+    s.next_delay_ms = 10_000;
+    engine.set_state(PlaybackState::Ended, 100_000, 100_000);
+    s.tick(0);
+    assert_eq!(opened(&engine), ["/m/a.mp3", "/m/b.mp3"]);
+
+    let (mut s, engine, _) = video_setup(&["a", "b"], 0);
+    engine.set_state(PlaybackState::Ended, 100_000, 100_000);
+    s.tick(0);
+    assert_eq!(opened(&engine), ["/m/a.mkv", "/m/b.mkv"]);
+}
+
+#[test]
+fn next_during_the_countdown_plays_the_waiting_item_now_and_does_not_skip_one() {
+    let (mut s, engine, _) = video_setup(&["a", "b", "c"], 10_000);
+    engine.set_state(PlaybackState::Ended, 100_000, 100_000);
+    s.tick(1_000);
+    s.skip_next().unwrap();
+    assert_eq!(opened(&engine), ["/m/a.mkv", "/m/b.mkv"]);
+    assert_eq!(s.view().next_in_ms, None);
+    assert_eq!(s.view().queue_index, Some(1));
+}
+
+#[test]
+fn cancelling_keeps_the_next_item_ready_but_starts_nothing() {
+    let (mut s, engine, _) = video_setup(&["a", "b"], 10_000);
+    engine.set_state(PlaybackState::Ended, 100_000, 100_000);
+    s.tick(1_000);
+    s.cancel_autoplay().unwrap();
+    assert_eq!(s.view().next_in_ms, None);
+    s.tick(60_000);
+    assert_eq!(opened(&engine), ["/m/a.mkv"], "na annuleren start er niets uit zichzelf");
+    s.toggle_pause().unwrap(); // afspelen-knop start het klaargezette item
+    assert_eq!(opened(&engine), ["/m/a.mkv", "/m/b.mkv"]);
+}
+
+#[test]
+fn the_last_video_ends_the_queue_without_a_countdown() {
+    let (mut s, engine, _) = video_setup(&["a"], 10_000);
+    engine.set_state(PlaybackState::Ended, 100_000, 100_000);
+    s.tick(0);
+    assert_eq!(s.take_events(), vec![SessionEvent::QueueEnded]);
+    assert_eq!(s.view().next_in_ms, None);
+}
+
+#[test]
+fn stopping_cancels_a_running_countdown() {
+    let (mut s, engine, _) = video_setup(&["a", "b"], 10_000);
+    engine.set_state(PlaybackState::Ended, 100_000, 100_000);
+    s.tick(1_000);
+    s.stop().unwrap();
+    assert_eq!(s.view().next_in_ms, None);
+    s.tick(60_000);
+    assert_eq!(opened(&engine), ["/m/a.mkv"]);
+}

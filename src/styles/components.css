@@ -616,3 +616,16 @@
 .toast--warning {
   border-left-color: var(--warning);
 }
+
+.license-text {
+  margin: var(--s-3) 0 0;
+  padding: var(--s-3);
+  max-height: 320px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  background: var(--bg-sunken, var(--surface-2));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}

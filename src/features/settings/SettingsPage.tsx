@@ -8,6 +8,7 @@ import { DB_FILTER, JSON_FILTER, pickFiles, pickFolder, pickSavePath, revealInFo
 import { formatBytes, mediaTitle } from "../../lib/format";
 import { useAsync } from "../../lib/useAsync";
 import { useLibrary } from "../../state/library";
+import { LicensesDialog } from "./LicensesDialog";
 import { useSettings } from "../../state/settings";
 import { reportError, toast } from "../../state/ui";
 
@@ -79,6 +80,11 @@ function Play() {
     <div className="card">
       <Row title="Korte sprong" hint="Pijltoetsen links/rechts en de knoppen in de afspeelbalk."><NumberField id="seek-short" label="Korte sprong" value={s.seek_short_s} min={1} max={300} suffix="seconden" onCommit={(n) => void update({ seek_short_s: n })} /></Row>
       <Row title="Lange sprong" hint="Shift + pijltoetsen."><NumberField id="seek-long" label="Lange sprong" value={s.seek_long_s} min={1} max={3600} suffix="seconden" onCommit={(n) => void update({ seek_long_s: n })} /></Row>
+      <Row title="Volgende aflevering" hint="Na een afgelopen video start het volgende item van de wachtrij vanzelf, na een korte aftelling waarin je kunt annuleren. Muziek gaat altijd direct door.">
+        <Select aria-label="Wachttijd volgende aflevering" value={String(s.autoplay_next_delay_s)} onChange={(e) => void update({ autoplay_next_delay_s: Number(e.target.value) })}>
+          {[...new Set([0, 5, 10, 15, 30, s.autoplay_next_delay_s])].sort((x, y) => x - y).map((n) => <option key={n} value={n}>{n === 0 ? "Direct" : `Na ${n} seconden`}</option>)}
+        </Select>
+      </Row>
       <Row title="Hervatten waar je gebleven was" hint="Onthoudt per bestand de positie en gaat daar verder."><Switch label={(s.resume_playback) ? "Aan" : "Uit"} checked={s.resume_playback} onChange={(v) => void update({ resume_playback: v })} /></Row>
       <Row title="Hardwaredecodering" hint="Werkt na het openen van het volgende bestand. Bij problemen met beeld kies je Uit.">
         <Select aria-label="Hardwaredecodering" value={s.hw_decoding} onChange={(e) => void update({ hw_decoding: e.target.value as HwDecoding })}><option value="auto">Automatisch</option><option value="d3d11va">Direct3D 11 (D3D11VA)</option><option value="dxva2">DXVA2</option><option value="none">Uit (software)</option></Select>
@@ -244,6 +250,7 @@ function Backup() {
 
 function About() {
   const d = useAsync<Diagnostics>(() => api.diagnostics(), []);
+  const [licenses, setLicenses] = useState(false);
   if (d.loading && !d.data) return <Spinner />;
   const x = d.data;
   return (
@@ -270,7 +277,8 @@ function About() {
           <li>Tauri (MIT/Apache-2.0), React (MIT), SQLite (publiek domein)</li>
           <li>Codecpatenten (zoals HEVC en AAC) rusten op de codecs zelf; dit is geen juridisch advies.</li>
         </ul>
-        <p className="field__hint" style={{ marginTop: "var(--s-2)" }}>De volledige lijst staat in licenses/THIRD-PARTY.md in de broncode.</p>
+        <div className="row" style={{ marginTop: "var(--s-3)" }}><Button icon="info" onClick={() => setLicenses(true)}>Licenties en broncode…</Button></div>
+        {licenses && <LicensesDialog ffmpegVersion={d.data?.ffmpeg} onClose={() => setLicenses(false)} />}
       </div>
     </div>
   );

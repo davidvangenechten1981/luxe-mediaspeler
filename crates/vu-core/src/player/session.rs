@@ -144,6 +144,8 @@ pub struct SessionView {
     pub ab_a_ms: Option<u64>,
     pub ab_b_ms: Option<u64>,
     pub location: Option<String>,
+    /// Resterende milliseconden van de aftelling voor het volgende item (alleen na een video).
+    pub next_in_ms: Option<u64>,
 }
 
 pub const RATE_STEPS: [f32; 9] = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0];
@@ -199,6 +201,11 @@ pub struct Session<E: Engine> {
     last_resume_save_ms: u64,
     prefs_pending: bool,
     fail_streak: usize,
+    /// Tijdstip (klok van `tick`) waarop het wachtende volgende item start.
+    pending_next: Option<u64>,
+    next_in_ms: Option<u64>,
+    /// Wachttijd na een afgelopen video voordat het volgende item start; 0 = direct.
+    pub next_delay_ms: u64,
     pub resume_enabled: bool,
     pub network_caching_ms: Option<u32>,
     pub preferred_audio: Vec<String>,
@@ -222,6 +229,9 @@ impl<E: Engine> Session<E> {
             last_resume_save_ms: 0,
             prefs_pending: false,
             fail_streak: 0,
+            pending_next: None,
+            next_in_ms: None,
+            next_delay_ms: 0,
             resume_enabled: true,
             network_caching_ms: None,
             preferred_audio: vec![],
@@ -252,6 +262,7 @@ impl<E: Engine> Session<E> {
             ab_a_ms: self.ab.a(),
             ab_b_ms: self.ab.b(),
             location: self.current_location.clone(),
+            next_in_ms: self.next_in_ms,
         }
     }
 
@@ -307,6 +318,7 @@ impl<E: Engine> Session<E> {
     }
 
     fn open_current(&mut self, allow_resume: bool) -> Result<()> {
+        self.clear_countdown();
         self.save_position();
         let item = self.queue.current().cloned().ok_or_else(|| CoreError::Invalid("De wachtrij is leeg".into()))?;
         let resume_ms = if allow_resume && self.resume_enabled {
@@ -360,6 +372,7 @@ impl<E: Engine> Session<E> {
     }
 
     pub fn stop(&mut self) -> Result<()> {
+        self.clear_countdown();
         self.save_position();
         self.ab.clear();
         self.engine.stop()
@@ -378,6 +391,10 @@ impl<E: Engine> Session<E> {
     }
 
     pub fn skip_next(&mut self) -> Result<()> {
+        if self.pending_next.is_some() {
+            // Tijdens de aftelling is het wachtende item al "het volgende": nu afspelen, niet een item overslaan.
+            return self.open_current(false);
+        }
         if self.queue.go_next().is_none() {
             return Ok(()); // einde van de lijst: niets te doen
         }
@@ -514,34 +531,74 @@ impl<E: Engine> Session<E> {
                     self.save_position();
                 }
             }
-            PlaybackState::Ended => self.handle_end(),
+            PlaybackState::Ended => self.handle_end(now_ms),
             _ => {}
         }
     }
 
-    fn handle_end(&mut self) {
-        if let Some(loc) = self.current_location.take() {
+    fn handle_end(&mut self, now_ms: u64) {
+        if let Some(deadline) = self.pending_next {
+            if now_ms < deadline {
+                self.next_in_ms = Some(deadline - now_ms);
+                return;
+            }
+            self.clear_countdown();
+            self.open_after_end(false);
+            return;
+        }
+        let finished = self.current_location.take();
+        let was_video = finished.as_deref().is_some_and(|l| !is_audio_location(l));
+        if let Some(loc) = finished {
             self.store.mark_completed(&loc);
         }
+        // Na een video even wachten (zoals bij series), zodat je kunt afhaken of direct door kunt gaan.
+        if was_video && self.next_delay_ms > 0 {
+            if let Some(next) = self.queue.next_after_end().cloned() {
+                self.current_location = Some(next.location);
+                self.pending_next = Some(now_ms + self.next_delay_ms);
+                self.next_in_ms = Some(self.next_delay_ms);
+            } else {
+                self.events.push(SessionEvent::QueueEnded);
+            }
+            return;
+        }
+        self.open_after_end(true);
+    }
+
+    /// Opent het volgende item na een einde. Met `advance = false` is de wachtrij al doorgeschoven.
+    fn open_after_end(&mut self, mut advance: bool) {
         loop {
-            let next = self.queue.next_after_end().cloned();
-            match next {
-                None => {
-                    self.events.push(SessionEvent::QueueEnded);
-                    return;
-                }
-                Some(_) => match self.open_current(false) {
-                    Ok(()) => return,
-                    Err(_) => {
-                        self.fail_streak += 1;
-                        if self.fail_streak >= self.queue.len().max(1) {
-                            self.events.push(SessionEvent::QueueEnded);
-                            return; // alles in de lijst faalt: stop in plaats van eindeloos te proberen
-                        }
+            if advance && self.queue.next_after_end().is_none() {
+                self.events.push(SessionEvent::QueueEnded);
+                return;
+            }
+            advance = true;
+            match self.open_current(false) {
+                Ok(()) => return,
+                Err(_) => {
+                    self.fail_streak += 1;
+                    if self.fail_streak >= self.queue.len().max(1) {
+                        self.events.push(SessionEvent::QueueEnded);
+                        return; // alles in de lijst faalt: stop in plaats van eindeloos te proberen
                     }
-                },
+                }
             }
         }
+    }
+
+    fn clear_countdown(&mut self) {
+        self.pending_next = None;
+        self.next_in_ms = None;
+    }
+
+    /// Stopt de aftelling; het wachtende item blijft klaarstaan en start met de afspeelknop.
+    pub fn cancel_autoplay(&mut self) -> Result<()> {
+        if self.pending_next.is_none() {
+            return Ok(());
+        }
+        self.clear_countdown();
+        // Stoppen zet de engine uit de stand "afgelopen"; anders telt de volgende tik het wachtende item als afgespeeld.
+        self.engine.stop()
     }
 
     /// Bij afsluiten van de app: positie vastleggen en afspelen stoppen.

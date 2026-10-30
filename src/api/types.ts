@@ -121,6 +121,8 @@ export interface SessionView {
   shuffle: boolean;
   ab_a_ms: number | null;
   ab_b_ms: number | null;
+  /** Resterende milliseconden van de aftelling voor het volgende item (na een video), anders null. */
+  next_in_ms: number | null;
   location: string | null;
 }
 export interface QueueItem {
@@ -160,7 +162,8 @@ export type PlayerCommand =
   | { type: "jump_to"; index: number }
   | { type: "remove_from_queue"; index: number }
   | { type: "move_in_queue"; from: number; to: number }
-  | { type: "clear_queue" };
+  | { type: "clear_queue" }
+  | { type: "cancel_autoplay" };
 
 export interface PlayResult {
   queued: number;
@@ -327,6 +330,7 @@ export interface AppSettings {
   preferred_subtitle_languages: string[];
   subtitle_scale: number;
   subtitle_color: string;
+  autoplay_next_delay_s: number;
   crossfade_ms: number;
   normalize_realtime: boolean;
   network_caching_ms: number;

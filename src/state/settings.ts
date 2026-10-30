@@ -20,6 +20,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   preferred_subtitle_languages: ["nld"],
   subtitle_scale: 1,
   subtitle_color: "#ffffff",
+  autoplay_next_delay_s: 10,
   crossfade_ms: 0,
   normalize_realtime: false,
   network_caching_ms: 1500,

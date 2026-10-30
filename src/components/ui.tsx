@@ -115,15 +115,19 @@ export interface SliderProps {
   buffered?: number;
   marks?: number[];
   range?: [number, number] | null;
+  /** Waarde waar de gekleurde vulling begint (bijv. 0 bij een equalizer); standaard het minimum. */
+  origin?: number;
   disabled?: boolean;
   format?: (v: number) => string;
 }
 
-export function Slider({ value, min = 0, max, step = 1, bigStep, onChange, onCommit, label, vertical, buffered, marks, range, disabled, format }: SliderProps) {
+export function Slider({ value, min = 0, max, step = 1, bigStep, onChange, onCommit, label, vertical, buffered, marks, range, origin, disabled, format }: SliderProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
   const span = max - min || 1;
   const frac = clamp((value - min) / span, 0, 1);
+  const originFrac = origin === undefined ? 0 : clamp((origin - min) / span, 0, 1);
+  const [fillLo, fillHi] = [Math.min(frac, originFrac), Math.max(frac, originFrac)];
 
   const fromPointer = useCallback(
     (e: { clientX: number; clientY: number }) => {
@@ -190,7 +194,18 @@ export function Slider({ value, min = 0, max, step = 1, bigStep, onChange, onCom
       <div className="slider__track">
         {buffered !== undefined && <div className="slider__buffer" style={vertical ? { height: `${clamp(buffered, 0, 1) * 100}%`, top: "auto" } : { width: `${clamp(buffered, 0, 1) * 100}%` }} />}
         {range && <div className="slider__range" style={{ left: `${clamp((range[0] - min) / span, 0, 1) * 100}%`, width: `${clamp((range[1] - range[0]) / span, 0, 1) * 100}%` }} />}
-        <div className="slider__fill" style={vertical ? { height: `${frac * 100}%` } : { width: `${frac * 100}%` }} />
+        <div
+          className="slider__fill"
+          style={
+            origin === undefined
+              ? vertical
+                ? { height: `${frac * 100}%` }
+                : { width: `${frac * 100}%` }
+              : vertical
+                ? { bottom: `${fillLo * 100}%`, height: `${(fillHi - fillLo) * 100}%` }
+                : { left: `${fillLo * 100}%`, width: `${(fillHi - fillLo) * 100}%` }
+          }
+        />
         {marks?.map((m) => <div key={m} className="slider__mark" style={pos(clamp((m - min) / span, 0, 1))} />)}
         <div className="slider__thumb" style={pos(frac)} />
       </div>

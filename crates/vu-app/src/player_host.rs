@@ -103,6 +103,7 @@ impl Drop for PlayerHost {
 pub fn apply_settings(s: &mut Session<VlcEngine>, a: &AppSettings) {
     s.resume_enabled = a.resume_playback;
     s.network_caching_ms = Some(a.network_caching_ms);
+    s.next_delay_ms = u64::from(a.autoplay_next_delay_s) * 1000;
     s.preferred_audio = a.preferred_audio_languages.clone();
     s.preferred_subtitles = a.preferred_subtitle_languages.clone();
     let _ = s.engine_mut().set_hw_decoding(hw_mode(a.hw_decoding));

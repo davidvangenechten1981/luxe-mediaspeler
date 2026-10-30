@@ -2,6 +2,7 @@
   "ab_a_ms": 1000,
   "ab_b_ms": null,
   "location": "/m/a.mp3",
+  "next_in_ms": 7500,
   "queue_index": 0,
   "queue_len": 3,
   "repeat": "all",

@@ -61,7 +61,7 @@ const statusShape: Shape<EngineStatus> = {
   subtitle_tracks: true, current_subtitle: true, audio_delay_ms: true, subtitle_delay_ms: true, buffering_percent: true, error: true,
 };
 const viewShape: Shape<SessionView> = {
-  status: true, queue_index: true, queue_len: true, repeat: true, shuffle: true, ab_a_ms: true, ab_b_ms: true, location: true,
+  status: true, queue_index: true, queue_len: true, repeat: true, shuffle: true, ab_a_ms: true, ab_b_ms: true, location: true, next_in_ms: true,
 };
 const convertShape: Shape<ConvertSettings> = {
   container: true, video: true, audio: true, max_height: true, fps: true, video_bitrate_kbps: true, audio_bitrate_kbps: true,
@@ -75,7 +75,7 @@ const jobShape: Shape<JobSnapshot> = {
 const settingsShape: Shape<AppSettings> = {
   theme: true, accent: true, ui_scale: true, compact: true, always_on_top: true, language: true, seek_short_s: true,
   seek_long_s: true, default_volume: true, resume_playback: true, hw_decoding: true, preferred_audio_languages: true,
-  preferred_subtitle_languages: true, subtitle_scale: true, subtitle_color: true, crossfade_ms: true, normalize_realtime: true,
+  preferred_subtitle_languages: true, subtitle_scale: true, subtitle_color: true, autoplay_next_delay_s: true, crossfade_ms: true, normalize_realtime: true,
   network_caching_ms: true, allow_local_streams: true, online_metadata: true, online_subtitle_search: true, scan_on_startup: true,
   periodic_scan_minutes: true, extensions: true, convert_output_dir: true, convert_template: true, convert_overwrite: true,
   convert_parallel: true, shortcuts: true,

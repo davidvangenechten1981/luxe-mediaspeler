@@ -54,6 +54,8 @@ pub struct AppSettings {
     pub preferred_subtitle_languages: Vec<String>,
     pub subtitle_scale: f32,
     pub subtitle_color: String,
+    /// Wachttijd na een afgelopen video voordat het volgende item start; 0 = direct.
+    pub autoplay_next_delay_s: u32,
     // audio
     pub crossfade_ms: u32,
     pub normalize_realtime: bool,
@@ -126,6 +128,7 @@ impl Default for AppSettings {
             preferred_subtitle_languages: vec!["nld".into()],
             subtitle_scale: 1.0,
             subtitle_color: "#ffffff".into(),
+            autoplay_next_delay_s: 10,
             crossfade_ms: 0,
             normalize_realtime: false,
             network_caching_ms: 1500,
@@ -216,6 +219,14 @@ pub fn normalize_accelerator(input: &str) -> Result<String> {
 }
 
 impl AppSettings {
+    /// LibVLC-opties voor de ondertitels. Ze gelden vanaf het opstarten van de speler.
+    /// Bij VLC betekent een kleiner getal een groter lettertype (16 = normaal).
+    pub fn subtitle_vlc_args(&self) -> Vec<String> {
+        let rel = (16.0 / self.subtitle_scale.clamp(0.5, 3.0)).round().clamp(4.0, 40.0) as u32;
+        let rgb = u32::from_str_radix(self.subtitle_color.trim_start_matches('#'), 16).unwrap_or(0x00ff_ffff);
+        vec![format!("--freetype-rel-fontsize={rel}"), format!("--freetype-color={rgb}")]
+    }
+
     /// Controleert en normaliseert. Geeft een duidelijke fout bij onmogelijke waarden.
     pub fn validate(&mut self) -> Result<()> {
         let bad = |m: &str| Err(CoreError::Invalid(m.to_string()));
@@ -233,6 +244,9 @@ impl AppSettings {
         }
         if !(1..=300).contains(&self.seek_short_s) || !(1..=3600).contains(&self.seek_long_s) {
             return bad("De sprongintervallen liggen buiten het toegestane bereik");
+        }
+        if self.autoplay_next_delay_s > 120 {
+            return bad("De wachttijd voor de volgende aflevering mag maximaal 120 seconden zijn");
         }
         if self.default_volume > 200 {
             return bad("Het standaardvolume mag maximaal 200% zijn");
@@ -404,6 +418,7 @@ mod tests {
             Box::new(|s| s.default_volume = 500),
             Box::new(|s| s.crossfade_ms = 60_000),
             Box::new(|s| s.network_caching_ms = 5),
+            Box::new(|s| s.autoplay_next_delay_s = 500),
             Box::new(|s| s.periodic_scan_minutes = Some(1)),
             Box::new(|s| s.convert_parallel = 9),
             Box::new(|s| s.language = "xx".into()),
@@ -417,6 +432,27 @@ mod tests {
             mutate(&mut s);
             assert!(s.validate().is_err(), "geval {i} moest worden geweigerd");
         }
+    }
+
+    #[test]
+    fn the_next_episode_countdown_defaults_to_ten_seconds_and_can_be_switched_off() {
+        let mut s = AppSettings::default();
+        assert_eq!(s.autoplay_next_delay_s, 10);
+        s.autoplay_next_delay_s = 0; // 0 = direct doorgaan
+        assert!(s.validate().is_ok());
+    }
+
+    #[test]
+    fn subtitle_settings_become_libvlc_options() {
+        let mut s = AppSettings::default();
+        assert_eq!(s.subtitle_vlc_args(), ["--freetype-rel-fontsize=16", "--freetype-color=16777215"]);
+        s.subtitle_scale = 2.0; // groter = kleiner getal bij VLC
+        s.subtitle_color = "#ffcc00".into();
+        assert_eq!(s.subtitle_vlc_args(), ["--freetype-rel-fontsize=8", "--freetype-color=16763904"]);
+        s.subtitle_scale = 0.5;
+        assert_eq!(s.subtitle_vlc_args()[0], "--freetype-rel-fontsize=32");
+        s.subtitle_scale = 3.0;
+        assert_eq!(s.subtitle_vlc_args()[0], "--freetype-rel-fontsize=5");
     }
 
     #[test]

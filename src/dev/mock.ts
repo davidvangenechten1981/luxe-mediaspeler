@@ -172,6 +172,7 @@ function openIndex(i: number, startMs = 0) {
     location: item.location,
     ab_a_ms: null,
     ab_b_ms: null,
+    next_in_ms: null,
     status: {
       ...view.status,
       state: "playing",

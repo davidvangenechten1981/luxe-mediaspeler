@@ -294,3 +294,20 @@ fn full_session_plays_a_queue_to_the_end_and_saves_history() {
     assert!(r.is_some_and(|r| r.completed));
     s.set_repeat(RepeatMode::Off);
 }
+
+#[test]
+fn libvlc_accepts_the_subtitle_options_we_generate() {
+    // Een onbekende of ongeldige optie laat libvlc_new mislukken; dit bewaakt de vertaling van de instellingen.
+    if engine().is_none() {
+        return; // zonder LibVLC niets te testen
+    }
+    let settings = vu_core::settings::AppSettings { subtitle_scale: 1.5, subtitle_color: "#ffcc00".into(), ..Default::default() };
+    let mut args = vec!["--aout=dummy".to_string(), "--vout=dummy".to_string()];
+    #[cfg(not(windows))]
+    args.push("--no-xlib".into());
+    args.extend(settings.subtitle_vlc_args());
+    let cfg = VlcConfig { library_dir: std::env::var_os("VU_VLC_DIR").map(PathBuf::from), extra_args: args };
+    if let Err(e) = VlcEngine::new(&cfg) {
+        panic!("libvlc weigert de ondertitelopties: {e}");
+    }
+}

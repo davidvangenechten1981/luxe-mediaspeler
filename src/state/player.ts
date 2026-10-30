@@ -26,6 +26,7 @@ export const IDLE_VIEW: SessionView = {
   shuffle: false,
   ab_a_ms: null,
   ab_b_ms: null,
+  next_in_ms: null,
   location: null,
 };
 
