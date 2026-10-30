@@ -14,7 +14,6 @@ import { reportError, toast, useUi } from "./state/ui";
 export async function bootstrap(): Promise<() => void> {
   const offs: (() => void)[] = [];
   let timer: ReturnType<typeof setInterval> | undefined;
-  let stopSync: (() => void) | undefined;
 
   offs.push(
     await onPlayerState((v) => {
@@ -83,7 +82,7 @@ export async function bootstrap(): Promise<() => void> {
   }
 
   // Kijkstatus delen met een andere pc: meteen en daarna elke 10 minuten, zolang er een map is gekozen.
-  stopSync = startAutoSync({
+  const stopSync = startAutoSync({
     folder: () => useSettings.getState().settings.sync_folder,
     run: () => api.syncRun(),
     onFirstError: (e) => toast.warning(`Synchroniseren van de kijkstatus mislukte: ${e instanceof Error ? e.message : String(e)}`),
@@ -92,6 +91,6 @@ export async function bootstrap(): Promise<() => void> {
   return () => {
     offs.forEach((o) => o());
     if (timer) clearInterval(timer);
-    stopSync?.();
+    stopSync();
   };
 }
