@@ -451,6 +451,45 @@ mod tests {
     }
 
     #[test]
+    fn burning_subtitles_really_changes_the_picture_and_adds_no_subtitle_track() {
+        if !have_ffmpeg()
+            || std::process::Command::new("ffmpeg")
+                .args(["-hide_banner", "-filters"])
+                .output()
+                .map(|o| !String::from_utf8_lossy(&o.stdout).contains("subtitles"))
+                .unwrap_or(true)
+        {
+            return;
+        }
+        let env = Env::new();
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("in.mkv");
+        make_video(&input, 3, "480x270");
+        let srt = dir.path().join("sub.srt");
+        std::fs::write(&srt, "1\n00:00:00,000 --> 00:00:02,500\nHallo wereld, dit staat in beeld\n").unwrap();
+        let mut plain = settings("compact");
+        plain.hw_accel = crate::convert::HwAccel::Off;
+        plain.max_height = None;
+        let mut burned = plain.clone();
+        burned.external_subtitle = Some(srt.to_string_lossy().into_owned());
+        burned.burn_external_subtitle = true;
+        let a = dir.path().join("zonder.mp4");
+        let b = dir.path().join("met.mp4");
+        convert(&env, &input, &a, &plain, &AtomicBool::new(false)).0.unwrap();
+        convert(&env, &input, &b, &burned, &AtomicBool::new(false)).0.unwrap();
+        let info = probe_file(Path::new("ffprobe"), &b).unwrap();
+        assert!(info.streams.iter().all(|s| s.kind != StreamKind::Subtitle));
+        assert_ne!(std::fs::read(&a).unwrap(), std::fs::read(&b).unwrap(), "het beeld moet verschillen");
+        // ook gecombineerd met knippen
+        let mut trimmed = burned.clone();
+        trimmed.trim_start_ms = Some(500);
+        trimmed.trim_end_ms = Some(2_000);
+        let c = dir.path().join("geknipt.mp4");
+        convert(&env, &input, &c, &trimmed, &AtomicBool::new(false)).0.unwrap();
+        assert!(probe_file(Path::new("ffprobe"), &c).unwrap().duration_ms < 2_000);
+    }
+
+    #[test]
     fn civil_date_is_correct() {
         assert_eq!(civil_date(0), "1970-01-01");
         assert_eq!(civil_date(951_782_400), "2000-02-29"); // schrikkeldag

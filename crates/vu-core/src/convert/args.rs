@@ -171,6 +171,17 @@ pub fn effective_duration_ms(total_ms: u64, start: Option<u64>, end: Option<u64>
     b.saturating_sub(a)
 }
 
+/// Maakt een pad geschikt voor een FFmpeg-filter tussen enkele aanhalingstekens: schuine strepen vooruit,
+/// dubbele punten (ook die van `C:`) met een backslash. Een apostrof in het pad kan niet veilig en wordt geweigerd.
+pub fn escape_filter_path(path: &str) -> Result<String> {
+    if path.contains('\'') {
+        return Err(CoreError::Invalid(
+            "Een apostrof in de bestandsnaam of map past niet bij het inbranden van ondertitels. Hernoem het bestand.".into(),
+        ));
+    }
+    Ok(path.replace('\\', "/").replace(':', "\\:"))
+}
+
 fn seconds(ms: u64) -> String {
     format!("{:.3}", ms as f64 / 1000.0)
 }
@@ -179,7 +190,7 @@ fn is_cover(s: &StreamInfo) -> bool {
     s.kind == StreamKind::Video && matches!(s.codec.as_str(), "mjpeg" | "png" | "bmp")
 }
 
-fn is_text_subtitle(codec: &str) -> bool {
+pub fn is_text_subtitle(codec: &str) -> bool {
     matches!(codec, "subrip" | "srt" | "ass" | "ssa" | "mov_text" | "webvtt" | "text")
 }
 
@@ -301,6 +312,10 @@ pub fn build_args(input: &Path, output: &Path, s: &Settings, info: &MediaInfo, c
             return Err(CoreError::Invalid("Het begin van het fragment ligt voorbij het einde van het bestand".into()));
         }
     }
+    let burning = s.burn_subtitle_track.is_some() || s.burn_external_subtitle;
+    if burning && video.is_some() && s.video == VideoCodec::Copy {
+        return Err(CoreError::Invalid("Ondertitels inbranden vereist dat de video opnieuw wordt gecodeerd. Kies een videocodec.".into()));
+    }
     let hw = if video.is_some() { pick_hardware(s, caps, &mut warnings) } else { None };
     let hardware = hw.map(|(b, _)| b);
     let mut args: Vec<String> = vec![];
@@ -318,7 +333,7 @@ pub fn build_args(input: &Path, output: &Path, s: &Settings, info: &MediaInfo, c
     }
     push(&mut args, &["-i"]);
     args.push(input.to_string_lossy().into_owned());
-    if let Some(sub) = &s.external_subtitle {
+    if let Some(sub) = s.external_subtitle.as_ref().filter(|_| !s.burn_external_subtitle) {
         if let Some(a) = s.trim_start_ms.filter(|a| *a > 0) {
             push(&mut args, &["-ss", &seconds(a)]);
         }
@@ -333,7 +348,7 @@ pub fn build_args(input: &Path, output: &Path, s: &Settings, info: &MediaInfo, c
         push(&mut args, &["-map", &format!("0:{}", a.index)]);
     }
     let mut kept_subs = 0;
-    if !audio_only && s.subtitles == SubtitleMode::Keep {
+    if !audio_only && s.subtitles == SubtitleMode::Keep && !burning {
         for st in info.streams.iter().filter(|st| st.kind == StreamKind::Subtitle) {
             let ok = match s.container {
                 Container::Mkv => true,
@@ -355,7 +370,7 @@ pub fn build_args(input: &Path, output: &Path, s: &Settings, info: &MediaInfo, c
     }
 
     // Extern ondertitelbestand als tweede invoer
-    if s.external_subtitle.is_some() {
+    if s.external_subtitle.is_some() && !s.burn_external_subtitle {
         if !matches!(s.container, Container::Mkv | Container::Mp4 | Container::Mov | Container::Webm) {
             return Err(CoreError::Invalid("Dit containerformaat kan geen ondertitels bevatten".into()));
         }
@@ -408,10 +423,29 @@ pub fn build_args(input: &Path, output: &Path, s: &Settings, info: &MediaInfo, c
             }
         }
         if s.video != VideoCodec::Copy {
+            let mut filters: Vec<String> = vec![];
+            if burning {
+                // Na het knippen begint de tijd opnieuw bij 0, maar de ondertitel kent de oorspronkelijke tijd.
+                let start = s.trim_start_ms.unwrap_or(0);
+                if start > 0 {
+                    filters.push(format!("setpts=PTS+{}/TB", seconds(start)));
+                }
+                if let Some(track) = s.burn_subtitle_track {
+                    filters.push(format!("subtitles='{}':si={track}", escape_filter_path(&input.to_string_lossy())?));
+                } else if let Some(sub) = &s.external_subtitle {
+                    filters.push(format!("subtitles='{}'", escape_filter_path(sub)?));
+                }
+                if start > 0 {
+                    filters.push("setpts=PTS-STARTPTS".into());
+                }
+            }
             if let Some(h) = s.max_height {
                 // Nooit opschalen; breedte blijft even.
+                filters.push(format!("scale=-2:'min({h},ih)'"));
+            }
+            if !filters.is_empty() {
                 args.push("-vf".into());
-                args.push(format!("scale=-2:'min({h},ih)'"));
+                args.push(filters.join(","));
             }
             if let Some(f) = s.fps {
                 push(&mut args, &["-r", &format!("{f}")]);
@@ -986,5 +1020,54 @@ mod tests {
         assert_eq!(effective_duration_ms(60_000, Some(10_000), Some(30_000)), 20_000);
         assert_eq!(effective_duration_ms(60_000, Some(10_000), Some(90_000)), 50_000); // einde voorbij het bestand
         assert_eq!(effective_duration_ms(0, Some(10_000), None), 0); // onbekende duur blijft onbekend
+    }
+
+    // ---------- ondertitels inbranden ----------
+
+    #[test]
+    fn filter_paths_are_escaped_for_windows_and_unix() {
+        assert_eq!(escape_filter_path("C:\\Users\\jan\\sub.srt").unwrap(), "C\\:/Users/jan/sub.srt");
+        assert_eq!(escape_filter_path("/home/a b/sub.srt").unwrap(), "/home/a b/sub.srt");
+        assert!(escape_filter_path("/home/o'neil/sub.srt").is_err());
+        assert!(escape_filter_path("/a/sub,[1].srt").is_ok());
+    }
+
+    #[test]
+    fn burning_an_embedded_track_uses_the_subtitles_filter_before_scaling_and_drops_the_muxed_tracks() {
+        let mut s = profile("compact");
+        s.burn_subtitle_track = Some(0);
+        let p = plan(&s, VIDEO_JSON).unwrap();
+        let vf = p.args.windows(2).find(|w| w[0] == "-vf").map(|w| w[1].clone()).expect("-vf");
+        assert!(vf.starts_with("subtitles='/in/film.mkv':si=0,"), "{vf}");
+        assert!(vf.contains("scale="), "{vf}");
+        assert!(!p.args.iter().any(|a| a == "-c:s"), "ingebrande ondertitels worden niet ook als spoor toegevoegd");
+    }
+
+    #[test]
+    fn burning_an_external_file_replaces_muxing_it() {
+        let mut s = profile("compact");
+        s.external_subtitle = Some("/s/ondertitel.srt".into());
+        s.burn_external_subtitle = true;
+        let p = plan(&s, VIDEO_JSON).unwrap();
+        assert!(p.args.iter().any(|a| a.starts_with("subtitles='/s/ondertitel.srt'")), "{:?}", p.args);
+        assert!(!has_pair(&p.args, "-map", "1:0") && !p.args.iter().any(|a| a == "/s/ondertitel.srt"), "het bestand is geen tweede invoer");
+    }
+
+    #[test]
+    fn burning_needs_re_encoded_video_and_a_video_container() {
+        let mut s = profile("remux_mp4");
+        s.burn_subtitle_track = Some(0);
+        assert!(plan(&s, VIDEO_JSON).unwrap_err().to_string().contains("opnieuw"));
+        let mut a = profile("music_opus");
+        a.burn_subtitle_track = Some(0);
+        assert!(a.validate().is_err());
+        let mut e = profile("compact");
+        e.burn_external_subtitle = true; // zonder bestand
+        assert!(e.validate().is_err());
+        let mut both = profile("compact");
+        both.burn_subtitle_track = Some(0);
+        both.external_subtitle = Some("/s/a.srt".into());
+        both.burn_external_subtitle = true;
+        assert!(both.validate().is_err(), "kies één bron om in te branden");
     }
 }

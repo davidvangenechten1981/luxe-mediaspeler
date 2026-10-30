@@ -36,6 +36,7 @@ pub enum Request {
     LibraryScanRunning,
     SeriesList,
     SyncRun,
+    SystemAction { action: crate::services::system_action::SystemAction },
     TagsGet { path: String },
     TagsSet { path: String, update: vu_core::tags::TagUpdate },
     CollectionsList,
@@ -105,6 +106,7 @@ pub enum Request {
     // converter
     ConvertPause { id: u64 },
     ConvertResume { id: u64 },
+    ConvertExtractSubtitle { path: String, stream_index: u32, out_dir: String },
     ConvertProfiles,
     ConvertProfileSave { name: String, settings: vu_core::convert::Settings },
     ConvertProfileDelete { id: String },
@@ -176,6 +178,7 @@ pub fn handle(st: &AppState, req: Request) -> Result<Value> {
 
         TagsGet { path } => json_of(tags::get(st, &path)?),
         TagsSet { path, update } => tags::set(st, &path, &update).and_then(|_| unit()),
+        SystemAction { action } => crate::services::system_action::run(action).and_then(|_| unit()),
         SyncRun => json_of(sync::run(st)?),
         SeriesList => json_of(series::list(st)?),
         PlaylistList => json_of(playlists::list(st)?),
@@ -240,6 +243,7 @@ pub fn handle(st: &AppState, req: Request) -> Result<Value> {
 
         ConvertPause { id } => converter::pause(st, id).and_then(|_| unit()),
         ConvertResume { id } => converter::resume(st, id).and_then(|_| unit()),
+        ConvertExtractSubtitle { path, stream_index, out_dir } => json_of(converter::extract_subtitle(st, &path, stream_index, &out_dir)?),
         ConvertProfiles => json_of(converter::profiles(st)?),
         ConvertProfileSave { name, settings } => json_of(converter::save_profile(st, &name, settings)?),
         ConvertProfileDelete { id } => converter::delete_profile(st, &id).and_then(|_| unit()),

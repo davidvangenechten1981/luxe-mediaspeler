@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../api/client";
 import type { Container, ConvertSettings, MediaInfo, Overwrite } from "../../api/types";
 import { Icon } from "../../components/Icon";
@@ -9,7 +9,10 @@ import { MEDIA_FILTER, SUBTITLE_FILTER, pickFiles, pickFolder } from "../../lib/
 import { useJobs } from "../../state/jobs";
 import { useSettings } from "../../state/settings";
 import { reportError, toast, useUi } from "../../state/ui";
+import { actionLabel, queueJustFinished, type AfterAction } from "../../lib/afterJobs";
+import { AfterActionDialog } from "./AfterActionDialog";
 import { JobList } from "./JobList";
+import { SubtitleTools } from "./SubtitleTools";
 import { TrimFields } from "./TrimFields";
 
 const CUSTOM = "__custom";
@@ -38,6 +41,17 @@ export function ConverterPage() {
   const [estimate, setEstimate] = useState<number | null>(null);
   const [saveName, setSaveName] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [after, setAfter] = useState<AfterAction>("none");
+  const [pending, setPending] = useState<"sleep" | "shutdown" | null>(null);
+  const jobs = useJobs((j) => j.jobs);
+  const prevJobs = useRef(jobs);
+  useEffect(() => {
+    if (queueJustFinished(prevJobs.current, jobs)) {
+      if (after === "notify") toast.success("Alle conversies zijn klaar");
+      else if (after === "sleep" || after === "shutdown") setPending(after);
+    }
+    prevJobs.current = jobs;
+  }, [jobs, after]);
 
   useEffect(() => { if (!caps) void loadStatic(); void refresh(); }, [caps, loadStatic, refresh]);
   const profile = profiles.find((p) => p.id === profileId);
@@ -240,6 +254,7 @@ export function ConverterPage() {
                       {settings.external_subtitle && <IconButton icon="close" label="Ondertitelbestand loskoppelen" size={15} onClick={() => set({ external_subtitle: null, external_subtitle_language: null })} />}
                     </div>
                   </Field>
+                  <SubtitleTools input={inputs[0] ?? null} info={info} settings={settings} set={set} />
                   {settings.external_subtitle && <Field label="Taalcode van de ondertitel" htmlFor="cv-extlang" hint="Bijvoorbeeld nld of eng"><TextInput id="cv-extlang" maxLength={3} value={settings.external_subtitle_language ?? ""} onChange={(e) => set({ external_subtitle_language: e.target.value.toLowerCase() || null })} /></Field>}
                 </div>
               )}
@@ -267,6 +282,11 @@ export function ConverterPage() {
             <Button variant="primary" size="lg" icon="convert" disabled={!canStart} onClick={() => void start()}>Toevoegen aan wachtrij</Button>
             <Button size="lg" disabled={!canStart} onClick={() => void start(true)} title="Zet alleen 10 seconden om, om de kwaliteit te beoordelen">Voorbeeld (10 s)</Button>
           </div>
+          <Field label="Als alle conversies klaar zijn" htmlFor="cv-after">
+            <Select id="cv-after" value={after} onChange={(e) => setAfter(e.target.value as AfterAction)}>
+              {(["none", "notify", "sleep", "shutdown"] as const).map((a) => <option key={a} value={a}>{actionLabel(a)}</option>)}
+            </Select>
+          </Field>
           {!canStart && <span className="field__hint">{inputs.length === 0 ? "Kies eerst bestanden of een map." : dir.trim() === "" ? "Kies een uitvoermap." : ""}</span>}
         </section>
       </div>
@@ -276,6 +296,7 @@ export function ConverterPage() {
         <JobList />
       </section>
 
+      {pending && <AfterActionDialog action={pending} onCancel={() => setPending(null)} onRun={() => { const a = pending; setPending(null); void api.systemAction(a).catch(reportError); }} />}
       {saveName !== null && (
         <Modal title="Profiel opslaan" onClose={() => setSaveName(null)} footer={<><Button variant="ghost" onClick={() => setSaveName(null)}>Annuleren</Button><Button variant="primary" disabled={saveName.trim() === ""} onClick={() => void saveProfile()}>Opslaan</Button></>}>
           <Field label="Naam van het profiel" htmlFor="cv-profile-name" hint="Een bestaand profiel met dezelfde naam wordt vervangen.">

@@ -199,6 +199,12 @@ pub struct Settings {
     pub trim_start_ms: Option<u64>,
     #[serde(default)]
     pub trim_end_ms: Option<u64>,
+    /// Een ondertitelspoor uit het bestand (nummer onder de ondertitelsporen, vanaf 0) in het beeld branden.
+    #[serde(default)]
+    pub burn_subtitle_track: Option<u32>,
+    /// Het externe ondertitelbestand in het beeld branden in plaats van als spoor toe te voegen.
+    #[serde(default)]
+    pub burn_external_subtitle: bool,
 }
 
 impl Settings {
@@ -266,6 +272,17 @@ impl Settings {
                 return bad("De kwaliteit (CRF) moet tussen 0 en 63 liggen");
             }
         }
+        if self.burn_subtitle_track.is_some() || self.burn_external_subtitle {
+            if self.container.is_audio_only() {
+                return bad("Ondertitels inbranden kan alleen bij video");
+            }
+            if self.burn_external_subtitle && self.external_subtitle.is_none() {
+                return bad("Kies eerst het ondertitelbestand dat je wilt inbranden");
+            }
+            if self.burn_external_subtitle && self.burn_subtitle_track.is_some() {
+                return bad("Kies één bron om in te branden: een spoor uit het bestand of een extern bestand");
+            }
+        }
         match (self.trim_start_ms, self.trim_end_ms) {
             (_, Some(0)) => return bad("Het einde van het fragment moet na het begin liggen"),
             (Some(a), Some(b)) if b <= a => return bad("Het einde van het fragment moet na het begin liggen"),
@@ -322,6 +339,8 @@ fn video_profile(
         threads: None,
         trim_start_ms: None,
         trim_end_ms: None,
+        burn_subtitle_track: None,
+        burn_external_subtitle: false,
     };
     f(&mut s);
     Profile { id: id.into(), name: name.into(), description: desc.into(), settings: s }

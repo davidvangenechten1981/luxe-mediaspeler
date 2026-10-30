@@ -130,7 +130,7 @@ const profiles: Profile[] = [
   description: description as string,
   settings: {
     container, video, audio, max_height, fps: null, video_bitrate_kbps: null, audio_bitrate_kbps: null, quality, audio_channels: null,
-    subtitles: "keep", keep_metadata: true, equalizer: null, normalize_audio: false, external_subtitle: null, external_subtitle_language: null, hw_accel: "auto", threads: null, trim_start_ms: null, trim_end_ms: null,
+    subtitles: "keep", keep_metadata: true, equalizer: null, normalize_audio: false, external_subtitle: null, external_subtitle_language: null, hw_accel: "auto", threads: null, trim_start_ms: null, trim_end_ms: null, burn_subtitle_track: null, burn_external_subtitle: false,
   } as Profile["settings"],
 }));
 

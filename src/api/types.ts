@@ -277,6 +277,8 @@ export interface ConvertSettings {
   threads: number | null;
   trim_start_ms: number | null;
   trim_end_ms: number | null;
+  burn_subtitle_track: number | null;
+  burn_external_subtitle: boolean;
 }
 export interface Profile {
   id: string;

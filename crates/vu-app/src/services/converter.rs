@@ -47,6 +47,8 @@ pub fn save_profile(st: &AppState, name: &str, settings: Settings) -> Result<Pro
     settings.external_subtitle_language = None;
     settings.trim_start_ms = None;
     settings.trim_end_ms = None;
+    settings.burn_subtitle_track = None;
+    settings.burn_external_subtitle = false;
     let mut list = user_profiles(st)?;
     let existing = list.iter().position(|p| p.name.eq_ignore_ascii_case(name));
     let id = match existing {
@@ -76,6 +78,52 @@ pub fn delete_profile(st: &AppState, id: &str) -> Result<()> {
         return Err(CoreError::NotFound(format!("eigen profiel '{id}'")));
     }
     store_user_profiles(st, &list)
+}
+
+/// Haalt een tekstondertitel uit een video en bewaart hem als `.srt` naast de gekozen map.
+/// `stream_index` is het nummer van het spoor in het bestand (zoals bij de mediagegevens).
+pub fn extract_subtitle(st: &AppState, path: &str, stream_index: u32, out_dir: &str) -> Result<PathBuf> {
+    let input = validate_media_path(path)?;
+    let dir = validate_path_shape(out_dir)?;
+    std::fs::create_dir_all(&dir)?;
+    let ffprobe = st.require_ffprobe()?;
+    let info = probe_file(ffprobe, &input)?;
+    let stream = info
+        .streams
+        .iter()
+        .find(|s| s.kind == vu_core::probe::StreamKind::Subtitle && s.index == stream_index)
+        .ok_or_else(|| CoreError::NotFound(format!("ondertitelspoor {stream_index}")))?;
+    if !vu_core::convert::args::is_text_subtitle(&stream.codec) {
+        return Err(CoreError::Invalid(format!(
+            "Dit ondertitelspoor ({}) bestaat uit plaatjes en kan niet als tekst worden opgeslagen",
+            stream.codec
+        )));
+    }
+    let stem = input.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "ondertitel".into());
+    let tag = stream.language.clone().unwrap_or_else(|| format!("spoor{stream_index}"));
+    let base = vu_core::validate::sanitize_file_name(&format!("{stem}.{tag}"));
+    let mut out = dir.join(format!("{base}.srt"));
+    let mut n = 1;
+    while out.exists() {
+        out = dir.join(format!("{base} ({n}).srt"));
+        n += 1;
+    }
+    let tmp = out.with_extension("srt.part");
+    let mut cmd = vu_core::proc::quiet(st.require_ffmpeg()?);
+    cmd.args(["-hide_banner", "-loglevel", "error", "-nostdin", "-i"])
+        .arg(&input)
+        .args(["-map", &format!("0:{stream_index}"), "-c:s", "srt", "-f", "srt", "-y"])
+        .arg(&tmp);
+    if let Err(e) = crate::services::video::run_with_timeout(cmd, std::time::Duration::from_secs(120)) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e);
+    }
+    if std::fs::metadata(&tmp).map(|m| m.len() == 0).unwrap_or(true) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(CoreError::Ffmpeg("De ondertitel is leeg".into()));
+    }
+    std::fs::rename(&tmp, &out)?;
+    Ok(out)
 }
 
 /// Begin en einde (ms) van een voorbeeld van 10 seconden vanaf ongeveer een derde van de film.
@@ -363,6 +411,8 @@ pub fn add_audio_processing(st: &AppState, req: AudioProcessRequest) -> Result<A
         threads: None,
         trim_start_ms: None,
         trim_end_ms: None,
+        burn_subtitle_track: None,
+        burn_external_subtitle: false,
     };
     add(
         st,
@@ -475,6 +525,36 @@ mod tests {
         let app = app();
         app.state.lock_db().unwrap().set_setting(USER_PROFILES_KEY, "{kapot").unwrap();
         assert_eq!(profiles(&app.state).unwrap().len(), builtin_profiles().len());
+    }
+
+    #[test]
+    fn a_text_subtitle_track_is_extracted_to_a_readable_srt_and_never_overwrites() {
+        let app = app();
+        if app.state.tasks.is_none() {
+            return;
+        }
+        let ffmpeg = app.state.require_ffmpeg().unwrap().to_path_buf();
+        let srt = app.dir.path().join("bron.srt");
+        std::fs::write(&srt, "1\n00:00:00,000 --> 00:00:01,500\nHallo wereld\n").unwrap();
+        let film = app.dir.path().join("met-ondertitel.mkv");
+        let ok = vu_core::proc::quiet(&ffmpeg)
+            .args(["-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=160x90:rate=10", "-i"])
+            .arg(&srt)
+            .args(["-t", "2", "-c:v", "libx264", "-c:s", "srt", "-metadata:s:s:0", "language=nld"])
+            .arg(&film)
+            .status()
+            .unwrap()
+            .success();
+        assert!(ok);
+        let info = probe_file(app.state.require_ffprobe().unwrap(), &film).unwrap();
+        let idx = info.streams.iter().find(|s| s.kind == vu_core::probe::StreamKind::Subtitle).unwrap().index;
+        let out_dir = app.dir.path().join("ondertitels").to_string_lossy().into_owned();
+        let a = extract_subtitle(&app.state, &film.to_string_lossy(), idx, &out_dir).unwrap();
+        assert!(a.file_name().unwrap().to_string_lossy().contains("nld"), "{a:?}");
+        assert!(std::fs::read_to_string(&a).unwrap().contains("Hallo wereld"));
+        let b = extract_subtitle(&app.state, &film.to_string_lossy(), idx, &out_dir).unwrap();
+        assert_ne!(a, b, "bestaand bestand blijft staan");
+        assert!(extract_subtitle(&app.state, &film.to_string_lossy(), 0, &out_dir).is_err(), "spoor 0 is video");
     }
 
     #[test]

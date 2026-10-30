@@ -16,6 +16,7 @@ library_scan_cancel
 library_scan_running
 series_list
 sync_run
+system_action
 tags_get
 tags_set
 collections_list
@@ -79,6 +80,7 @@ video_deinterlace
 video_rotation
 convert_pause
 convert_resume
+convert_extract_subtitle
 convert_profiles
 convert_profile_save
 convert_profile_delete
