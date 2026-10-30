@@ -168,7 +168,7 @@ export function App() {
 
   if (mini) {
     return (
-      <div className="app" style={{ gridTemplateRows: "1fr" }}>
+      <div className="app is-video" style={{ gridTemplateRows: "1fr" }}>
         <div className="mini-player">
           <div className="content is-video grow" data-tauri-drag-region onDoubleClick={() => useUi.getState().setMini(false)} />
           <PlayerBar />
@@ -179,7 +179,7 @@ export function App() {
   }
 
   return (
-    <div className={`app ${immersive ? "is-immersive" : ""}`}>
+    <div className={`app ${immersive ? "is-immersive" : ""} ${isVideoPage ? "is-video" : ""}`}>
       <TitleBar />
       <div className="app__body">
         <Sidebar />

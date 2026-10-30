@@ -6,6 +6,11 @@
   background: var(--bg);
   color: var(--text);
 }
+/* Het videovenster zit achter dit venster: op de videopagina moet de app doorzichtig zijn.
+   Titelbalk, zijbalk en spelbalk hebben hun eigen achtergrond en blijven dicht. */
+.app.is-video {
+  background: transparent;
+}
 .app.is-immersive {
   grid-template-rows: 0 1fr 0;
 }
