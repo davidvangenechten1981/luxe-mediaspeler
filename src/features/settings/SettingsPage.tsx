@@ -133,6 +133,8 @@ function LibrarySettings() {
   const { settings: s, update } = useSettings();
   const version = useLibrary((x) => x.version);
   const folders = useAsync(() => api.libraryFolders(), [version]);
+  const status = useAsync(() => api.libraryFolderStatus(), [version]);
+  const offline = new Set((status.data ?? []).filter((x) => !x.online).map((x) => x.path));
   const [remove, setRemove] = useState<string | null>(null);
   const [dups, setDups] = useState(false);
   const bump = useLibrary((x) => x.bump);
@@ -141,7 +143,7 @@ function LibrarySettings() {
       <div style={{ paddingBottom: "var(--s-3)" }}>
         <div className="row" style={{ justifyContent: "space-between", marginBottom: "var(--s-2)" }}><strong>Bibliotheekmappen</strong><Button size="sm" icon="folder-plus" onClick={async () => { const f = await pickFolder({ title: "Kies een map met media" }); if (f) try { await api.libraryScanStart(f); folders.reload(); toast.info("Scannen gestart"); } catch (e) { reportError(e); } }}>Map toevoegen</Button></div>
         {folders.data?.length === 0 && <p className="muted">Nog geen mappen. Er wordt alleen gescand wat je zelf toevoegt.</p>}
-        <div className="list">{folders.data?.map((f) => (<div key={f} className="list-item"><Icon name="folder" size={16} /><span className="grow ellipsis" title={f}>{f}</span><IconButton icon="trash" label={`${f} uit de bibliotheek halen`} size={15} onClick={() => setRemove(f)} /></div>))}</div>
+        <div className="list">{folders.data?.map((f) => (<div key={f} className="list-item"><Icon name="folder" size={16} /><span className="grow ellipsis" title={f}>{f}</span>{offline.has(f) && <span className="chip" title="Deze map is nu niet bereikbaar, bijvoorbeeld een NAS die uit staat. Je bibliotheek blijft bewaard.">Offline</span>}<IconButton icon="trash" label={`${f} uit de bibliotheek halen`} size={15} onClick={() => setRemove(f)} /></div>))}</div>
       </div>
       <Row title="Scannen bij het opstarten" hint="Zoekt nieuwe en ontbrekende bestanden zodra de app start."><Switch label={(s.scan_on_startup) ? "Aan" : "Uit"} checked={s.scan_on_startup} onChange={(v) => void update({ scan_on_startup: v })} /></Row>
       <Row title="Periodiek scannen" hint="Alleen terwijl de app open is."><Select aria-label="Periodiek scannen" value={s.periodic_scan_minutes ?? ""} onChange={(e) => void update({ periodic_scan_minutes: e.target.value === "" ? null : Number(e.target.value) })}><option value="">Uit</option><option value="15">Elk kwartier</option><option value="60">Elk uur</option><option value="360">Elke 6 uur</option><option value="1440">Elke dag</option></Select></Row>

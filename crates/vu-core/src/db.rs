@@ -558,6 +558,14 @@ impl Database {
         Ok(removed as u64)
     }
 
+    /// Staan er (niet-ontbrekende) bestanden onder `folder` in de bibliotheek?
+    pub fn has_live_media_in_folder(&self, folder: &str) -> Result<bool> {
+        let prefix = format!("{}%", escape_like(&with_trailing_sep(folder)));
+        Ok(self.conn.query_row("SELECT EXISTS(SELECT 1 FROM media WHERE path LIKE ?1 ESCAPE '\\' AND missing = 0)", [prefix], |r| {
+            r.get::<_, i64>(0)
+        })? != 0)
+    }
+
     /// Markeert items onder `folder` die niet in `seen` voorkomen als ontbrekend.
     pub fn mark_missing_in_folder(&mut self, folder: &str, seen: &std::collections::HashSet<String>) -> Result<u64> {
         let prefix = format!("{}%", escape_like(&with_trailing_sep(folder)));

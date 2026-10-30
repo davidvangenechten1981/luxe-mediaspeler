@@ -26,6 +26,22 @@ pub fn list_folders(st: &AppState) -> Result<Vec<String>> {
     st.lock_db()?.list_library_folders()
 }
 
+#[derive(Debug, serde::Serialize)]
+pub struct FolderStatus {
+    pub path: String,
+    /// De map is nu bereikbaar. Een NAS die uit staat is offline, geen reden om bestanden te verwijderen.
+    pub online: bool,
+}
+
+pub fn folder_status(st: &AppState) -> Result<Vec<FolderStatus>> {
+    Ok(st
+        .lock_db()?
+        .list_library_folders()?
+        .into_iter()
+        .map(|path| FolderStatus { online: std::path::Path::new(&path).is_dir(), path })
+        .collect())
+}
+
 pub fn query(st: &AppState, q: &MediaQuery) -> Result<Vec<Media>> {
     st.lock_db()?.query_media(q)
 }
@@ -172,6 +188,21 @@ mod tests {
         }
         cancel_scan(&app.state);
         assert!(wait_until(30, || !scan_running(&app.state)));
+    }
+
+    #[test]
+    fn folder_status_marks_unreachable_folders_offline_without_touching_the_library() {
+        let app = app();
+        let gone = tempfile::tempdir().unwrap();
+        let gone_path = gone.path().to_string_lossy().into_owned();
+        add_folder(&app.state, &app.dir.path().to_string_lossy()).unwrap();
+        add_folder(&app.state, &gone_path).unwrap();
+        drop(gone); // de map verdwijnt, zoals een NAS die uit gaat
+        let status = folder_status(&app.state).unwrap();
+        assert_eq!(status.len(), 2);
+        assert!(status.iter().any(|f| f.online));
+        assert!(status.iter().any(|f| f.path == gone_path && !f.online));
+        assert_eq!(list_folders(&app.state).unwrap().len(), 2); // map blijft in de lijst staan
     }
 
     #[test]

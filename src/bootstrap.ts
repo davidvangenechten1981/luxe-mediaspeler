@@ -38,6 +38,8 @@ export async function bootstrap(): Promise<() => void> {
       else {
         const n = (d.reports ?? []).reduce((s, r) => s + r.report.added, 0);
         if (n > 0) toast.success(`${n} nieuwe bestanden toegevoegd`);
+        const empty = (d.reports ?? []).filter((r) => r.report.skipped_empty).map((r) => r.folder);
+        if (empty.length > 0) toast.warning(`${empty.join(", ")} lijkt leeg of offline (bijvoorbeeld een NAS). Er is niets uit je bibliotheek gehaald.`);
       }
       lib.bump();
     }),

@@ -3,6 +3,7 @@ diagnostics
 library_add_folder
 library_remove_folder
 library_folders
+library_folder_status
 library_query
 library_count
 library_stats

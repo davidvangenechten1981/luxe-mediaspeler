@@ -377,6 +377,7 @@ export interface ScanProgress {
   current: string;
 }
 export interface ScanReport {
+  skipped_empty?: boolean;
   added: number;
   updated: number;
   unchanged: number;
@@ -439,4 +440,9 @@ export interface LibraryStats {
   audio_count: number;
   total_duration_ms: number;
   total_plays: number;
+}
+
+export interface FolderStatus {
+  path: string;
+  online: boolean;
 }

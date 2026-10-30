@@ -257,6 +257,7 @@ async function handle(request: Record<string, unknown>): Promise<unknown> {
     case "playlist_missing": return [];
     case "history_list": return history;
     case "history_enabled": return true;
+    case "library_folder_status": return [{ path: "D:\\Media", online: true }, { path: "\\\\nas\\films", online: false }];
     case "library_stats": return { video_count: library.filter((m) => m.kind === "video").length, audio_count: library.filter((m) => m.kind === "audio").length, total_duration_ms: library.reduce((a, m) => a + m.duration_ms, 0), total_plays: 42 };
     case "series_list": {
       const eps = library.filter((m) => m.kind === "video").slice(0, 4).map((m, i) => ({ media: m, season: 1 + Math.floor(i / 2), episode: 1 + (i % 2), watched: i < 1 }));

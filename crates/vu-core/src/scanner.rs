@@ -47,6 +47,8 @@ pub struct ScanReport {
     pub updated: u64,
     pub unchanged: u64,
     pub missing: u64,
+    /// De map leek leeg terwijl er bestanden bekend waren (bijv. een NAS die offline is): niets is als ontbrekend gemarkeerd.
+    pub skipped_empty: bool,
     pub failed: Vec<(String, String)>,
 }
 
@@ -146,7 +148,11 @@ pub fn scan_folder(
         }
     }
     progress(ScanProgress { done: total, total, current: String::new() });
-    report.missing = db.mark_missing_in_folder(&folder.to_string_lossy(), &seen)?;
+    if seen.is_empty() && db.has_live_media_in_folder(&folder.to_string_lossy())? {
+        report.skipped_empty = true;
+    } else {
+        report.missing = db.mark_missing_in_folder(&folder.to_string_lossy(), &seen)?;
+    }
     Ok(report)
 }
 
@@ -238,6 +244,31 @@ mod tests {
         assert_eq!((r.updated, r.missing), (1, 1));
         assert_eq!(db.count_media(&MediaQuery::default()).unwrap(), 1);
         assert_eq!(db.count_media(&MediaQuery { include_missing: true, ..Default::default() }).unwrap(), 2);
+    }
+
+    #[test]
+    fn an_empty_folder_does_not_wipe_a_known_library_folder() {
+        // Een NAS die half gekoppeld is toont een lege map; dan mag niets als ontbrekend worden gemarkeerd.
+        if !have_ffprobe() {
+            return;
+        }
+        let (dir, mut db) = setup();
+        let p = prober();
+        scan_folder(&mut db, dir.path(), &p, &ScanOptions::default(), &mut |_| {}).unwrap();
+        std::fs::remove_file(dir.path().join("film.mkv")).unwrap();
+        std::fs::remove_file(dir.path().join("sub/lied.MP3")).unwrap();
+        let r = scan_folder(&mut db, dir.path(), &p, &ScanOptions::default(), &mut |_| {}).unwrap();
+        assert!(r.skipped_empty);
+        assert_eq!(r.missing, 0);
+        assert_eq!(db.count_media(&MediaQuery::default()).unwrap(), 2);
+    }
+
+    #[test]
+    fn an_empty_folder_with_nothing_known_is_not_flagged() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut db = Database::open_in_memory().unwrap();
+        let r = scan_folder(&mut db, dir.path(), &prober(), &ScanOptions::default(), &mut |_| {}).unwrap();
+        assert!(!r.skipped_empty);
     }
 
     #[test]

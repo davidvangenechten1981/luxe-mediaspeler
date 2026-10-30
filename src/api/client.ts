@@ -12,6 +12,7 @@ import type {
   CapabilityView,
   Collection,
   Series,
+  FolderStatus,
   LibraryStats,
   Lyrics,
   ContinueItem,
@@ -84,6 +85,7 @@ export const api = {
   // bibliotheek
   libraryAddFolder: (path: string) => call<null>(t("library_add_folder", { path })),
   libraryRemoveFolder: (path: string) => call<number>(t("library_remove_folder", { path })),
+  libraryFolderStatus: () => call<FolderStatus[]>(t("library_folder_status")),
   libraryFolders: () => call<string[]>(t("library_folders")),
   libraryQuery: (query: MediaQuery) => call<Media[]>(t("library_query", { query })),
   libraryCount: (query: MediaQuery) => call<number>(t("library_count", { query })),

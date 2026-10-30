@@ -23,6 +23,7 @@ pub enum Request {
     LibraryAddFolder { path: String },
     LibraryRemoveFolder { path: String },
     LibraryFolders,
+    LibraryFolderStatus,
     LibraryQuery { query: MediaQuery },
     LibraryCount { query: MediaQuery },
     LibraryStats,
@@ -138,6 +139,7 @@ pub fn handle(st: &AppState, req: Request) -> Result<Value> {
 
         LibraryAddFolder { path } => library::add_folder(st, &path).and_then(|_| unit()),
         LibraryRemoveFolder { path } => json_of(library::remove_folder(st, &path)?),
+        LibraryFolderStatus => json_of(library::folder_status(st)?),
         LibraryFolders => json_of(library::list_folders(st)?),
         LibraryQuery { query } => json_of(library::query(st, &query)?),
         LibraryCount { query } => json_of(library::count(st, &query)?),
