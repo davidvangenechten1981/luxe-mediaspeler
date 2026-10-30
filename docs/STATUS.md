@@ -5,7 +5,7 @@ Legenda: **Getest** = geautomatiseerde test met echte ffmpeg/libvlc (Linux) en/o
 | Onderdeel | Status |
 |---|---|
 | Afspelen (open, pauze, stop, zoeken, volume, snelheid, sporen, ondertitels, A-B, frame-stap) | Getest met echte LibVLC (dummy audio/video); echt beeld en geluid op Windows: alleen de CI-schermtest |
-| Video naast transparante interface (Windows) | Gemeten op een echte Windows-runner (83% video zichtbaar + interface); in de nieuwe app door CI-schermtest |
+| Video naast transparante interface (Windows) | Bewezen op een echte Windows-runner met de geïnstalleerde app: speler `playing`, 44% van het scherm toont de video én de interface is zichtbaar (CI-run 9) |
 | Hervatten, wachtrij, shuffle/herhalen, automatisch doorgaan | Getest |
 | Bibliotheek (scanner, zoeken, filters, dubbelen, ontbrekende bestanden, herlinken) | Getest |
 | Playlists (maken, bewerken, M3U import/export), favorieten, geschiedenis | Getest |
@@ -16,7 +16,8 @@ Legenda: **Getest** = geautomatiseerde test met echte ffmpeg/libvlc (Linux) en/o
 | Back-up/herstel van de database, beschadigde database wordt opzijgezet | Getest |
 | Windows-integratie (Openen met, rechtsklikmenu) — alleen na toestemming | Alleen compileren/CI; handmatig testen nodig |
 | Mediatoetsen, één instantie, opdrachtregel-bestanden | Alleen gebouwd |
-| Installer (NSIS), stille installatie en verwijderen | Door de CI-workflow; resultaat per run in Actions |
+| Installer (NSIS, ±131 MB met FFmpeg en VLC), stille installatie, start, verwijderen | Groen in CI (run 9). Handmatig klikken in de app is nog niet door een mens gedaan |
+| Rust-tests op Windows met echte FFmpeg en VLC | Groen in CI (run 9), naast Linux |
 | Privacy: geen telemetrie, geen externe verbindingen behalve door jou geopende streams | Ontwerp + URL-validatie getest |
 
 ## Niet gemaakt / bewust verborgen
