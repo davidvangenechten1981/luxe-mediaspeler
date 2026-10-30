@@ -84,7 +84,8 @@ mod tests {
     fn resource_dir_without_binaries_finds_nothing_extra() {
         let dir = tempfile::tempdir().unwrap();
         let t = Tools::discover(Some(dir.path()));
-        assert!(t.vlc_dir.is_none());
+        // VU_VLC_DIR mag de CI wel zetten; er mag alleen niets uit de lege resourcemap komen
+        assert!(t.vlc_dir.as_deref().is_none_or(|d| !d.starts_with(dir.path())));
     }
 
     #[test]

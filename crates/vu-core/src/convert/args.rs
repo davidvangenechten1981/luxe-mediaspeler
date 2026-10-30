@@ -341,6 +341,10 @@ pub fn build_args(input: &Path, output: &Path, s: &Settings, info: &MediaInfo, c
             }
             if s.normalize_audio {
                 chain.push(crate::audio::LOUDNORM_FILTER.to_string());
+                // loudnorm rekent intern op 192 kHz; zonder terugzetten krijgt de encoder die frequentie
+                // (nieuwere FFmpeg-versies laten FLAC daar op falen) en wordt het bestand onnodig groot.
+                let rate = audios.first().and_then(|a| a.sample_rate).filter(|r| *r > 0).unwrap_or(48_000);
+                chain.push(format!("aresample={rate}"));
             }
             if !chain.is_empty() {
                 push(&mut args, &["-af", &chain.join(",")]);
@@ -571,6 +575,17 @@ mod tests {
     }
 
     #[test]
+    fn normalization_resamples_back_to_the_source_rate() {
+        let mut s = profile("high_quality");
+        s.normalize_audio = true;
+        let info = parse_ffprobe_json(AUDIO_JSON).unwrap();
+        let rate = info.streams.iter().find(|st| st.kind == StreamKind::Audio).and_then(|a| a.sample_rate).unwrap();
+        let p = plan(&s, AUDIO_JSON).unwrap();
+        let af = p.args.windows(2).find(|w| w[0] == "-af").map(|w| w[1].clone()).unwrap();
+        assert!(af.ends_with(&format!("loudnorm=I=-16:TP=-1.5:LRA=11,aresample={rate}")), "{af}");
+    }
+
+    #[test]
     fn audio_filters_are_added_in_order_equalizer_then_normalization() {
         let mut s = profile("high_quality");
         s.equalizer = Some(crate::audio::EqConfig { preamp_db: -2.0, bands_db: [0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 0.0, 0.0] });
@@ -578,7 +593,7 @@ mod tests {
         let p = plan(&s, VIDEO_JSON).unwrap();
         let af = p.args.windows(2).find(|w| w[0] == "-af").map(|w| w[1].clone()).unwrap();
         assert!(af.starts_with("volume=-2.00dB,equalizer=f=1000:t=o:w=1:g=4.00,alimiter"), "{af}");
-        assert!(af.ends_with("loudnorm=I=-16:TP=-1.5:LRA=11"), "{af}");
+        assert!(af.contains(",loudnorm=I=-16:TP=-1.5:LRA=11,aresample="), "{af}");
         // zonder filters geen -af
         assert!(!plan(&profile("high_quality"), VIDEO_JSON).unwrap().args.contains(&"-af".to_string()));
     }
