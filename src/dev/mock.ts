@@ -249,7 +249,7 @@ async function handle(request: Record<string, unknown>): Promise<unknown> {
     case "library_set_favorite": { const m = library.find((x) => x.id === (r.id as number)); if (m) m.favorite = r.favorite as boolean; return ok; }
     case "library_scan_running": return false;
     case "library_duplicates": return [];
-    case "collections_list": return [{ id: 1, name: "Lange films", query: { kind: "video", min_duration_ms: 5_400_000 } }];
+    case "collections_list": return [{ id: 1, name: "Lange films die ik nog niet zag", query: { kind: "video", min_duration_ms: 5_400_000, unplayed_only: true } }];
     case "collection_run": return library.filter((m) => matches(m, { kind: "video", min_duration_ms: 5_400_000 }));
     case "playlist_list": return playlists;
     case "playlist_items": return playlistItems(r.id as number);

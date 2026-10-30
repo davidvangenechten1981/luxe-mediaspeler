@@ -8,6 +8,7 @@ export const PAGES = [
   { id: "all_media", label: "Alle mediabestanden", group: "Bibliotheek" },
   { id: "series", label: "Series", group: "Bibliotheek" },
   { id: "playlists", label: "Playlists", group: "Bibliotheek" },
+  { id: "smart_lists", label: "Slimme lijsten", group: "Bibliotheek" },
   { id: "favorites", label: "Favorieten", group: "Bibliotheek" },
   { id: "recent", label: "Recent afgespeeld", group: "Bibliotheek" },
   { id: "most_played", label: "Meest gespeeld", group: "Bibliotheek" },

@@ -11,6 +11,7 @@ const ICONS: Record<PageId, IconName> = {
   all_media: "library",
   series: "film",
   playlists: "list",
+  smart_lists: "tune",
   favorites: "heart",
   recent: "clock",
   most_played: "play",

@@ -40,6 +40,8 @@ export interface MediaQuery {
   added_since?: number | null;
   favorite_only?: boolean;
   played_only?: boolean;
+  unplayed_only?: boolean;
+  added_within_days?: number | null;
   include_missing?: boolean;
   artist?: string | null;
   album?: string | null;

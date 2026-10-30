@@ -541,3 +541,36 @@ fn duplicate_groups_carry_one_recommendation_each() {
     assert_eq!(out[0].keep_id, 1);
     assert_eq!(out[0].items.len(), 2);
 }
+
+#[test]
+fn smart_rules_unplayed_and_added_within_days_follow_the_live_library() {
+    let mut d = Database::open_in_memory().unwrap();
+    let oud = d.upsert_media(&media("/m/oud.mkv", MediaKind::Video)).unwrap();
+    d.upsert_media(&media("/m/nieuw.mkv", MediaKind::Video)).unwrap();
+    d.upsert_media(&media("/m/gezien.mkv", MediaKind::Video)).unwrap();
+    d.record_play("/m/gezien.mkv", None).unwrap();
+    // "oud" is 40 dagen geleden toegevoegd
+    d.conn.execute("UPDATE media SET added_at = ?1 WHERE id = ?2", rusqlite::params![now() - 40 * 86_400, oud]).unwrap();
+    let names = |q: &MediaQuery| -> Vec<String> { d.query_media(q).unwrap().into_iter().map(|m| m.path).collect() };
+    let mut unplayed = names(&MediaQuery { unplayed_only: true, ..Default::default() });
+    unplayed.sort();
+    assert_eq!(unplayed, ["/m/nieuw.mkv", "/m/oud.mkv"]);
+    assert_eq!(names(&MediaQuery { added_within_days: Some(7), ..Default::default() }).len(), 2);
+    assert_eq!(names(&MediaQuery { added_within_days: Some(60), ..Default::default() }).len(), 3);
+    assert_eq!(names(&MediaQuery { unplayed_only: true, added_within_days: Some(7), ..Default::default() }), ["/m/nieuw.mkv"]);
+    assert_eq!(d.count_media(&MediaQuery { unplayed_only: true, ..Default::default() }).unwrap(), 2);
+}
+
+#[test]
+fn a_saved_smart_list_with_the_new_rules_roundtrips_and_runs() {
+    let mut d = Database::open_in_memory().unwrap();
+    d.upsert_media(&media("/m/a.mkv", MediaKind::Video)).unwrap();
+    let q = MediaQuery { unplayed_only: true, added_within_days: Some(30), kind: Some(MediaKind::Video), ..Default::default() };
+    let id = d.create_collection("Nog te kijken", &q).unwrap();
+    let list = d.list_collections().unwrap();
+    assert_eq!(list[0].2.unplayed_only, true);
+    assert_eq!(list[0].2.added_within_days, Some(30));
+    assert_eq!(d.run_collection(id).unwrap().len(), 1);
+    d.record_play("/m/a.mkv", None).unwrap();
+    assert!(d.run_collection(id).unwrap().is_empty(), "de lijst volgt de bibliotheek");
+}

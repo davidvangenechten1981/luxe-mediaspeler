@@ -265,6 +265,10 @@ pub struct MediaQuery {
     pub added_since: Option<i64>,
     pub favorite_only: bool,
     pub played_only: bool,
+    /// Alleen wat nog nooit is afgespeeld.
+    pub unplayed_only: bool,
+    /// Alleen wat in de laatste N dagen is toegevoegd (wordt bij elke zoekopdracht opnieuw uitgerekend).
+    pub added_within_days: Option<u32>,
     pub include_missing: bool,
     pub artist: Option<String>,
     pub album: Option<String>,
@@ -527,6 +531,13 @@ impl Database {
         }
         if q.played_only {
             conds.push("last_played IS NOT NULL".into());
+        }
+        if q.unplayed_only {
+            conds.push("play_count = 0 AND last_played IS NULL".into());
+        }
+        if let Some(days) = q.added_within_days {
+            conds.push("added_at >= ?".into());
+            args.push(Value::Integer(now() - i64::from(days) * 86_400));
         }
         for (col, val) in [("artist", &q.artist), ("album", &q.album), ("genre", &q.genre)] {
             if let Some(v) = val {

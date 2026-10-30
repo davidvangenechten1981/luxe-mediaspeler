@@ -5,6 +5,7 @@ import { bootstrap } from "./bootstrap";
 import { Button, Modal, Spinner, TextInput, Toasts } from "./components/ui";
 import { ConverterPage } from "./features/converter/ConverterPage";
 import { ContinuePage } from "./features/pages/ContinuePage";
+import { SmartListsPage } from "./features/pages/SmartListsPage";
 import { SeriesPage } from "./features/pages/SeriesPage";
 import { HistoryPage } from "./features/pages/HistoryPage";
 import { HomePage } from "./features/pages/HomePage";
@@ -37,6 +38,7 @@ const PAGE_VIEW: Record<PageId, () => ReactElement> = {
   all_media: AllMediaPage,
   series: SeriesPage,
   playlists: PlaylistsPage,
+  smart_lists: SmartListsPage,
   favorites: FavoritesPage,
   recent: RecentPage,
   most_played: MostPlayedPage,

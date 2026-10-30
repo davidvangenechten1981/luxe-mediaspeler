@@ -53,7 +53,7 @@ const mediaShape: Shape<Media> = {
 };
 const queryShape: Shape<MediaQuery> = {
   kind: true, text: true, container: true, min_duration_ms: true, max_duration_ms: true, min_height: true, added_since: true,
-  favorite_only: true, played_only: true, include_missing: true, artist: true, album: true, genre: true, sort: true,
+  favorite_only: true, played_only: true, unplayed_only: true, added_within_days: true, include_missing: true, artist: true, album: true, genre: true, sort: true,
   descending: true, limit: true, offset: true,
 };
 const statusShape: Shape<EngineStatus> = {

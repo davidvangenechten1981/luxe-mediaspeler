@@ -1,5 +1,6 @@
 {
   "added_since": null,
+  "added_within_days": null,
   "album": null,
   "artist": null,
   "container": null,
@@ -15,5 +16,6 @@
   "offset": null,
   "played_only": false,
   "sort": "title",
-  "text": null
+  "text": null,
+  "unplayed_only": false
 }
