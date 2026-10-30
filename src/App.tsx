@@ -5,6 +5,7 @@ import { bootstrap } from "./bootstrap";
 import { Button, Modal, Spinner, TextInput, Toasts } from "./components/ui";
 import { ConverterPage } from "./features/converter/ConverterPage";
 import { ContinuePage } from "./features/pages/ContinuePage";
+import { SeriesPage } from "./features/pages/SeriesPage";
 import { HistoryPage } from "./features/pages/HistoryPage";
 import { HomePage } from "./features/pages/HomePage";
 import { AllMediaPage, FavoritesPage, MusicPage, RecentPage, VideosPage } from "./features/pages/MediaPages";
@@ -34,6 +35,7 @@ const PAGE_VIEW: Record<PageId, () => ReactElement> = {
   videos: VideosPage,
   music: MusicPage,
   all_media: AllMediaPage,
+  series: SeriesPage,
   playlists: PlaylistsPage,
   favorites: FavoritesPage,
   recent: RecentPage,

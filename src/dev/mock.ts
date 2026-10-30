@@ -257,6 +257,10 @@ async function handle(request: Record<string, unknown>): Promise<unknown> {
     case "playlist_missing": return [];
     case "history_list": return history;
     case "history_enabled": return true;
+    case "series_list": {
+      const eps = library.filter((m) => m.kind === "video").slice(0, 4).map((m, i) => ({ media: m, season: 1 + Math.floor(i / 2), episode: 1 + (i % 2), watched: i < 1 }));
+      return [{ show: "Voorbeeldserie", episodes: eps, watched: 1, next_media_id: eps[1]?.media.id ?? null }];
+    }
     case "continue_watching": return library.filter((m) => m.kind === "video").slice(2, 7).map((m, i) => ({ location: m.path, position_ms: m.duration_ms * (0.2 + i * 0.13), duration_ms: m.duration_ms, updated_at: now - i * 7200, media: m, missing: false }));
     case "bookmark_list": return [{ id: 1, location: r.location, position_ms: 600_000, label: "Mooie scène", created_at: now - 4000 }];
     case "player_view": return view;

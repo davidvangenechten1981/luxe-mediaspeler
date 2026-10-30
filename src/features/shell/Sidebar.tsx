@@ -9,6 +9,7 @@ const ICONS: Record<PageId, IconName> = {
   videos: "film",
   music: "music",
   all_media: "library",
+  series: "film",
   playlists: "list",
   favorites: "heart",
   recent: "clock",

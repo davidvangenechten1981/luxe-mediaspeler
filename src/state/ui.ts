@@ -6,6 +6,7 @@ export const PAGES = [
   { id: "videos", label: "Videobibliotheek", group: "Bibliotheek" },
   { id: "music", label: "Muziekbibliotheek", group: "Bibliotheek" },
   { id: "all_media", label: "Alle mediabestanden", group: "Bibliotheek" },
+  { id: "series", label: "Series", group: "Bibliotheek" },
   { id: "playlists", label: "Playlists", group: "Bibliotheek" },
   { id: "favorites", label: "Favorieten", group: "Bibliotheek" },
   { id: "recent", label: "Recent afgespeeld", group: "Bibliotheek" },
