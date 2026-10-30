@@ -4,7 +4,7 @@
 //! verkeerd getypeerde velden, en elke dienst valideert zijn invoer opnieuw.
 //! Er bestaat geen manier om een shellcommando of een vrij FFmpeg-argument mee te geven.
 
-use crate::services::{audio, converter, history, library, player, playlists, series, settings, video};
+use crate::services::{audio, converter, history, library, lyrics, player, playlists, series, settings, video};
 use crate::state::AppState;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -86,6 +86,7 @@ pub enum Request {
     AudioSetNormalize { on: bool },
     // video
     MediaInfo { path: String },
+    LyricsGet { path: String },
     Thumbnail { path: String, at_ms: u64, width: u32 },
     ThumbnailStrip { path: String, count: u32, width: u32 },
     ClearThumbnails,
@@ -207,6 +208,7 @@ pub fn handle(st: &AppState, req: Request) -> Result<Value> {
         AudioSetVisualization { mode } => audio::set_visualization(st, mode).and_then(|_| unit()),
         AudioSetNormalize { on } => audio::set_normalize(st, on).and_then(|_| unit()),
 
+        LyricsGet { path } => json_of(lyrics::get(st, &path)?),
         MediaInfo { path } => json_of(video::media_info(st, &path)?),
         Thumbnail { path, at_ms, width } => json_of(video::thumbnail(st, &path, at_ms, width)?),
         ThumbnailStrip { path, count, width } => json_of(video::thumbnail_strip(st, &path, count, width)?),

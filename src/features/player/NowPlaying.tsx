@@ -12,6 +12,7 @@ import { useSettings } from "../../state/settings";
 import { reportError, toast, useUi } from "../../state/ui";
 import { SeekBar } from "../shell/SeekBar";
 import { useCurrentInfo } from "../shell/useCurrentInfo";
+import { LyricsPanel } from "./LyricsPanel";
 import { MediaInfoOverlay } from "./MediaInfoOverlay";
 import { NextUpCard } from "./NextUpCard";
 import { QueueList } from "./QueueList";
@@ -166,6 +167,7 @@ export function NowPlayingPage() {
 
         {nextUp && <NextUpCard title={title} remainingMs={view.next_in_ms!} onNow={() => void send({ type: "next" })} onCancel={() => void send({ type: "cancel_autoplay" })} />}
         {infoOpen && <MediaInfoOverlay info={info} loading={infoLoading} onClose={() => setInfoOpen(false)} />}
+        {!hasVideo && <LyricsPanel location={view.location} positionMs={st.time_ms} />}
         {hud && <div className="video-zone__hud" role="status">{hud}</div>}
         {(st.state === "opening" || st.state === "buffering") && (
           <div className="video-zone__status" role="status">

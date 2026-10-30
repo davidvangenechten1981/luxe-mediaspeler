@@ -61,6 +61,7 @@ audio_set_device
 audio_set_visualization
 audio_set_normalize
 media_info
+lyrics_get
 thumbnail
 thumbnail_strip
 clear_thumbnails

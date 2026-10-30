@@ -952,3 +952,7 @@
   font-weight: 600;
   pointer-events: none;
 }
+
+.lyrics { position: absolute; inset: 72px 0 120px; overflow-y: auto; padding: 0 var(--sp-6, 24px); text-align: center; color: #fff; pointer-events: none; mask-image: linear-gradient(transparent, #000 15%, #000 85%, transparent); }
+.lyrics__line { margin: 0.4em 0; font-size: var(--fs-lg); opacity: 0.55; }
+.lyrics__line.is-active { opacity: 1; font-weight: 650; font-size: var(--fs-xl, 1.4rem); }

@@ -1,6 +1,6 @@
 //! Songteksten uit `.lrc`-bestanden (tijdgebonden) of gewone tekst.
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct LyricLine {
     /// `None` bij tekst zonder tijden.
     pub time_ms: Option<u64>,

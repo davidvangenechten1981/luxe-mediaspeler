@@ -423,3 +423,13 @@ export interface Series {
   watched: number;
   next_media_id: number | null;
 }
+
+export interface LyricLine {
+  time_ms: number | null;
+  text: string;
+}
+
+export interface Lyrics {
+  lines: LyricLine[];
+  synced: boolean;
+}
