@@ -87,7 +87,14 @@ fn golden_json_shapes_are_stable() {
     check("history_entry", serde_json::to_value(HistoryEntry { id: 1, location: "/m/a.mp3".into(), title: None, played_at: 9 }).unwrap());
     check(
         "bookmark",
-        serde_json::to_value(Bookmark { id: 1, location: "/m/a.mp3".into(), position_ms: 5_000, label: Some("Begin".into()), created_at: 9 }).unwrap(),
+        serde_json::to_value(Bookmark {
+            id: 1,
+            location: "/m/a.mp3".into(),
+            position_ms: 5_000,
+            label: Some("Begin".into()),
+            created_at: 9,
+        })
+        .unwrap(),
     );
     check("engine_status", serde_json::to_value(status()).unwrap());
     check(

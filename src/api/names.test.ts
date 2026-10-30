@@ -5,7 +5,7 @@ import { api, setCommandTransport } from "./client";
 // Elk verzoektype uit de Rust-enum moet door de client worden gebruikt.
 describe("API-dekking", () => {
   it("de client stuurt elk Rust-verzoektype minstens één keer", async () => {
-    const names = namesRaw.split("\n").filter(Boolean);
+    const names = namesRaw.split(/\r?\n/).map((n) => n.trim()).filter(Boolean);
     const sent = new Set<string>();
     setCommandTransport(async (_name, args) => {
       sent.add((args as { request: { type: string } }).request.type);
