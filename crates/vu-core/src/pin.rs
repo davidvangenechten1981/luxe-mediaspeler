@@ -90,7 +90,11 @@ mod tests {
     fn the_stored_text_never_contains_the_pin_and_differs_per_seed() {
         let a = make_record("4821", 1).unwrap();
         let b = make_record("4821", 2).unwrap();
-        assert!(!a.contains("4821"));
+        // De PIN staat nergens als los veld: alleen versie, zout en afgeleide waarde (willekeurige hex-tekens
+        // kunnen "4821" toevallig bevatten, dus we controleren de velden en niet een deelstring).
+        assert!(a.split('$').all(|field| field != "4821"));
+        assert_eq!(a.split('$').count(), 3);
+        assert!(a.split('$').skip(1).all(|f| f.len() >= 32 && f.chars().all(|c| c.is_ascii_hexdigit())));
         assert_ne!(a, b, "ander zout, andere waarde");
         assert!(verify(&a, "4821") && verify(&b, "4821"));
     }
