@@ -34,6 +34,10 @@ pub fn count(st: &AppState, q: &MediaQuery) -> Result<u64> {
     st.lock_db()?.count_media(q)
 }
 
+pub fn stats(st: &AppState) -> Result<vu_core::db::LibraryStats> {
+    st.lock_db()?.library_stats()
+}
+
 pub fn set_favorite(st: &AppState, id: i64, favorite: bool) -> Result<()> {
     st.lock_db()?.set_favorite(id, favorite)
 }

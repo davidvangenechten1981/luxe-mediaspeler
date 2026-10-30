@@ -10,6 +10,8 @@ export const PAGES = [
   { id: "playlists", label: "Playlists", group: "Bibliotheek" },
   { id: "favorites", label: "Favorieten", group: "Bibliotheek" },
   { id: "recent", label: "Recent afgespeeld", group: "Bibliotheek" },
+  { id: "most_played", label: "Meest gespeeld", group: "Bibliotheek" },
+  { id: "recently_added", label: "Recent toegevoegd", group: "Bibliotheek" },
   { id: "continue", label: "Kijk verder", group: "Bibliotheek" },
   { id: "audio_studio", label: "Audio Studio", group: "Studio" },
   { id: "video_studio", label: "Video Studio", group: "Studio" },

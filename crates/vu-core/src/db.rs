@@ -305,6 +305,15 @@ pub struct PlaylistItem {
 
 /// De spoorkeuze van de gebruiker voor één bestand. Een sleutel is een taalcode (bijv. "nld") of, als de
 /// taal onbekend is, de spoornaam in kleine letters; zo vinden we het spoor terug als de nummers anders zijn.
+/// Totalen van de bibliotheek (ontbrekende bestanden tellen niet mee). Alles blijft lokaal.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct LibraryStats {
+    pub video_count: u64,
+    pub audio_count: u64,
+    pub total_duration_ms: u64,
+    pub total_plays: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct TrackPref {
     pub audio_key: Option<String>,
@@ -802,6 +811,22 @@ impl Database {
         }
         tx.commit()?;
         Ok(())
+    }
+
+    pub fn library_stats(&self) -> Result<LibraryStats> {
+        Ok(self.conn.query_row(
+            "SELECT COALESCE(SUM(kind='video'),0), COALESCE(SUM(kind='audio'),0), COALESCE(SUM(duration_ms),0), COALESCE(SUM(play_count),0)
+             FROM media WHERE missing = 0",
+            [],
+            |r| {
+                Ok(LibraryStats {
+                    video_count: r.get::<_, i64>(0)? as u64,
+                    audio_count: r.get::<_, i64>(1)? as u64,
+                    total_duration_ms: r.get::<_, i64>(2)? as u64,
+                    total_plays: r.get::<_, i64>(3)? as u64,
+                })
+            },
+        )?)
     }
 
     // ---------- spoorkeuze per bestand ----------

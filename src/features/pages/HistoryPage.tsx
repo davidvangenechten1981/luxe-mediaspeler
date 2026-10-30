@@ -6,11 +6,13 @@ import { formatRelative, stem } from "../../lib/format";
 import { useAsync } from "../../lib/useAsync";
 import { usePlayer } from "../../state/player";
 import { reportError, toast, useUi } from "../../state/ui";
+import { StatsStrip } from "./StatsStrip";
 
 export function HistoryPage() {
   const go = useUi((s) => s.go);
   const list = useAsync(() => api.historyList(300), []);
   const enabled = useAsync(() => api.historyEnabled(), []);
+  const stats = useAsync(() => api.libraryStats(), []);
   const [confirm, setConfirm] = useState(false);
 
   const toggle = async (on: boolean) => {
@@ -37,6 +39,7 @@ export function HistoryPage() {
           </Button>
         </div>
       </div>
+      <StatsStrip stats={stats.data ?? null} />
       {list.loading && !list.data && <Spinner />}
       {list.data && list.data.length === 0 && <EmptyState icon="history" title="Geen geschiedenis">Wat je afspeelt, verschijnt hier.</EmptyState>}
       <div className="list">

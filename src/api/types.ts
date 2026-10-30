@@ -433,3 +433,10 @@ export interface Lyrics {
   lines: LyricLine[];
   synced: boolean;
 }
+
+export interface LibraryStats {
+  video_count: number;
+  audio_count: number;
+  total_duration_ms: number;
+  total_plays: number;
+}

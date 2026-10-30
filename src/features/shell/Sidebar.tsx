@@ -13,6 +13,8 @@ const ICONS: Record<PageId, IconName> = {
   playlists: "list",
   favorites: "heart",
   recent: "clock",
+  most_played: "play",
+  recently_added: "library",
   continue: "continue",
   audio_studio: "sliders",
   video_studio: "wand",

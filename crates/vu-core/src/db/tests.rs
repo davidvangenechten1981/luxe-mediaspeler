@@ -436,3 +436,26 @@ fn upgrading_an_older_database_adds_the_track_prefs_table() {
     assert_eq!(d.schema_version().unwrap() as usize, MIGRATIONS.len());
     d.save_track_pref("/x.mkv", &TrackPref::default()).unwrap();
 }
+
+#[test]
+fn library_stats_count_items_hours_and_plays_per_kind() {
+    let mut d = Database::open_in_memory().unwrap();
+    let with = |path: &str, kind: MediaKind, ms: u64| NewMedia { duration_ms: ms, ..media(path, kind) };
+    d.upsert_media(&with("/m/a.mkv", MediaKind::Video, 3_600_000)).unwrap();
+    d.upsert_media(&with("/m/b.mp3", MediaKind::Audio, 180_000)).unwrap();
+    let gone = d.upsert_media(&with("/m/weg.mp3", MediaKind::Audio, 999_000)).unwrap();
+    d.record_play("/m/a.mkv", None).unwrap();
+    d.record_play("/m/a.mkv", None).unwrap();
+    d.conn.execute("UPDATE media SET missing = 1 WHERE id = ?1", [gone]).unwrap();
+    let st = d.library_stats().unwrap();
+    assert_eq!((st.video_count, st.audio_count), (1, 1)); // ontbrekende bestanden tellen niet mee
+    assert_eq!(st.total_duration_ms, 3_780_000);
+    assert_eq!(st.total_plays, 2);
+}
+
+#[test]
+fn an_empty_library_has_zero_stats() {
+    let d = Database::open_in_memory().unwrap();
+    let st = d.library_stats().unwrap();
+    assert_eq!((st.video_count, st.audio_count, st.total_duration_ms, st.total_plays), (0, 0, 0, 0));
+}

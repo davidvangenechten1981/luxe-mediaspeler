@@ -8,7 +8,7 @@ import { ContinuePage } from "./features/pages/ContinuePage";
 import { SeriesPage } from "./features/pages/SeriesPage";
 import { HistoryPage } from "./features/pages/HistoryPage";
 import { HomePage } from "./features/pages/HomePage";
-import { AllMediaPage, FavoritesPage, MusicPage, RecentPage, VideosPage } from "./features/pages/MediaPages";
+import { AllMediaPage, FavoritesPage, MostPlayedPage, MusicPage, RecentlyAddedPage, RecentPage, VideosPage } from "./features/pages/MediaPages";
 import { PlaylistsPage } from "./features/pages/PlaylistsPage";
 import { QueuePage } from "./features/pages/QueuePage";
 import { NowPlayingPage } from "./features/player/NowPlaying";
@@ -39,6 +39,8 @@ const PAGE_VIEW: Record<PageId, () => ReactElement> = {
   playlists: PlaylistsPage,
   favorites: FavoritesPage,
   recent: RecentPage,
+  most_played: MostPlayedPage,
+  recently_added: RecentlyAddedPage,
   continue: ContinuePage,
   audio_studio: AudioStudioPage,
   video_studio: VideoStudioPage,

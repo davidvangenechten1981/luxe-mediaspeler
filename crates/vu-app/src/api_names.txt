@@ -5,6 +5,7 @@ library_remove_folder
 library_folders
 library_query
 library_count
+library_stats
 library_set_favorite
 library_duplicates
 library_relink

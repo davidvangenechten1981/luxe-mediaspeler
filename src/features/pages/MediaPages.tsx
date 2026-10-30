@@ -15,3 +15,9 @@ export const FavoritesPage = () => (
 export const RecentPage = () => (
   <MediaBrowser title="Recent afgespeeld" base={{ played_only: true }} defaultSort="played" defaultDescending music emptyTitle="Nog niets afgespeeld" emptyText="Alles wat je afspeelt, verschijnt hier, het nieuwste bovenaan." />
 );
+export const MostPlayedPage = () => (
+  <MediaBrowser title="Meest gespeeld" base={{ played_only: true }} defaultSort="play_count" defaultDescending music emptyTitle="Nog niets afgespeeld" emptyText="Je meest afgespeelde bestanden komen hier vanzelf bovenaan." />
+);
+export const RecentlyAddedPage = () => (
+  <MediaBrowser title="Recent toegevoegd" base={{}} defaultSort="added" defaultDescending music emptyTitle="Je bibliotheek is leeg" emptyText="Nieuwe bestanden verschijnen hier, het nieuwste bovenaan." />
+);
