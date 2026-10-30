@@ -31,3 +31,6 @@ Meld elk probleem met: wat deed je, wat verwachtte je, wat gebeurde er, plus het
 20. **Intro overslaan**: rechtsklik tijdens afspelen, "Hier begint de intro" en "Hier eindigt de intro"; start opnieuw en klik "Intro overslaan".
 21. **Tags bewerken**: rechtsklik op een nummer in de muziekbibliotheek, "Tags bewerken…"; de reservekopie staat in de back-upmap van de app.
 22. **ReplayGain / doorgifte** (Instellingen): zet aan, herstart de app en luister of volumeverschillen kleiner zijn (ReplayGain) of het surroundgeluid de versterker bereikt (doorgifte).
+23. **Converter met videokaart**: open Media Converter, kies een video en het profiel "Compacte video". Bij **Videokaart** moet je kaart genoemd worden (bij Automatisch). Zet een conversie in de wachtrij en vergelijk de snelheid ("speed" in de wachtrij) met "Alleen processor". Open Taakbeheer: tijdens het coderen hoort de videokaart (tabblad Prestaties, "Video Encode") te werken.
+24. **Terugval**: kies een videokaart die je pc niet heeft (bijvoorbeeld AMD op een NVIDIA-pc). De conversie moet toch slagen, met een waarschuwing dat de processor is gebruikt.
+25. **Kernen**: zet bij "Processorthreads" 2 en daarna leeg; in Taakbeheer gebruikt het converteren dan 2 threads, respectievelijk alle kernen.

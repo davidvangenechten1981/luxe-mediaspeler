@@ -96,6 +96,55 @@ pub enum AudioCodec {
     Pcm,
 }
 
+/// De videokaart-techniek waarmee FFmpeg kan coderen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HwBackend {
+    /// NVIDIA (NVENC)
+    Nvenc,
+    /// Intel (Quick Sync)
+    Qsv,
+    /// AMD (AMF)
+    Amf,
+}
+
+impl HwBackend {
+    pub const ALL: [HwBackend; 3] = [HwBackend::Nvenc, HwBackend::Qsv, HwBackend::Amf];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            HwBackend::Nvenc => "NVIDIA (NVENC)",
+            HwBackend::Qsv => "Intel (Quick Sync)",
+            HwBackend::Amf => "AMD (AMF)",
+        }
+    }
+}
+
+/// Welke videokaart-versnelling bij het coderen wordt gebruikt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HwAccel {
+    /// Alleen de processor.
+    Off,
+    /// Automatisch de eerste werkende videokaart; anders de processor.
+    #[default]
+    Auto,
+    Nvenc,
+    Qsv,
+    Amf,
+}
+
+impl HwAccel {
+    pub fn forced(self) -> Option<HwBackend> {
+        match self {
+            HwAccel::Nvenc => Some(HwBackend::Nvenc),
+            HwAccel::Qsv => Some(HwBackend::Qsv),
+            HwAccel::Amf => Some(HwBackend::Amf),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SubtitleMode {
@@ -138,6 +187,12 @@ pub struct Settings {
     /// Taalcode (bv. "nld") voor het externe ondertitelspoor.
     #[serde(default)]
     pub external_subtitle_language: Option<String>,
+    /// Videokaart gebruiken bij het opnieuw coderen van video.
+    #[serde(default)]
+    pub hw_accel: HwAccel,
+    /// Aantal processorthreads voor de software-encoders; `None` = de encoder kiest zelf (alle kernen).
+    #[serde(default)]
+    pub threads: Option<u32>,
 }
 
 impl Settings {
@@ -205,6 +260,11 @@ impl Settings {
                 return bad("De kwaliteit (CRF) moet tussen 0 en 63 liggen");
             }
         }
+        if let Some(t) = self.threads {
+            if !(1..=128).contains(&t) {
+                return bad("Het aantal threads moet tussen 1 en 128 liggen");
+            }
+        }
         if let Some(c) = self.audio_channels {
             if !(1..=8).contains(&c) {
                 return bad("Het aantal audiokanalen moet tussen 1 en 8 liggen");
@@ -247,6 +307,8 @@ fn video_profile(
         normalize_audio: false,
         external_subtitle: None,
         external_subtitle_language: None,
+        hw_accel: HwAccel::Auto,
+        threads: None,
     };
     f(&mut s);
     Profile { id: id.into(), name: name.into(), description: desc.into(), settings: s }
@@ -308,6 +370,34 @@ pub fn builtin_profiles() -> Vec<Profile> {
                 s.subtitles = SubtitleMode::Remove;
             },
         ),
+        video_profile(
+            "phone",
+            "Telefoon of tablet (klein)",
+            "H.264, maximaal 480p, zuinige AAC-stereo. Klein genoeg om te delen.",
+            C::Mp4,
+            V::H264,
+            A::Aac,
+            |s| {
+                s.max_height = Some(480);
+                s.quality = Some(28);
+                s.audio_bitrate_kbps = Some(96);
+                s.audio_channels = Some(2);
+            },
+        ),
+        video_profile(
+            "music_opus",
+            "Muziek klein (Opus)",
+            "Zeer compact en toch mooi geluid (128 kbit/s).",
+            C::Opus,
+            V::Copy,
+            A::Opus,
+            |s| {
+                s.audio_bitrate_kbps = Some(128);
+            },
+        ),
+        video_profile("music_m4a", "Muziek voor apparaten (M4A)", "AAC 256 kbit/s; speelt vrijwel overal.", C::M4a, V::Copy, A::Aac, |s| {
+            s.audio_bitrate_kbps = Some(256);
+        }),
         video_profile("audio_only", "Alleen audio (MP3)", "Haalt het geluid uit een video als MP3.", C::Mp3, V::Copy, A::Mp3, |s| {
             s.audio_bitrate_kbps = Some(192);
             s.subtitles = SubtitleMode::Remove;

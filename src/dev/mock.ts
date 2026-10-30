@@ -130,7 +130,7 @@ const profiles: Profile[] = [
   description: description as string,
   settings: {
     container, video, audio, max_height, fps: null, video_bitrate_kbps: null, audio_bitrate_kbps: null, quality, audio_channels: null,
-    subtitles: "keep", keep_metadata: true, equalizer: null, normalize_audio: false, external_subtitle: null, external_subtitle_language: null,
+    subtitles: "keep", keep_metadata: true, equalizer: null, normalize_audio: false, external_subtitle: null, external_subtitle_language: null, hw_accel: "auto", threads: null,
   } as Profile["settings"],
 }));
 
@@ -335,6 +335,7 @@ async function handle(request: Record<string, unknown>): Promise<unknown> {
     case "convert_profiles": return profiles;
     case "convert_capabilities": return {
       containers: ["mp4", "mkv", "mov", "webm", "mp3", "m4a", "flac", "wav", "ogg", "opus"].map((id) => ({ id, label: id.toUpperCase(), available: true, audio_only: ["mp3", "m4a", "flac", "wav", "ogg", "opus"].includes(id) })),
+      hardware: { cpu_threads: 12, gpus: [{ id: "nvenc", label: "NVIDIA (NVENC)", available: true, audio_only: false }], recommended_parallel: 2 },
       video_codecs: [["copy", "Ongewijzigd kopiëren (remux)"], ["h264", "H.264"], ["h265", "H.265 / HEVC"], ["vp9", "VP9"], ["av1", "AV1"]].map(([id, label]) => ({ id, label, available: true, audio_only: false })),
       audio_codecs: [["copy", "Ongewijzigd kopiëren"], ["aac", "AAC"], ["mp3", "MP3"], ["flac", "FLAC"], ["opus", "Opus"], ["vorbis", "Vorbis"], ["pcm", "PCM (WAV)"]].map(([id, label]) => ({ id, label, available: true, audio_only: false })),
     };

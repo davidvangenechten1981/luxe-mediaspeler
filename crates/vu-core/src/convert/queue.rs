@@ -74,6 +74,8 @@ struct Shared {
     ffmpeg: PathBuf,
     ffprobe: PathBuf,
     caps: Capabilities,
+    /// Werkende videokaarten; pas bij het eerste gebruik bepaald (de proef start FFmpeg een paar keer).
+    hw: std::sync::OnceLock<Vec<super::HwBackend>>,
     max_parallel: usize,
     log_path: Option<PathBuf>,
     on_event: EventFn,
@@ -131,7 +133,8 @@ fn worker(shared: Arc<Shared>, id: u64, request: JobRequest, cancel: Arc<AtomicB
             Resolved::Path(p) => p,
         };
         shared.update(id, |s| s.output = Some(final_path.to_string_lossy().into_owned()));
-        let tools = Tools { ffmpeg: &shared.ffmpeg, ffprobe: &shared.ffprobe, caps: &shared.caps };
+        let caps = shared.caps_with_hw();
+        let tools = Tools { ffmpeg: &shared.ffmpeg, ffprobe: &shared.ffprobe, caps: &caps };
         let shared2 = shared.clone();
         let outcome = run_conversion(&tools, &input, &final_path, &request.settings, &info, &cancel, &mut |p: Progress| {
             shared2.update(id, |s| {
@@ -218,6 +221,22 @@ fn coordinator(shared: Arc<Shared>) {
     }
 }
 
+impl Shared {
+    fn hw(&self) -> &Vec<super::HwBackend> {
+        self.hw.get_or_init(|| {
+            let mut c = self.caps.clone();
+            c.probe_hardware(&self.ffmpeg);
+            c.working_hw
+        })
+    }
+
+    fn caps_with_hw(&self) -> Capabilities {
+        let mut c = self.caps.clone();
+        c.working_hw = self.hw().clone();
+        c
+    }
+}
+
 impl TaskManager {
     pub fn new(
         ffmpeg: PathBuf,
@@ -233,6 +252,7 @@ impl TaskManager {
             ffmpeg,
             ffprobe,
             caps,
+            hw: std::sync::OnceLock::new(),
             max_parallel: max_parallel.clamp(1, 4),
             log_path,
             on_event,
@@ -244,6 +264,11 @@ impl TaskManager {
 
     pub fn capabilities(&self) -> &Capabilities {
         &self.shared.caps
+    }
+
+    /// Videokaarten waarmee een proefcodering echt lukte. De eerste aanroep doet de proef; daarna is het direct.
+    pub fn hardware(&self) -> Vec<super::HwBackend> {
+        self.shared.hw().clone()
     }
 
     pub fn add(&self, request: JobRequest) -> Result<u64> {

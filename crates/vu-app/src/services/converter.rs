@@ -26,7 +26,28 @@ pub struct Option_ {
 }
 
 #[derive(Debug, Serialize)]
+pub struct HardwareView {
+    /// Aantal processorthreads van deze pc.
+    pub cpu_threads: u32,
+    /// Werkende videokaarten, bijvoorbeeld "NVIDIA (NVENC)".
+    pub gpus: Vec<Option_>,
+    /// Handig aantal gelijktijdige conversies voor deze pc.
+    pub recommended_parallel: u32,
+}
+
+/// Aanbevolen aantal gelijktijdige conversies: de encoders gebruiken zelf al meerdere kernen, dus weinig is genoeg.
+pub fn recommended_parallel(cpu_threads: u32, has_gpu: bool) -> u32 {
+    let by_cpu = (cpu_threads / 8).clamp(1, 4);
+    if has_gpu {
+        by_cpu.clamp(2, 4)
+    } else {
+        by_cpu
+    }
+}
+
+#[derive(Debug, Serialize)]
 pub struct CapabilityView {
+    pub hardware: HardwareView,
     pub containers: Vec<Option_>,
     pub video_codecs: Vec<Option_>,
     pub audio_codecs: Vec<Option_>,
@@ -40,7 +61,12 @@ fn opt(id: &str, label: &str, available: bool, audio_only: bool) -> Option_ {
 pub fn capabilities(st: &AppState) -> Result<CapabilityView> {
     let caps = st.require_tasks()?.capabilities();
     let c = |c: Container, label: &str| opt(c.ext(), label, caps.container_available(c), c.is_audio_only());
+    let cpu_threads = std::thread::available_parallelism().map(|n| n.get() as u32).unwrap_or(1);
+    let gpus: Vec<Option_> =
+        st.require_tasks()?.hardware().into_iter().map(|b| opt(&format!("{b:?}").to_lowercase(), b.label(), true, false)).collect();
+    let recommended = recommended_parallel(cpu_threads, !gpus.is_empty());
     Ok(CapabilityView {
+        hardware: HardwareView { cpu_threads, gpus, recommended_parallel: recommended },
         containers: vec![
             c(Container::Mp4, "MP4"),
             c(Container::Mkv, "MKV"),
@@ -227,6 +253,8 @@ pub fn add_audio_processing(st: &AppState, req: AudioProcessRequest) -> Result<A
         normalize_audio: req.normalize,
         external_subtitle: None,
         external_subtitle_language: None,
+        hw_accel: Default::default(),
+        threads: None,
     };
     add(
         st,
@@ -270,6 +298,32 @@ mod tests {
             settings: None,
             output: OutputChoice { dir: Some(app.dir.path().join("uit").to_string_lossy().into_owned()), template: None, overwrite },
         }
+    }
+
+    #[test]
+    fn hardware_view_reports_threads_and_only_gpus_that_really_work() {
+        let app = app();
+        if app.state.tasks.is_none() {
+            return;
+        }
+        let c = capabilities(&app.state).unwrap();
+        assert!(c.hardware.cpu_threads >= 1);
+        // De testmachine heeft geen NVIDIA/Intel/AMD-videokaart: FFmpeg kent de encoders wel, maar de proef moet ze weren.
+        let gpu_present = std::process::Command::new("nvidia-smi").output().map(|o| o.status.success()).unwrap_or(false);
+        if !gpu_present {
+            assert!(c.hardware.gpus.is_empty(), "{:?}", c.hardware.gpus);
+        }
+        assert!((1..=4).contains(&c.hardware.recommended_parallel));
+    }
+
+    #[test]
+    fn the_recommended_number_of_parallel_jobs_scales_with_the_machine() {
+        assert_eq!(recommended_parallel(2, false), 1);
+        assert_eq!(recommended_parallel(8, false), 1);
+        assert_eq!(recommended_parallel(16, false), 2);
+        assert_eq!(recommended_parallel(64, false), 4);
+        assert_eq!(recommended_parallel(4, true), 2);
+        assert_eq!(recommended_parallel(128, true), 4);
     }
 
     #[test]

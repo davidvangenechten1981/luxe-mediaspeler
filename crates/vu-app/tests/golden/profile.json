@@ -11,11 +11,13 @@
     "external_subtitle": null,
     "external_subtitle_language": null,
     "fps": null,
+    "hw_accel": "auto",
     "keep_metadata": true,
     "max_height": 720,
     "normalize_audio": false,
     "quality": 28,
     "subtitles": "keep",
+    "threads": null,
     "video": "h264",
     "video_bitrate_kbps": null
   }

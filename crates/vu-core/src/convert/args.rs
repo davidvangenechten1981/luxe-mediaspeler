@@ -1,7 +1,7 @@
 //! Bouwt FFmpeg-argumenten als lijst (nooit als shell-string) en controleert
 //! wat de gebruikte FFmpeg-build werkelijk kan.
 
-use super::{AudioCodec, Container, Mode, Settings, SubtitleMode, VideoCodec};
+use super::{AudioCodec, Container, HwAccel, HwBackend, Mode, Settings, SubtitleMode, VideoCodec};
 use crate::error::{CoreError, Result};
 use crate::probe::{MediaInfo, StreamInfo, StreamKind};
 use std::collections::HashSet;
@@ -15,6 +15,8 @@ const FRAME_LIMIT_FILTER: &str = "asetnsamples=n=4096:p=0";
 pub struct Capabilities {
     pub encoders: HashSet<String>,
     pub muxers: HashSet<String>,
+    /// Videokaarten waarmee een proefcodering echt lukte (zie `probe_hardware`).
+    pub working_hw: Vec<HwBackend>,
 }
 
 fn names_after_header(text: &str) -> HashSet<String> {
@@ -42,7 +44,7 @@ fn names_after_header(text: &str) -> HashSet<String> {
 
 impl Capabilities {
     pub fn from_text(encoders: &str, muxers: &str) -> Capabilities {
-        Capabilities { encoders: names_after_header(encoders), muxers: names_after_header(muxers) }
+        Capabilities { encoders: names_after_header(encoders), muxers: names_after_header(muxers), working_hw: vec![] }
     }
 
     pub fn detect(ffmpeg: &Path) -> Result<Capabilities> {
@@ -58,6 +60,16 @@ impl Capabilities {
             Ok(String::from_utf8_lossy(&out.stdout).into_owned())
         };
         Ok(Capabilities::from_text(&run("-encoders")?, &run("-muxers")?))
+    }
+
+    /// Probeert per videokaart-techniek een kleine echte codering. Een encoder die FFmpeg alleen kent maar
+    /// waarvoor geen passende videokaart of driver aanwezig is, valt hier af.
+    pub fn probe_hardware(&mut self, ffmpeg: &Path) {
+        self.working_hw = HwBackend::ALL
+            .into_iter()
+            .filter(|b| self.has_encoder(hw_encoder_name(*b, VideoCodec::H264).unwrap_or("-")))
+            .filter(|b| hw_probe(ffmpeg, hw_encoder_name(*b, VideoCodec::H264).unwrap_or("-")))
+            .collect();
     }
 
     pub fn has_encoder(&self, name: &str) -> bool {
@@ -107,6 +119,46 @@ impl Capabilities {
         }
         Ok(())
     }
+}
+
+/// Naam van de FFmpeg-encoder voor deze videokaart-techniek en codec.
+pub fn hw_encoder_name(b: HwBackend, v: VideoCodec) -> Option<&'static str> {
+    Some(match (b, v) {
+        (HwBackend::Nvenc, VideoCodec::H264) => "h264_nvenc",
+        (HwBackend::Nvenc, VideoCodec::H265) => "hevc_nvenc",
+        (HwBackend::Nvenc, VideoCodec::Av1) => "av1_nvenc",
+        (HwBackend::Qsv, VideoCodec::H264) => "h264_qsv",
+        (HwBackend::Qsv, VideoCodec::H265) => "hevc_qsv",
+        (HwBackend::Qsv, VideoCodec::Av1) => "av1_qsv",
+        (HwBackend::Amf, VideoCodec::H264) => "h264_amf",
+        (HwBackend::Amf, VideoCodec::H265) => "hevc_amf",
+        (HwBackend::Amf, VideoCodec::Av1) => "av1_amf",
+        _ => return None,
+    })
+}
+
+/// Echte proef: één klein beeld coderen met deze encoder.
+fn hw_probe(ffmpeg: &Path, encoder: &str) -> bool {
+    crate::proc::quiet(ffmpeg)
+        .args([
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-nostdin",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=black:s=256x256:d=0.2:r=10",
+            "-frames:v",
+            "2",
+            "-c:v",
+        ])
+        .arg(encoder)
+        .args(["-f", "null", "-"])
+        .stdin(Stdio::null())
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
 }
 
 fn is_cover(s: &StreamInfo) -> bool {
@@ -173,6 +225,8 @@ pub struct Plan {
     pub args: Vec<String>,
     pub mode: Mode,
     pub warnings: Vec<String>,
+    /// De videokaart die voor het coderen is gekozen; `None` = processor.
+    pub hardware: Option<HwBackend>,
 }
 
 fn push(args: &mut Vec<String>, items: &[&str]) {
@@ -226,8 +280,15 @@ pub fn build_args(input: &Path, output: &Path, s: &Settings, info: &MediaInfo, c
         }
     }
 
+    let hw = if video.is_some() { pick_hardware(s, caps, &mut warnings) } else { None };
+    let hardware = hw.map(|(b, _)| b);
     let mut args: Vec<String> = vec![];
-    push(&mut args, &["-hide_banner", "-nostdin", "-loglevel", "error", "-progress", "pipe:1", "-nostats", "-i"]);
+    push(&mut args, &["-hide_banner", "-nostdin", "-loglevel", "error", "-progress", "pipe:1", "-nostats"]);
+    if hardware.is_some() {
+        // Decoderen op de videokaart (met automatische terugval op de processor) versnelt het geheel.
+        push(&mut args, &["-hwaccel", "auto"]);
+    }
+    push(&mut args, &["-i"]);
     args.push(input.to_string_lossy().into_owned());
     if let Some(sub) = &s.external_subtitle {
         push(&mut args, &["-i", sub]);
@@ -278,26 +339,39 @@ pub fn build_args(input: &Path, output: &Path, s: &Settings, info: &MediaInfo, c
     if video.is_some() {
         match s.video {
             VideoCodec::Copy => push(&mut args, &["-c:v", "copy"]),
+            _ if hw.is_some() => {
+                let (backend, enc) = hw.unwrap_or((HwBackend::Nvenc, "h264_nvenc"));
+                hw_video_args(&mut args, s, backend, enc);
+            }
             VideoCodec::H264 => {
                 push(&mut args, &["-c:v", "libx264", "-preset", "medium", "-pix_fmt", "yuv420p"]);
+                thread_args(&mut args, s);
                 quality_or_bitrate(&mut args, s, 23, false);
             }
             VideoCodec::H265 => {
                 push(&mut args, &["-c:v", "libx265", "-preset", "medium", "-pix_fmt", "yuv420p"]);
+                if let Some(t) = s.threads {
+                    push(&mut args, &["-x265-params", &format!("pools={t}")]);
+                }
                 if matches!(s.container, Container::Mp4 | Container::Mov) {
                     push(&mut args, &["-tag:v", "hvc1"]);
                 }
                 quality_or_bitrate(&mut args, s, 28, false);
             }
             VideoCodec::Vp9 => {
-                push(&mut args, &["-c:v", "libvpx-vp9", "-row-mt", "1", "-pix_fmt", "yuv420p"]);
+                // Rij-multithreading en tegels laten VP9 alle kernen gebruiken.
+                push(&mut args, &["-c:v", "libvpx-vp9", "-row-mt", "1", "-tile-columns", "2", "-pix_fmt", "yuv420p"]);
+                thread_args(&mut args, s);
                 quality_or_bitrate(&mut args, s, 32, true);
             }
             VideoCodec::Av1 => {
                 let enc = caps.av1_encoder().unwrap_or("libsvtav1");
                 push(&mut args, &["-c:v", enc, "-pix_fmt", "yuv420p"]);
                 if enc == "libaom-av1" {
-                    push(&mut args, &["-cpu-used", "6"]);
+                    push(&mut args, &["-cpu-used", "6", "-row-mt", "1"]);
+                    thread_args(&mut args, s);
+                } else if let Some(t) = s.threads {
+                    push(&mut args, &["-svtav1-params", &format!("lp={t}")]);
                 }
                 quality_or_bitrate(&mut args, s, 30, enc == "libaom-av1");
             }
@@ -381,7 +455,53 @@ pub fn build_args(input: &Path, output: &Path, s: &Settings, info: &MediaInfo, c
     push(&mut args, &["-f", s.container.muxer(), "-y"]);
     args.push(output.to_string_lossy().into_owned());
 
-    Ok(Plan { args, mode: s.mode(), warnings })
+    Ok(Plan { args, mode: s.mode(), warnings, hardware })
+}
+
+fn thread_args(args: &mut Vec<String>, s: &Settings) {
+    if let Some(t) = s.threads {
+        push(args, &["-threads", &t.to_string()]);
+    }
+}
+
+/// Kiest welke videokaart-encoder bij deze instellingen hoort. Geeft `None` voor de processor.
+fn pick_hardware(s: &Settings, caps: &Capabilities, warnings: &mut Vec<String>) -> Option<(HwBackend, &'static str)> {
+    if s.video == VideoCodec::Copy || s.hw_accel == HwAccel::Off {
+        return None;
+    }
+    if let Some(b) = s.hw_accel.forced() {
+        return match hw_encoder_name(b, s.video).filter(|e| caps.has_encoder(e)) {
+            Some(enc) => Some((b, enc)),
+            None => {
+                warnings.push(format!("{} is voor deze codec niet beschikbaar in deze FFmpeg; de processor wordt gebruikt", b.label()));
+                None
+            }
+        };
+    }
+    caps.working_hw.iter().find_map(|b| hw_encoder_name(*b, s.video).filter(|e| caps.has_encoder(e)).map(|e| (*b, e)))
+}
+
+/// Encoder-opties voor een videokaart: constante kwaliteit, of een doelbitrate.
+fn hw_video_args(args: &mut Vec<String>, s: &Settings, backend: HwBackend, enc: &str) {
+    let default_q: u8 = match s.video {
+        VideoCodec::H265 => 28,
+        VideoCodec::Av1 => 30,
+        _ => 23,
+    };
+    let q = s.quality.unwrap_or(default_q).min(51).to_string();
+    push(args, &["-c:v", enc]);
+    match (backend, s.video_bitrate_kbps) {
+        (HwBackend::Nvenc, Some(b)) => push(args, &["-preset", "p5", "-rc", "vbr", "-b:v", &format!("{b}k")]),
+        (HwBackend::Nvenc, None) => push(args, &["-preset", "p5", "-rc", "vbr", "-cq", &q, "-b:v", "0"]),
+        (HwBackend::Qsv, Some(b)) => push(args, &["-preset", "medium", "-b:v", &format!("{b}k")]),
+        (HwBackend::Qsv, None) => push(args, &["-preset", "medium", "-global_quality", &q]),
+        (HwBackend::Amf, Some(b)) => push(args, &["-quality", "balanced", "-rc", "vbr_peak", "-b:v", &format!("{b}k")]),
+        (HwBackend::Amf, None) => push(args, &["-quality", "balanced", "-rc", "cqp", "-qp_i", &q, "-qp_p", &q, "-qp_b", &q]),
+    }
+    push(args, &["-pix_fmt", "yuv420p"]);
+    if s.video == VideoCodec::H265 && matches!(s.container, Container::Mp4 | Container::Mov) {
+        push(args, &["-tag:v", "hvc1"]);
+    }
 }
 
 fn quality_or_bitrate(args: &mut Vec<String>, s: &Settings, default_crf: u8, vp9_style: bool) {
@@ -399,7 +519,7 @@ fn quality_or_bitrate(args: &mut Vec<String>, s: &Settings, default_crf: u8, vp9
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::convert::builtin_profiles;
+    use crate::convert::{builtin_profiles, HwAccel};
     use crate::probe::parse_ffprobe_json;
 
     const VIDEO_JSON: &str = include_str!("../../tests/fixtures/sample.ffprobe.json");
@@ -638,5 +758,132 @@ mod tests {
         let only_aom = Capabilities::from_text(&ENCODERS.replace("libsvtav1", "zzz"), MUXERS);
         let p = build_args(Path::new("/i.mkv"), Path::new("/o.part"), &s, &parse_ffprobe_json(VIDEO_JSON).unwrap(), &only_aom).unwrap();
         assert!(has_pair(&p.args, "-c:v", "libaom-av1"));
+    }
+
+    // ---------- GPU en meerdere kernen ----------
+
+    fn caps_with(extra: &[&str], working: &[HwBackend]) -> Capabilities {
+        let mut c = caps();
+        for e in extra {
+            c.encoders.insert((*e).to_string());
+        }
+        c.working_hw = working.to_vec();
+        c
+    }
+    fn plan_with(s: &Settings, c: &Capabilities) -> Plan {
+        build_args(Path::new("/in/film.mkv"), Path::new("/out/film.mp4.part"), s, &parse_ffprobe_json(VIDEO_JSON).unwrap(), c).unwrap()
+    }
+
+    #[test]
+    fn auto_uses_the_first_working_gpu_for_h264_with_a_constant_quality() {
+        let mut s = profile("compact");
+        s.hw_accel = HwAccel::Auto;
+        s.quality = Some(25);
+        let p = plan_with(&s, &caps_with(&["h264_nvenc", "h264_qsv"], &[HwBackend::Nvenc, HwBackend::Qsv]));
+        assert_eq!(p.hardware, Some(HwBackend::Nvenc));
+        assert!(has_pair(&p.args, "-c:v", "h264_nvenc") && has_pair(&p.args, "-cq", "25") && has_pair(&p.args, "-rc", "vbr"));
+        assert!(!p.args.iter().any(|a| a == "libx264"));
+    }
+
+    #[test]
+    fn each_backend_gets_its_own_quality_options() {
+        let mut s = profile("compact");
+        s.hw_accel = HwAccel::Qsv;
+        s.quality = Some(24);
+        let p = plan_with(&s, &caps_with(&["h264_qsv"], &[]));
+        assert!(has_pair(&p.args, "-c:v", "h264_qsv") && has_pair(&p.args, "-global_quality", "24"));
+        s.hw_accel = HwAccel::Amf;
+        let p = plan_with(&s, &caps_with(&["h264_amf"], &[]));
+        assert!(has_pair(&p.args, "-c:v", "h264_amf") && has_pair(&p.args, "-qp_i", "24") && has_pair(&p.args, "-rc", "cqp"));
+    }
+
+    #[test]
+    fn a_target_bitrate_replaces_the_quality_options_on_the_gpu() {
+        let mut s = profile("compact");
+        s.hw_accel = HwAccel::Nvenc;
+        s.video_bitrate_kbps = Some(4000);
+        let p = plan_with(&s, &caps_with(&["h264_nvenc"], &[]));
+        assert!(has_pair(&p.args, "-b:v", "4000k"));
+        assert!(!p.args.iter().any(|a| a == "-cq"));
+    }
+
+    #[test]
+    fn h265_on_the_gpu_keeps_the_hvc1_tag_for_mp4() {
+        let mut s = profile("compact");
+        s.video = VideoCodec::H265;
+        s.hw_accel = HwAccel::Nvenc;
+        let p = plan_with(&s, &caps_with(&["hevc_nvenc"], &[]));
+        assert!(has_pair(&p.args, "-c:v", "hevc_nvenc") && has_pair(&p.args, "-tag:v", "hvc1"));
+    }
+
+    #[test]
+    fn off_or_a_missing_gpu_encoder_uses_the_cpu() {
+        let mut s = profile("compact");
+        s.hw_accel = HwAccel::Off;
+        assert_eq!(plan_with(&s, &caps_with(&["h264_nvenc"], &[HwBackend::Nvenc])).hardware, None);
+        s.hw_accel = HwAccel::Auto;
+        let p = plan_with(&s, &caps());
+        assert_eq!(p.hardware, None);
+        assert!(has_pair(&p.args, "-c:v", "libx264"));
+        // een gekozen GPU die deze FFmpeg niet kent: ook dan de processor, met uitleg
+        s.hw_accel = HwAccel::Amf;
+        let p = plan_with(&s, &caps());
+        assert!(p.hardware.is_none() && p.warnings.iter().any(|w| w.contains("AMD")), "{:?}", p.warnings);
+    }
+
+    #[test]
+    fn hardware_decoding_is_switched_on_before_the_input_only_when_the_gpu_encodes() {
+        let mut s = profile("compact");
+        s.hw_accel = HwAccel::Nvenc;
+        let p = plan_with(&s, &caps_with(&["h264_nvenc"], &[]));
+        let hw = p.args.iter().position(|a| a == "-hwaccel").expect("-hwaccel ontbreekt");
+        let input = p.args.iter().position(|a| a == "-i").unwrap();
+        assert!(hw < input && p.args[hw + 1] == "auto");
+        s.hw_accel = HwAccel::Off;
+        assert!(!plan_with(&s, &caps()).args.iter().any(|a| a == "-hwaccel"));
+    }
+
+    #[test]
+    fn copying_video_never_uses_the_gpu() {
+        let mut s = profile("remux_mp4");
+        s.hw_accel = HwAccel::Auto;
+        let p = plan_with(&s, &caps_with(&["h264_nvenc"], &[HwBackend::Nvenc]));
+        assert_eq!(p.hardware, None);
+        assert!(has_pair(&p.args, "-c:v", "copy"));
+    }
+
+    #[test]
+    fn the_thread_count_goes_to_the_software_encoders() {
+        let mut s = profile("compact");
+        s.hw_accel = HwAccel::Off;
+        s.threads = Some(6);
+        let p = plan_with(&s, &caps());
+        assert!(has_pair(&p.args, "-threads", "6"));
+        s.video = VideoCodec::H265;
+        let p = plan_with(&s, &caps());
+        assert!(p.args.iter().any(|a| a == "pools=6" || a.contains("pools=6")), "{:?}", p.args);
+        s.threads = None;
+        assert!(!plan_with(&s, &caps()).args.iter().any(|a| a == "-threads"));
+    }
+
+    #[test]
+    fn vp9_always_uses_all_cores_through_row_multithreading_and_tiles() {
+        let mut s = profile("compact");
+        s.container = Container::Webm;
+        s.video = VideoCodec::Vp9;
+        s.audio = AudioCodec::Opus;
+        let p = plan_with(&s, &caps());
+        assert!(has_pair(&p.args, "-row-mt", "1") && has_pair(&p.args, "-tile-columns", "2"));
+    }
+
+    #[test]
+    fn thread_counts_outside_the_range_are_refused() {
+        let mut s = profile("compact");
+        s.threads = Some(0);
+        assert!(s.validate().is_err());
+        s.threads = Some(129);
+        assert!(s.validate().is_err());
+        s.threads = Some(16);
+        assert!(s.validate().is_ok());
     }
 }

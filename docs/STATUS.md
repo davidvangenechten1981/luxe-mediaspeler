@@ -35,6 +35,8 @@ Legenda: **Getest** = geautomatiseerde test met echte ffmpeg/libvlc (Linux) en/o
 | Intro/aftiteling handmatig markeren en overslaan | Getest (sessie en scherm); echte bestanden: door jou te proberen |
 | Tags van muziek bewerken (met reservekopie) | Getest op mp3 met echte bestanden; andere formaten niet apart getest |
 | HDR-waarschuwing in het infopaneel | Getest; echte HDR-weergave blijft een beperking van LibVLC 3 |
+| Converter: videokaart (NVIDIA/Intel/AMD) en meerdere processorkernen | Argumenten per videokaart en de automatische terugval op de processor zijn getest met echte FFmpeg; een echte videokaart is niet getest (de testmachine heeft er geen): door jou te proberen |
+| Converter: extra profielen (telefoon, Opus, M4A), lagere prioriteit tijdens converteren, aanbevolen aantal gelijktijdige taken | Getest met echte FFmpeg; de lagere prioriteit werkt alleen op Windows en is daar niet apart gemeten |
 | Privacy: geen telemetrie, geen externe verbindingen behalve door jou geopende streams | Ontwerp + URL-validatie getest |
 
 ## Niet gemaakt / bewust verborgen

@@ -153,9 +153,39 @@ pub fn run_conversion(
 
     let temp = temp_path_for(final_path);
     let plan = build_args(input, &temp, settings, info, tools.caps)?;
+    let result = execute(tools, plan, &temp, final_path, info, cancel, on_progress);
+    // Een videokaart die bij het starten of tijdens het coderen faalt (driver, geheugen, niet-ondersteund formaat)
+    // mag de conversie niet laten mislukken: één nieuwe poging met de processor.
+    if let (Err(CoreError::Ffmpeg(msg)), Some(backend)) = (&result, hw_used(settings, tools.caps, input, &temp, info)) {
+        let mut cpu = settings.clone();
+        cpu.hw_accel = super::HwAccel::Off;
+        let mut plan = build_args(input, &temp, &cpu, info, tools.caps)?;
+        let first_line = msg.lines().next().unwrap_or("onbekende fout").trim().to_string();
+        plan.warnings.push(format!("Coderen met {} mislukte ({first_line}); de processor is gebruikt", backend.label()));
+        return execute(tools, plan, &temp, final_path, info, cancel, on_progress);
+    }
+    result
+}
+
+/// Welke videokaart het plan voor deze instellingen zou gebruiken (voor de terugval).
+fn hw_used(settings: &Settings, caps: &Capabilities, input: &Path, temp: &Path, info: &MediaInfo) -> Option<super::HwBackend> {
+    build_args(input, temp, settings, info, caps).ok().and_then(|p| p.hardware)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn execute(
+    tools: &Tools,
+    plan: super::args::Plan,
+    temp: &Path,
+    final_path: &Path,
+    info: &MediaInfo,
+    cancel: &AtomicBool,
+    on_progress: &mut dyn FnMut(Progress),
+) -> Result<RunOutcome> {
+    let temp = temp.to_path_buf();
     let _ = std::fs::remove_file(&temp); // restant van een eerdere, afgebroken poging
 
-    let mut child = crate::proc::quiet(tools.ffmpeg)
+    let mut child = crate::proc::background(tools.ffmpeg)
         .args(&plan.args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -317,6 +347,83 @@ mod tests {
         let mut ticks = vec![];
         let r = run_conversion(&env.tools(), input, out, s, &info, cancel, &mut |p| ticks.push(p));
         (r, ticks)
+    }
+
+    #[test]
+    fn a_gpu_encoder_that_fails_falls_back_to_the_cpu_and_says_so() {
+        if !have_ffmpeg() {
+            return;
+        }
+        let env = Env::new();
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("in.mkv");
+        make_video(&input, 3, "320x180");
+        let out = dir.path().join("uit.mp4");
+        // NVIDIA afdwingen: op een pc zonder NVIDIA-kaart (zoals deze testmachine) faalt de encoder bij het starten
+        // of kent FFmpeg hem niet; in beide gevallen moet de conversie met de processor slagen.
+        let mut s = settings("compact");
+        s.hw_accel = crate::convert::HwAccel::Nvenc;
+        let (r, _) = convert(&env, &input, &out, &s, &AtomicBool::new(false));
+        let outcome = r.expect("terugval op de processor moet slagen");
+        let info = probe_file(Path::new("ffprobe"), &out).unwrap();
+        assert_eq!(info.first_video().unwrap().codec, "h264");
+        let gpu_present = std::process::Command::new("nvidia-smi").output().map(|o| o.status.success()).unwrap_or(false);
+        if !gpu_present {
+            assert!(outcome.warnings.iter().any(|w| w.contains("NVIDIA")), "{:?}", outcome.warnings);
+        }
+    }
+
+    #[test]
+    fn an_explicit_thread_count_is_accepted_by_the_real_encoders() {
+        if !have_ffmpeg() {
+            return;
+        }
+        let env = Env::new();
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("in.mkv");
+        make_video(&input, 2, "320x180");
+        for (video, codec, enc) in [(VideoCodec::H264, "h264", "libx264"), (VideoCodec::H265, "hevc", "libx265")] {
+            if !env.caps.has_encoder(enc) {
+                continue;
+            }
+            let mut s = settings("compact");
+            s.video = video;
+            s.hw_accel = crate::convert::HwAccel::Off;
+            s.threads = Some(2);
+            let out = dir.path().join(format!("uit-{codec}.mp4"));
+            let (r, _) = convert(&env, &input, &out, &s, &AtomicBool::new(false));
+            r.unwrap_or_else(|e| panic!("{enc} met 2 threads: {e}"));
+            assert_eq!(probe_file(Path::new("ffprobe"), &out).unwrap().first_video().unwrap().codec, codec);
+        }
+    }
+
+    #[test]
+    fn the_new_phone_and_music_profiles_really_convert() {
+        if !have_ffmpeg() {
+            return;
+        }
+        let env = Env::new();
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("in.mkv");
+        make_video(&input, 3, "960x540");
+        for (id, ext, check_height) in [("phone", "mp4", Some(480)), ("music_opus", "opus", None), ("music_m4a", "m4a", None)] {
+            let s = settings(id);
+            if !env.caps.container_available(s.container)
+                || (!s.container.is_audio_only() && !env.caps.video_available(s.video))
+                || !env.caps.audio_available(s.audio)
+            {
+                continue;
+            }
+            let out = dir.path().join(format!("uit-{id}.{ext}"));
+            let (r, _) = convert(&env, &input, &out, &s, &AtomicBool::new(false));
+            r.unwrap_or_else(|e| panic!("profiel {id}: {e}"));
+            let info = probe_file(Path::new("ffprobe"), &out).unwrap();
+            if let Some(h) = check_height {
+                assert_eq!(info.first_video().unwrap().height, Some(h), "profiel {id}");
+            } else {
+                assert!(info.first_video().is_none(), "profiel {id} hoort alleen audio te zijn");
+            }
+        }
     }
 
     #[test]

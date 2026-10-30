@@ -256,6 +256,7 @@ export type VideoCodec = "copy" | "h264" | "h265" | "vp9" | "av1";
 export type AudioCodec = "copy" | "aac" | "mp3" | "flac" | "opus" | "vorbis" | "pcm";
 export type SubtitleMode = "keep" | "remove";
 export type Overwrite = "skip" | "rename" | "replace";
+export type HwAccel = "off" | "auto" | "nvenc" | "qsv" | "amf";
 export interface ConvertSettings {
   container: Container;
   video: VideoCodec;
@@ -272,6 +273,8 @@ export interface ConvertSettings {
   normalize_audio: boolean;
   external_subtitle: string | null;
   external_subtitle_language: string | null;
+  hw_accel: HwAccel;
+  threads: number | null;
 }
 export interface Profile {
   id: string;
@@ -301,7 +304,13 @@ export interface CapabilityOption {
   available: boolean;
   audio_only: boolean;
 }
+export interface HardwareView {
+  cpu_threads: number;
+  gpus: CapabilityOption[];
+  recommended_parallel: number;
+}
 export interface CapabilityView {
+  hardware: HardwareView;
   containers: CapabilityOption[];
   video_codecs: CapabilityOption[];
   audio_codecs: CapabilityOption[];

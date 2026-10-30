@@ -9,6 +9,7 @@ import { formatBytes, mediaTitle } from "../../lib/format";
 import { useAsync } from "../../lib/useAsync";
 import { useLibrary } from "../../state/library";
 import { LicensesDialog } from "./LicensesDialog";
+import { useJobs } from "../../state/jobs";
 import { useSettings } from "../../state/settings";
 import { reportError, toast } from "../../state/ui";
 
@@ -173,12 +174,14 @@ function LibrarySettings() {
 
 function ConvertSettingsSection() {
   const { settings: s, update } = useSettings();
+  const caps = useJobs((j) => j.caps);
+  useEffect(() => { if (!caps) void useJobs.getState().loadStatic(); }, [caps]);
   return (
     <div className="card">
       <Row title="Standaard uitvoermap"><div className="row"><TextInput aria-label="Standaard uitvoermap" readOnly value={s.convert_output_dir ?? ""} placeholder="Geen" style={{ width: 260 }} /><Button onClick={async () => { const d = await pickFolder({ title: "Standaard uitvoermap" }); if (d) void update({ convert_output_dir: d }); }}>Kiezen…</Button>{s.convert_output_dir && <IconButton icon="close" label="Wissen" size={15} onClick={() => void update({ convert_output_dir: null })} />}</div></Row>
       <Row title="Bestandsnaamsjabloon" hint="Moet {name} bevatten. Verder: {profile}, {date}, {ext}."><TextInput aria-label="Bestandsnaamsjabloon" defaultValue={s.convert_template} style={{ width: 260 }} onBlur={(e) => e.target.value !== s.convert_template && void update({ convert_template: e.target.value })} /></Row>
       <Row title="Als het bestand al bestaat"><Select aria-label="Bij bestaand bestand" value={s.convert_overwrite} onChange={(e) => void update({ convert_overwrite: e.target.value as AppSettings["convert_overwrite"] })}><option value="rename">Nieuwe naam geven</option><option value="skip">Overslaan</option><option value="ask">Elke keer vragen</option></Select></Row>
-      <Row title="Gelijktijdige conversies" hint="Wordt toegepast na het opnieuw starten van de app."><NumberField id="parallel" label="Gelijktijdige conversies" value={s.convert_parallel} min={1} max={4} onCommit={(n) => void update({ convert_parallel: n })} /></Row>
+      <Row title="Gelijktijdige conversies" hint={`Wordt toegepast na het opnieuw starten van de app.${caps ? ` Aanbevolen voor deze pc: ${caps.hardware.recommended_parallel}.` : ""}`}><NumberField id="parallel" label="Gelijktijdige conversies" value={s.convert_parallel} min={1} max={4} onCommit={(n) => void update({ convert_parallel: n })} /></Row>
     </div>
   );
 }

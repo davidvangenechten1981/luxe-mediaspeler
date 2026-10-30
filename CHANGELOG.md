@@ -8,3 +8,4 @@
 - Series met gezien-status, songteksten offline, albumhoes en filmposter/NFO, meest gespeeld, recent toegevoegd, statistiek.
 - NAS-bescherming, ReplayGain, AC3/DTS-doorgifte, kijkstatus delen tussen pc's, intro/aftiteling overslaan, tags bewerken, HDR-waarschuwing.
 - Geen zwarte consolevensters meer die kort oplichten bij ffprobe/ffmpeg (alle hulpprogramma's starten zonder venster).
+- Converter: coderen met de videokaart (NVIDIA NVENC, Intel Quick Sync, AMD AMF) met een echte proef en automatische terugval op de processor, instelbaar aantal threads, extra profielen, lagere prioriteit en een aanbevolen aantal gelijktijdige taken.
