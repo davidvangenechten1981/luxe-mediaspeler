@@ -22,6 +22,19 @@ Legenda: **Getest** = geautomatiseerde test met echte ffmpeg/libvlc (Linux) en/o
 | Mediatoetsen, één instantie, opdrachtregel-bestanden | Alleen gebouwd |
 | Installer (NSIS, ±131 MB met FFmpeg en VLC), stille installatie, start, verwijderen | Groen in CI (run 9). Handmatig klikken in de app is nog niet door een mens gedaan |
 | Rust-tests op Windows met echte FFmpeg en VLC | Groen in CI (run 9), naast Linux |
+| Slaaptimer, ga naar tijd (Ctrl+T), sneltoetsen-overzicht, slepen-en-neerzetten van bestanden en mappen | Logica en schermen getest (vitest); slepen op een echt Windows-venster: door jou te proberen |
+| Audio-/ondertitelkeuze per bestand onthouden, tekenset voor ondertitels | Getest (database en sessie); echt ondertitelbestand met accenten: door jou te proberen |
+| Slapen voorkomen tijdens afspelen, venster onthouden, crashmelding, diagnoserapport, herstart-knop | Venster onthouden en herstellen bewezen in de Windows-CI; de rest getest of door CI-script gecontroleerd |
+| Series (herkenning S01E02/1x02, gezien, volgende aflevering) | Getest; rare bestandsnamen kun je handmatig als gezien/niet gezien zetten |
+| Songteksten offline (.lrc/.txt naast het bestand) | Parser en paneel getest; ingebedde songtekst in tags: niet ondersteund |
+| Albumhoes (map-afbeelding of ingebedde hoes) en lokale filmposter/NFO | Getest met echte FFmpeg (Linux) |
+| Meest gespeeld, recent toegevoegd, bibliotheekstatistiek | Getest; zoeken in 100.000 rijen duurt ±60 ms, dus geen aparte zoekindex nodig |
+| NAS offline (lege/losgekoppelde map wist niets, "Offline"-markering) | Getest met een verdwenen map; echte NAS: door jou te proberen |
+| ReplayGain en AC3/DTS-doorgifte (instellingen, gelden na herstart) | Opties getest; hoorbaar resultaat: door jou te proberen (LibVLC 3.0.21 moet de opties accepteren) |
+| Kijkstatus delen tussen twee pc's via een gedeelde map | Getest met twee databases; twee echte pc's: door jou te proberen |
+| Intro/aftiteling handmatig markeren en overslaan | Getest (sessie en scherm); echte bestanden: door jou te proberen |
+| Tags van muziek bewerken (met reservekopie) | Getest op mp3 met echte bestanden; andere formaten niet apart getest |
+| HDR-waarschuwing in het infopaneel | Getest; echte HDR-weergave blijft een beperking van LibVLC 3 |
 | Privacy: geen telemetrie, geen externe verbindingen behalve door jou geopende streams | Ontwerp + URL-validatie getest |
 
 ## Niet gemaakt / bewust verborgen
@@ -31,6 +44,12 @@ Legenda: **Getest** = geautomatiseerde test met echte ffmpeg/libvlc (Linux) en/o
 - Taalwissel (alleen Nederlands)
 - Conversies pauzeren (wel annuleren)
 - Beeld-in-beeld, uitlezen van de gebruikte hardwaredecoder, HDR/GPU-verificatie
-- Hoesafbeelding uit audiobestanden halen
 - Transcriptiemodule
-- Code-signing van de installer
+- Code-signing van de installer (kost geld; geen extra veiligheid voor thuisgebruik)
+- Automatisch updaten (vraagt een ondertekeningssleutel en een externe verbinding)
+- Casten, UPnP/DLNA, webafstandsbediening (open netwerkpoorten of multicast)
+- Online ondertitels, filmgegevens en songteksten (API-sleutels of accounts nodig)
+- Echte HDR-tonemapping, gapless/crossfade (LibVLC 3 kan dit niet)
+- SMTC (Windows-mediabediening met titel en hoes): mediatoetsen werken al, maar de SMTC-overlay is niet gemaakt omdat die niet zonder echte Windows-pc te testen is
+- Sneller opstarten (venster eerder tonen) en automatische terugval bij hardwaredecoder-problemen: niet gemaakt, te riskant zonder handmatige test
+- Internetradio, podcasts, audio-cd, portable versie, 24p-schermwissel, PIN op de bibliotheek
