@@ -989,7 +989,7 @@ mod tests {
     fn an_external_subtitle_is_shifted_along_with_the_trim() {
         let mut s = profile("remux_mkv");
         s.trim_start_ms = Some(500);
-        s.external_subtitle = Some("/s/ondertitel.srt".into());
+        s.external_subtitle = Some(abs("/s/ondertitel.srt"));
         let p = plan(&s, VIDEO_JSON).unwrap();
         assert_eq!(p.args.iter().filter(|a| *a == "-ss").count(), 2);
     }
@@ -1046,11 +1046,13 @@ mod tests {
     #[test]
     fn burning_an_external_file_replaces_muxing_it() {
         let mut s = profile("compact");
-        s.external_subtitle = Some("/s/ondertitel.srt".into());
+        let sub = abs("/s/ondertitel.srt");
+        s.external_subtitle = Some(sub.clone());
         s.burn_external_subtitle = true;
         let p = plan(&s, VIDEO_JSON).unwrap();
-        assert!(p.args.iter().any(|a| a.starts_with("subtitles='/s/ondertitel.srt'")), "{:?}", p.args);
-        assert!(!has_pair(&p.args, "-map", "1:0") && !p.args.iter().any(|a| a == "/s/ondertitel.srt"), "het bestand is geen tweede invoer");
+        let wanted = format!("subtitles='{}'", escape_filter_path(&sub).unwrap());
+        assert!(p.args.iter().any(|a| a.starts_with(&wanted)), "{:?}", p.args);
+        assert!(!has_pair(&p.args, "-map", "1:0") && !p.args.iter().any(|a| *a == sub), "het bestand is geen tweede invoer");
     }
 
     #[test]
@@ -1066,7 +1068,7 @@ mod tests {
         assert!(e.validate().is_err());
         let mut both = profile("compact");
         both.burn_subtitle_track = Some(0);
-        both.external_subtitle = Some("/s/a.srt".into());
+        both.external_subtitle = Some(abs("/s/a.srt"));
         both.burn_external_subtitle = true;
         assert!(both.validate().is_err(), "kies één bron om in te branden");
     }
