@@ -28,6 +28,13 @@ export const ACTION_LABELS: Record<string, string> = {
   open_settings: "Instellingen openen",
   mini_player: "Mini-speler",
   toggle_playlist: "Wachtrij tonen",
+  go_to_time: "Ga naar tijd",
+  subtitle_delay_down: "Ondertitels eerder",
+  subtitle_delay_up: "Ondertitels later",
+  audio_delay_down: "Geluid eerder",
+  audio_delay_up: "Geluid later",
+  chapter_next: "Volgend hoofdstuk",
+  chapter_previous: "Vorig hoofdstuk",
 };
 
 const NAMED: Record<string, string> = {

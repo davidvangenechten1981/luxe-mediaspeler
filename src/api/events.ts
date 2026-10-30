@@ -35,3 +35,18 @@ export const onScanProgress = (h: (p: ScanProgress) => void) => listenEvent<Scan
 export const onScanDone = (h: (d: ScanDone) => void) => listenEvent<ScanDone>(EVENTS.scanDone, h);
 export const onConvertJob = (h: (j: JobSnapshot) => void) => listenEvent<JobSnapshot>(EVENTS.convertJob, h);
 export const onOpenFiles = (h: (r: LaunchRequest) => void) => listenEvent<LaunchRequest>(EVENTS.openFiles, h);
+
+/** Bestanden en mappen die op het venster worden losgelaten. Alleen in de echte app; Tauri geeft de paden mee. */
+export async function onFileDrop(handler: (paths: string[]) => void, onHover?: (over: boolean) => void): Promise<() => void> {
+  if (!isTauri()) return () => undefined;
+  const { getCurrentWebview } = await import("@tauri-apps/api/webview");
+  return getCurrentWebview().onDragDropEvent((e) => {
+    const p = e.payload;
+    if (p.type === "enter" || p.type === "over") onHover?.(true);
+    else if (p.type === "leave") onHover?.(false);
+    else if (p.type === "drop") {
+      onHover?.(false);
+      if (p.paths.length > 0) handler(p.paths);
+    }
+  });
+}

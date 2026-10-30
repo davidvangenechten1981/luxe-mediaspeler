@@ -8,6 +8,7 @@ import { RATE_STEPS } from "../../lib/shortcuts";
 import { usePlayer } from "../../state/player";
 import { useUi } from "../../state/ui";
 import { SeekBar } from "./SeekBar";
+import { SleepMenu } from "./SleepMenu";
 import { windowApi } from "../../lib/platform";
 import { useSettings } from "../../state/settings";
 import { useCurrentInfo } from "./useCurrentInfo";
@@ -93,6 +94,7 @@ export function PlayerBar() {
         />
         <MenuButton icon="subtitles" label="Ondertitels" placement="above" pressed={st.current_subtitle !== null} entries={trackEntries(st.subtitle_tracks, st.current_subtitle, (id) => void send({ type: "subtitle_track", id }), () => void send({ type: "subtitle_track", id: null }))} />
         <MenuButton icon="audio-track" label="Audiospoor" placement="above" entries={trackEntries(st.audio_tracks, st.current_audio, (id) => void send({ type: "audio_track", id }))} />
+        <SleepMenu />
         <div className="volume">
           <IconButton icon={st.muted || st.volume === 0 ? "mute" : st.volume < 40 ? "volume-low" : "volume"} label={st.muted ? "Dempen opheffen" : "Dempen"} onClick={() => void send({ type: "toggle_mute" })} />
           <div style={{ width: 92 }}>

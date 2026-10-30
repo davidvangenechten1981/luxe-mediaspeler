@@ -35,8 +35,8 @@ interface UiState {
   theater: boolean;
   mini: boolean;
   queueOpen: boolean;
-  dialog: "url" | null;
-  setDialog: (d: "url" | null) => void;
+  dialog: "url" | "goto" | "shortcuts" | null;
+  setDialog: (d: "url" | "goto" | "shortcuts" | null) => void;
   /** Tekst van een eerdere crash (toont de melding bij het opstarten). */
   crashText: string | null;
   setCrashText: (t: string | null) => void;

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type ReactElement } from "react";
+import { onFileDrop } from "./api/events";
+import { isTauri } from "./api/client";
 import { bootstrap } from "./bootstrap";
 import { Button, Modal, Spinner, TextInput, Toasts } from "./components/ui";
 import { ConverterPage } from "./features/converter/ConverterPage";
@@ -11,15 +13,18 @@ import { QueuePage } from "./features/pages/QueuePage";
 import { NowPlayingPage } from "./features/player/NowPlaying";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { CrashDialog } from "./features/shell/CrashDialog";
+import { GoToTimeDialog } from "./features/shell/GoToTimeDialog";
+import { ShortcutsDialog } from "./features/shell/ShortcutsDialog";
 import { PlayerBar } from "./features/shell/PlayerBar";
 import { Sidebar } from "./features/shell/Sidebar";
 import { TitleBar } from "./features/shell/TitleBar";
 import { AudioStudioPage } from "./features/studio/AudioStudio";
 import { VideoStudioPage } from "./features/studio/VideoStudio";
-import { openLocations, openFiles } from "./lib/actions";
+import { adjustDelay, openLocations, openFiles, seekChapter } from "./lib/actions";
 import { windowApi } from "./lib/platform";
 import { actionFor } from "./lib/shortcuts";
 import { usePlayer } from "./state/player";
+import { useSleep } from "./state/sleep";
 import { useSettings } from "./state/settings";
 import { reportError, useUi, type PageId } from "./state/ui";
 
@@ -76,6 +81,12 @@ export function App() {
     };
   }, []);
 
+  // Slaaptimer: één keer per seconde kijken
+  useEffect(() => {
+    const id = setInterval(() => useSleep.getState().tick(), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   // Sneltoetsen (niet tijdens het typen in een invoerveld)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -83,6 +94,10 @@ export function App() {
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
       if (document.querySelector("[role=dialog]")) return;
       const s = useSettings.getState().settings;
+      if (e.key === "F1" || (e.key === "?" && !e.ctrlKey && !e.altKey)) {
+        e.preventDefault();
+        return useUi.getState().setDialog("shortcuts");
+      }
       const action = actionFor(e, s.shortcuts);
       if (!action) {
         if (e.key === "Escape" && useUi.getState().fullscreen) {
@@ -123,16 +138,29 @@ export function App() {
         case "open_settings": return ui.go("settings");
         case "mini_player": return ui.setMini(!ui.mini);
         case "toggle_playlist": return ui.go("queue");
+        case "go_to_time": return usePlayer.getState().view.location ? ui.setDialog("goto") : undefined;
+        case "subtitle_delay_down": return void adjustDelay("subtitle", -100);
+        case "subtitle_delay_up": return void adjustDelay("subtitle", 100);
+        case "audio_delay_down": return void adjustDelay("audio", -100);
+        case "audio_delay_up": return void adjustDelay("audio", 100);
+        case "chapter_next": return void seekChapter("next");
+        case "chapter_previous": return void seekChapter("previous");
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Bestanden naar het venster slepen
+  // Bestanden en mappen naar het venster slepen
+  const [dropping, setDropping] = useState(false);
   useEffect(() => {
-    const over = (e: DragEvent) => e.preventDefault();
+    let off: (() => void) | undefined;
+    let dead = false;
+    void onFileDrop((paths) => void openLocations(paths, false).catch(reportError), setDropping).then((o) => (dead ? o() : (off = o)));
+    // Buiten de echte app (browserweergave) werkt gewoon slepen van bestanden
+    const over = (e: DragEvent) => !isTauri() && e.preventDefault();
     const drop = (e: DragEvent) => {
+      if (isTauri()) return;
       e.preventDefault();
       const paths = Array.from(e.dataTransfer?.files ?? []).map((f) => (f as File & { path?: string }).path).filter((p): p is string => !!p);
       if (paths.length) void openLocations(paths, e.shiftKey);
@@ -140,6 +168,8 @@ export function App() {
     window.addEventListener("dragover", over);
     window.addEventListener("drop", drop);
     return () => {
+      dead = true;
+      off?.();
       window.removeEventListener("dragover", over);
       window.removeEventListener("drop", drop);
     };
@@ -190,7 +220,10 @@ export function App() {
       </div>
       <PlayerBar />
       {dialog === "url" && <UrlDialog onClose={() => setDialog(null)} />}
+      {dialog === "goto" && <GoToTimeDialog lengthMs={view.status.length_ms} onGo={(ms) => void usePlayer.getState().send({ type: "seek_to", ms })} onClose={() => setDialog(null)} />}
+      {dialog === "shortcuts" && <ShortcutsDialog onClose={() => setDialog(null)} />}
       {crashText && <CrashDialog text={crashText} onClose={() => setCrashText(null)} />}
+      {dropping && <div className="drop-overlay" aria-hidden="true">Laat los om af te spelen</div>}
       <Toasts />
     </div>
   );

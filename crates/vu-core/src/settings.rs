@@ -104,6 +104,13 @@ pub fn default_shortcuts() -> BTreeMap<String, String> {
         ("open_settings", "Ctrl+,"),
         ("mini_player", "Ctrl+M"),
         ("toggle_playlist", "Ctrl+P"),
+        ("go_to_time", "Ctrl+T"),
+        ("subtitle_delay_down", "G"),
+        ("subtitle_delay_up", "H"),
+        ("audio_delay_down", "J"),
+        ("audio_delay_up", "K"),
+        ("chapter_next", "Ctrl+ArrowRight"),
+        ("chapter_previous", "Ctrl+ArrowLeft"),
     ]
     .iter()
     .map(|(a, k)| (a.to_string(), k.to_string()))
@@ -389,6 +396,30 @@ mod tests {
         for bad in ["", "Ctrl+", "Ctrl+Shift", "A+B", "F25", "Ctrl+Ctrl+X+Y", "Hyper+Q", "Ctrl+Space+Enter", "ééé"] {
             assert!(normalize_accelerator(bad).is_err(), "{bad:?} moest worden geweigerd");
         }
+    }
+
+    #[test]
+    fn the_default_shortcuts_cover_delays_chapters_and_go_to_time() {
+        let d = default_shortcuts();
+        for action in [
+            "go_to_time",
+            "subtitle_delay_down",
+            "subtitle_delay_up",
+            "audio_delay_down",
+            "audio_delay_up",
+            "chapter_next",
+            "chapter_previous",
+        ] {
+            assert!(d.contains_key(action), "{action} ontbreekt");
+        }
+        // de vaste toetsen van de interface (I = mediagegevens, ?/F1 = sneltoetsen) mogen niet in gebruik zijn
+        for fixed in ["I", "?", "F1", "Escape"] {
+            assert!(!d.values().any(|k| k == fixed), "{fixed} is gereserveerd");
+        }
+        // een bestaande gebruiker krijgt de nieuwe toetsen erbij
+        let mut s = AppSettings { shortcuts: [("play_pause".to_string(), "Space".to_string())].into(), ..Default::default() };
+        s.fill_missing_shortcuts();
+        assert_eq!(s.shortcuts["go_to_time"], "Ctrl+T");
     }
 
     #[test]

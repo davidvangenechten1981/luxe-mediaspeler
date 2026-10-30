@@ -405,3 +405,34 @@ fn upgrading_a_version_1_database_keeps_data_and_adds_new_tables() {
     d.save_eq_preset("Nieuw", None, &EqConfig::default()).unwrap(); // nieuwe tabel werkt
     d.integrity_check().unwrap();
 }
+
+#[test]
+fn track_choices_are_remembered_per_file() {
+    let d = db();
+    assert_eq!(d.get_track_pref("/m/a.mkv").unwrap(), None);
+    let pref = TrackPref { audio_key: Some("eng".into()), subtitle_key: Some("nld".into()), subtitle_off: false };
+    d.save_track_pref("/m/a.mkv", &pref).unwrap();
+    assert_eq!(d.get_track_pref("/m/a.mkv").unwrap(), Some(pref));
+    // bijwerken vervangt de rij
+    let off = TrackPref { audio_key: Some("eng".into()), subtitle_key: None, subtitle_off: true };
+    d.save_track_pref("/m/a.mkv", &off).unwrap();
+    assert_eq!(d.get_track_pref("/m/a.mkv").unwrap(), Some(off));
+    // andere bestanden blijven ongemoeid
+    assert_eq!(d.get_track_pref("/m/b.mkv").unwrap(), None);
+    d.integrity_check().unwrap();
+}
+
+#[test]
+fn upgrading_an_older_database_adds_the_track_prefs_table() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = dir.path().join("v2.db");
+    {
+        let c = Connection::open(&p).unwrap();
+        c.execute_batch(MIGRATIONS[0]).unwrap();
+        c.execute_batch(MIGRATIONS[1]).unwrap();
+        c.pragma_update(None, "user_version", 2).unwrap();
+    }
+    let d = Database::open(&p).unwrap();
+    assert_eq!(d.schema_version().unwrap() as usize, MIGRATIONS.len());
+    d.save_track_pref("/x.mkv", &TrackPref::default()).unwrap();
+}

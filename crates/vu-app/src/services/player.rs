@@ -62,8 +62,8 @@ pub fn command(st: &AppState, cmd: PlayerCommand) -> Result<SessionView> {
             PlayerCommand::RateStep { up } => s.step_rate(up)?,
             PlayerCommand::CycleAudio => s.cycle_audio()?,
             PlayerCommand::CycleSubtitles => s.cycle_subtitles()?,
-            PlayerCommand::AudioTrack { id } => s.engine_mut().set_audio_track(id)?,
-            PlayerCommand::SubtitleTrack { id } => s.engine_mut().set_subtitle_track(id)?,
+            PlayerCommand::AudioTrack { id } => s.set_audio_track(id)?,
+            PlayerCommand::SubtitleTrack { id } => s.set_subtitle_track(id)?,
             PlayerCommand::LoadSubtitle { .. } => s.engine_mut().load_subtitle_file(subtitle.as_deref().unwrap())?,
             PlayerCommand::AudioDelay { ms } => s.engine_mut().set_audio_delay_ms(ms.clamp(-60_000, 60_000))?,
             PlayerCommand::SubtitleDelay { ms } => s.engine_mut().set_subtitle_delay_ms(ms.clamp(-60_000, 60_000))?,
@@ -98,8 +98,39 @@ pub struct PlayResult {
 
 type Rejected = Vec<(String, String)>;
 
+/// Maakt van gesleepte mappen een lijst bestanden (alleen mediabestanden, alfabetisch, met een maximum).
+/// Bestanden en URL's blijven zoals ze zijn.
+pub fn expand_folders(locations: &[String], extensions: &[String], limit: usize) -> Vec<String> {
+    let mut out: Vec<String> = vec![];
+    for loc in locations {
+        let path = std::path::Path::new(loc);
+        if loc.contains("://") || !path.is_dir() {
+            out.push(loc.clone());
+            continue;
+        }
+        let mut files: Vec<String> = walkdir::WalkDir::new(path)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_type().is_file())
+            .filter(|e| e.path().extension().is_some_and(|x| extensions.iter().any(|w| w.eq_ignore_ascii_case(&x.to_string_lossy()))))
+            .map(|e| e.path().to_string_lossy().into_owned())
+            .collect();
+        files.sort_by_key(|f| f.to_lowercase());
+        out.extend(files);
+    }
+    out.truncate(limit.max(1));
+    out
+}
+
 fn to_queue_items(st: &AppState, locations: &[String]) -> Result<(Vec<QueueItem>, Rejected)> {
-    let allow_local = st.settings()?.allow_local_streams;
+    let settings = st.settings()?;
+    let allow_local = settings.allow_local_streams;
+    let extensions: Vec<String> = if settings.extensions.is_empty() {
+        vu_core::scanner::DEFAULT_EXTENSIONS.iter().map(|s| s.to_string()).collect()
+    } else {
+        settings.extensions.clone()
+    };
+    let locations = &expand_folders(locations, &extensions, 3000);
     let (mut items, mut rejected) = (vec![], vec![]);
     for loc in locations {
         let checked = if loc.contains("://") {
@@ -199,6 +230,34 @@ mod tests {
     use super::*;
     use crate::services::testutil::*;
     use vu_core::player::session::PlaybackState;
+
+    #[test]
+    fn dropped_folders_are_expanded_into_their_media_files_in_a_stable_order() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("Serie");
+        std::fs::create_dir_all(root.join("Seizoen 2")).unwrap();
+        for f in ["Serie/b.mkv", "Serie/A.mp4", "Serie/notities.txt", "Serie/Seizoen 2/e01.mkv", "los.mp3"] {
+            std::fs::write(dir.path().join(f), b"x").unwrap();
+        }
+        let exts: Vec<String> = vec!["mkv".into(), "mp4".into(), "mp3".into()];
+        let folder = root.to_string_lossy().into_owned();
+        let single = dir.path().join("los.mp3").to_string_lossy().into_owned();
+        let out = expand_folders(&[single.clone(), folder, "https://x.example/stream".into()], &exts, 100);
+        let names: Vec<String> = out.iter().map(|p| p.rsplit(['/', '\\']).next().unwrap().to_string()).collect();
+        assert_eq!(names, ["los.mp3", "A.mp4", "b.mkv", "e01.mkv", "stream"], "{out:?}");
+        assert!(!out.iter().any(|p| p.ends_with("notities.txt")));
+        assert_eq!(out[0], single, "losse bestanden blijven ongemoeid");
+    }
+
+    #[test]
+    fn expanding_a_huge_folder_is_capped() {
+        let dir = tempfile::tempdir().unwrap();
+        for i in 0..30 {
+            std::fs::write(dir.path().join(format!("f{i:02}.mp3")), b"x").unwrap();
+        }
+        let out = expand_folders(&[dir.path().to_string_lossy().into_owned()], &["mp3".to_string()], 10);
+        assert_eq!(out.len(), 10);
+    }
 
     fn has_player(app: &TestApp) -> bool {
         app.state.player.is_ok()

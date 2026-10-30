@@ -5,7 +5,7 @@
 use super::ab::AbLoop;
 use super::queue::{Queue, QueueItem, RepeatMode};
 use crate::audio::EqConfig;
-use crate::db::{Database, ResumePoint};
+use crate::db::{Database, ResumePoint, TrackPref};
 use crate::error::{CoreError, Result};
 use serde::Serialize;
 use std::path::Path;
@@ -86,6 +86,11 @@ pub trait Persistence: Send + Sync {
     fn save_resume(&self, location: &str, position_ms: u64, duration_ms: u64);
     fn mark_completed(&self, location: &str);
     fn record_play(&self, location: &str, title: Option<&str>);
+    /// Eerder gekozen audio- en ondertitelspoor voor dit bestand.
+    fn track_pref(&self, _location: &str) -> Option<TrackPref> {
+        None
+    }
+    fn save_track_pref(&self, _location: &str, _pref: &TrackPref) {}
 }
 
 impl Persistence for Mutex<Database> {
@@ -107,6 +112,14 @@ impl Persistence for Mutex<Database> {
             let _ = db.record_play(location, title);
         }
     }
+    fn track_pref(&self, location: &str) -> Option<TrackPref> {
+        self.lock().ok()?.get_track_pref(location).ok().flatten()
+    }
+    fn save_track_pref(&self, location: &str, pref: &TrackPref) {
+        if let Ok(db) = self.lock() {
+            let _ = db.save_track_pref(location, pref);
+        }
+    }
 }
 
 impl<T: Persistence + ?Sized> Persistence for std::sync::Arc<T> {
@@ -121,6 +134,12 @@ impl<T: Persistence + ?Sized> Persistence for std::sync::Arc<T> {
     }
     fn record_play(&self, location: &str, title: Option<&str>) {
         (**self).record_play(location, title)
+    }
+    fn track_pref(&self, location: &str) -> Option<TrackPref> {
+        (**self).track_pref(location)
+    }
+    fn save_track_pref(&self, location: &str, pref: &TrackPref) {
+        (**self).save_track_pref(location, pref)
     }
 }
 
@@ -182,6 +201,11 @@ pub fn guess_language(name: &str) -> Option<&'static str> {
     let lower = name.to_lowercase();
     let words: Vec<&str> = lower.split(|c: char| !c.is_alphanumeric() && c != 'ç' && c != 'é').filter(|w| !w.is_empty()).collect();
     TABLE.iter().find(|(_, names)| words.iter().any(|w| names.contains(w))).map(|(code, _)| *code)
+}
+
+/// Sleutel waarmee we een spoor in een ander afspeelmoment terugvinden: taalcode, anders de naam in kleine letters.
+pub fn track_key(t: &Track) -> String {
+    t.language.clone().or_else(|| guess_language(&t.name).map(str::to_string)).unwrap_or_else(|| t.name.trim().to_lowercase())
 }
 
 /// Kiest het eerste spoor dat bij een voorkeurstaal past (in volgorde van voorkeur).
@@ -456,7 +480,7 @@ impl<E: Engine> Session<E> {
     pub fn cycle_audio(&mut self) -> Result<()> {
         let st = self.engine.status();
         match next_track(&st.audio_tracks, st.current_audio, false) {
-            Some(id) => self.engine.set_audio_track(id),
+            Some(id) => self.set_audio_track(id),
             None => Ok(()),
         }
     }
@@ -464,7 +488,36 @@ impl<E: Engine> Session<E> {
     pub fn cycle_subtitles(&mut self) -> Result<()> {
         let st = self.engine.status();
         let next = next_track(&st.subtitle_tracks, st.current_subtitle, true);
-        self.engine.set_subtitle_track(next)
+        self.set_subtitle_track(next)
+    }
+
+    /// Kiest een audiospoor en onthoudt die keuze voor dit bestand.
+    pub fn set_audio_track(&mut self, id: i32) -> Result<()> {
+        self.engine.set_audio_track(id)?;
+        let key = self.engine.status().audio_tracks.iter().find(|t| t.id == id).map(track_key);
+        if let (Some(loc), Some(key)) = (self.current_location.clone(), key) {
+            let mut pref = self.store.track_pref(&loc).unwrap_or_default();
+            pref.audio_key = Some(key);
+            self.store.save_track_pref(&loc, &pref);
+        }
+        Ok(())
+    }
+
+    /// Kiest een ondertitelspoor (`None` = uit) en onthoudt die keuze voor dit bestand.
+    pub fn set_subtitle_track(&mut self, id: Option<i32>) -> Result<()> {
+        self.engine.set_subtitle_track(id)?;
+        if let Some(loc) = self.current_location.clone() {
+            let mut pref = self.store.track_pref(&loc).unwrap_or_default();
+            match id {
+                None => (pref.subtitle_off, pref.subtitle_key) = (true, None),
+                Some(id) => {
+                    pref.subtitle_off = false;
+                    pref.subtitle_key = self.engine.status().subtitle_tracks.iter().find(|t| t.id == id).map(track_key);
+                }
+            }
+            self.store.save_track_pref(&loc, &pref);
+        }
+        Ok(())
     }
 
     pub fn ab_press(&mut self) -> Result<()> {
@@ -513,13 +566,29 @@ impl<E: Engine> Session<E> {
                 self.fail_streak = 0;
                 if self.prefs_pending && (!st.audio_tracks.is_empty() || !st.subtitle_tracks.is_empty()) {
                     self.prefs_pending = false;
-                    if let Some(id) = pick_track(&st.audio_tracks, &self.preferred_audio) {
+                    // Een eerdere keuze van de gebruiker voor dit bestand gaat vóór de algemene voorkeurstalen.
+                    let saved = self.current_location.as_deref().and_then(|l| self.store.track_pref(l)).unwrap_or_default();
+                    let audio = saved
+                        .audio_key
+                        .as_ref()
+                        .and_then(|k| st.audio_tracks.iter().find(|t| track_key(t) == *k).map(|t| t.id))
+                        .or_else(|| pick_track(&st.audio_tracks, &self.preferred_audio));
+                    if let Some(id) = audio {
                         if st.current_audio != Some(id) {
                             let _ = self.engine.set_audio_track(id);
                         }
                     }
-                    if let Some(id) = pick_track(&st.subtitle_tracks, &self.preferred_subtitles) {
-                        let _ = self.engine.set_subtitle_track(Some(id));
+                    if saved.subtitle_off {
+                        let _ = self.engine.set_subtitle_track(None);
+                    } else {
+                        let subs = saved
+                            .subtitle_key
+                            .as_ref()
+                            .and_then(|k| st.subtitle_tracks.iter().find(|t| track_key(t) == *k).map(|t| t.id))
+                            .or_else(|| pick_track(&st.subtitle_tracks, &self.preferred_subtitles));
+                        if let Some(id) = subs {
+                            let _ = self.engine.set_subtitle_track(Some(id));
+                        }
                     }
                 }
                 if let Some(a) = self.ab.jump_target(st.time_ms) {

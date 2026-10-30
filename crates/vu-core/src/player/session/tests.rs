@@ -130,6 +130,7 @@ struct StoreInner {
     saves: Vec<(String, u64, u64)>,
     completed: Vec<String>,
     plays: Vec<String>,
+    prefs: HashMap<String, TrackPref>,
 }
 
 #[derive(Clone, Default)]
@@ -147,6 +148,12 @@ impl Persistence for FakeStore {
     }
     fn record_play(&self, l: &str, _t: Option<&str>) {
         self.0.lock().unwrap().plays.push(l.into());
+    }
+    fn track_pref(&self, l: &str) -> Option<TrackPref> {
+        self.0.lock().unwrap().prefs.get(l).cloned()
+    }
+    fn save_track_pref(&self, l: &str, p: &TrackPref) {
+        self.0.lock().unwrap().prefs.insert(l.into(), p.clone());
     }
 }
 
@@ -628,4 +635,85 @@ fn stopping_cancels_a_running_countdown() {
     assert_eq!(s.view().next_in_ms, None);
     s.tick(60_000);
     assert_eq!(opened(&engine), ["/m/a.mkv"]);
+}
+
+// ---------- spoorkeuze per bestand onthouden ----------
+
+fn with_tracks(engine: &FakeEngine) {
+    engine.with(|i| {
+        i.status.state = PlaybackState::Playing;
+        i.status.audio_tracks = vec![track(1, "Track 1 - [Nederlands]", None), track(2, "Track 2 - [English]", None)];
+        i.status.current_audio = Some(1);
+        i.status.subtitle_tracks = vec![track(10, "Nederlands", None), track(11, "English", None)];
+        i.status.current_subtitle = None;
+    });
+}
+
+#[test]
+fn a_manual_track_choice_is_remembered_and_applied_when_the_file_is_opened_again() {
+    let (mut s, engine, store) = setup(&["a"]);
+    s.preferred_audio = vec!["nld".into()];
+    with_tracks(&engine);
+    s.tick(1_000); // eerste keer: voorkeurstaal Nederlands
+    assert_eq!(engine.with(|i| i.status.current_audio), Some(1));
+    s.set_audio_track(2).unwrap(); // gebruiker kiest Engels
+    s.set_subtitle_track(Some(10)).unwrap();
+    assert_eq!(
+        store.0.lock().unwrap().prefs["/m/a.mp3"],
+        TrackPref { audio_key: Some("eng".into()), subtitle_key: Some("nld".into()), subtitle_off: false }
+    );
+
+    s.play_items(items(&["a"]), 0).unwrap(); // zelfde bestand opnieuw
+    with_tracks(&engine);
+    s.tick(2_000);
+    assert_eq!(engine.with(|i| i.status.current_audio), Some(2), "Engels onthouden, ondanks voorkeur Nederlands");
+    assert_eq!(engine.with(|i| i.status.current_subtitle), Some(10));
+}
+
+#[test]
+fn turning_subtitles_off_is_remembered_too_and_beats_the_preferred_language() {
+    let (mut s, engine, _) = setup(&["a"]);
+    s.preferred_subtitles = vec!["nld".into()];
+    with_tracks(&engine);
+    s.tick(1_000);
+    assert_eq!(engine.with(|i| i.status.current_subtitle), Some(10)); // voorkeur geldt eerst
+    s.set_subtitle_track(None).unwrap();
+    s.play_items(items(&["a"]), 0).unwrap();
+    with_tracks(&engine);
+    s.tick(2_000);
+    assert_eq!(engine.with(|i| i.status.current_subtitle), None, "uit blijft uit");
+}
+
+#[test]
+fn cycling_tracks_counts_as_a_choice_and_other_files_are_not_affected() {
+    let (mut s, engine, store) = setup(&["a", "b"]);
+    with_tracks(&engine);
+    s.cycle_audio().unwrap(); // 1 -> 2
+    assert_eq!(store.0.lock().unwrap().prefs["/m/a.mp3"].audio_key.as_deref(), Some("eng"));
+    s.skip_next().unwrap(); // ander bestand: geen opgeslagen keuze, dus voorkeurstaal-logica
+    with_tracks(&engine);
+    s.preferred_audio = vec!["nld".into()];
+    s.tick(5_000);
+    assert_eq!(engine.with(|i| i.status.current_audio), Some(1));
+    assert!(!store.0.lock().unwrap().prefs.contains_key("/m/b.mp3"));
+}
+
+#[test]
+fn choices_are_matched_by_language_or_by_name_when_the_language_is_unknown() {
+    let (mut s, engine, store) = setup(&["a"]);
+    engine.with(|i| {
+        i.status.state = PlaybackState::Playing;
+        i.status.audio_tracks = vec![track(1, "Commentaar van de regisseur", None), track(2, "Hoofdgeluid", None)];
+        i.status.current_audio = Some(2);
+    });
+    s.set_audio_track(1).unwrap();
+    assert_eq!(store.0.lock().unwrap().prefs["/m/a.mp3"].audio_key.as_deref(), Some("commentaar van de regisseur"));
+    s.play_items(items(&["a"]), 0).unwrap();
+    engine.with(|i| {
+        i.status.state = PlaybackState::Playing;
+        i.status.audio_tracks = vec![track(7, "Hoofdgeluid", None), track(8, "Commentaar van de regisseur", None)];
+        i.status.current_audio = Some(7);
+    });
+    s.tick(1_000);
+    assert_eq!(engine.with(|i| i.status.current_audio), Some(8), "gevonden op naam, ook al zijn de nummers anders");
 }

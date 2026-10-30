@@ -101,6 +101,16 @@ const MIGRATIONS: &[&str] = &[
         created_at INTEGER NOT NULL
     );
     "#,
+    // 3: gekozen audio- en ondertitelspoor per bestand
+    r#"
+    CREATE TABLE track_prefs (
+        location TEXT PRIMARY KEY,
+        audio_key TEXT,
+        subtitle_key TEXT,
+        subtitle_off INTEGER NOT NULL DEFAULT 0,
+        updated_at INTEGER NOT NULL
+    );
+    "#,
 ];
 
 pub fn now() -> i64 {
@@ -291,6 +301,16 @@ pub struct PlaylistItem {
     pub position: u32,
     pub location: String,
     pub title: Option<String>,
+}
+
+/// De spoorkeuze van de gebruiker voor één bestand. Een sleutel is een taalcode (bijv. "nld") of, als de
+/// taal onbekend is, de spoornaam in kleine letters; zo vinden we het spoor terug als de nummers anders zijn.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct TrackPref {
+    pub audio_key: Option<String>,
+    pub subtitle_key: Option<String>,
+    /// De gebruiker heeft de ondertitels bewust uitgezet.
+    pub subtitle_off: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -774,6 +794,26 @@ impl Database {
             tx.execute("UPDATE playlist_items SET position = ?2 WHERE id = ?1", params![id, pos as u32])?;
         }
         tx.commit()?;
+        Ok(())
+    }
+
+    // ---------- spoorkeuze per bestand ----------
+
+    pub fn get_track_pref(&self, location: &str) -> Result<Option<TrackPref>> {
+        Ok(self
+            .conn
+            .query_row("SELECT audio_key, subtitle_key, subtitle_off FROM track_prefs WHERE location = ?1", [location], |r| {
+                Ok(TrackPref { audio_key: r.get(0)?, subtitle_key: r.get(1)?, subtitle_off: r.get::<_, i64>(2)? != 0 })
+            })
+            .optional()?)
+    }
+
+    pub fn save_track_pref(&self, location: &str, pref: &TrackPref) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO track_prefs (location, audio_key, subtitle_key, subtitle_off, updated_at) VALUES (?1,?2,?3,?4,?5)
+             ON CONFLICT(location) DO UPDATE SET audio_key=?2, subtitle_key=?3, subtitle_off=?4, updated_at=?5",
+            params![location, pref.audio_key, pref.subtitle_key, i64::from(pref.subtitle_off), now()],
+        )?;
         Ok(())
     }
 
