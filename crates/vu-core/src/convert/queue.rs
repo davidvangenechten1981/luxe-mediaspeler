@@ -76,7 +76,8 @@ struct Shared {
     cv: Condvar,
     ffmpeg: PathBuf,
     ffprobe: PathBuf,
-    caps: Capabilities,
+    /// Wat deze FFmpeg kan; pas bij het eerste gebruik bepaald zodat de app sneller start.
+    caps: std::sync::OnceLock<std::result::Result<Capabilities, String>>,
     /// Werkende videokaarten; pas bij het eerste gebruik bepaald (de proef start FFmpeg een paar keer).
     hw: std::sync::OnceLock<Vec<super::HwBackend>>,
     max_parallel: usize,
@@ -136,7 +137,7 @@ fn worker(shared: Arc<Shared>, id: u64, request: JobRequest, cancel: Arc<AtomicB
             Resolved::Path(p) => p,
         };
         shared.update(id, |s| s.output = Some(final_path.to_string_lossy().into_owned()));
-        let caps = shared.caps_with_hw();
+        let caps = shared.caps_with_hw()?;
         let tools = Tools { ffmpeg: &shared.ffmpeg, ffprobe: &shared.ffprobe, caps: &caps };
         let shared2 = shared.clone();
         let outcome = run_conversion(&tools, &input, &final_path, &request.settings, &info, &cancel, &paused, &mut |p: Progress| {
@@ -227,18 +228,26 @@ fn coordinator(shared: Arc<Shared>) {
 }
 
 impl Shared {
-    fn hw(&self) -> &Vec<super::HwBackend> {
-        self.hw.get_or_init(|| {
-            let mut c = self.caps.clone();
-            c.probe_hardware(&self.ffmpeg);
-            c.working_hw
-        })
+    fn caps(&self) -> Result<&Capabilities> {
+        self.caps
+            .get_or_init(|| Capabilities::detect(&self.ffmpeg).map_err(|e| e.to_string()))
+            .as_ref()
+            .map_err(|e| CoreError::Ffmpeg(e.clone()))
     }
 
-    fn caps_with_hw(&self) -> Capabilities {
-        let mut c = self.caps.clone();
-        c.working_hw = self.hw().clone();
-        c
+    fn hw(&self) -> Result<&Vec<super::HwBackend>> {
+        let caps = self.caps()?;
+        Ok(self.hw.get_or_init(|| {
+            let mut c = caps.clone();
+            c.probe_hardware(&self.ffmpeg);
+            c.working_hw
+        }))
+    }
+
+    fn caps_with_hw(&self) -> Result<Capabilities> {
+        let mut c = self.caps()?.clone();
+        c.working_hw = self.hw()?.clone();
+        Ok(c)
     }
 }
 
@@ -250,13 +259,12 @@ impl TaskManager {
         log_path: Option<PathBuf>,
         on_event: EventFn,
     ) -> Result<TaskManager> {
-        let caps = Capabilities::detect(&ffmpeg)?;
         let shared = Arc::new(Shared {
             state: Mutex::new(State::default()),
             cv: Condvar::new(),
             ffmpeg,
             ffprobe,
-            caps,
+            caps: std::sync::OnceLock::new(),
             hw: std::sync::OnceLock::new(),
             max_parallel: max_parallel.clamp(1, 4),
             log_path,
@@ -267,19 +275,20 @@ impl TaskManager {
         Ok(TaskManager { shared, coordinator: Mutex::new(Some(handle)) })
     }
 
-    pub fn capabilities(&self) -> &Capabilities {
-        &self.shared.caps
+    /// Wat de FFmpeg kan. De eerste aanroep start FFmpeg even; daarna is het direct.
+    pub fn capabilities(&self) -> Result<&Capabilities> {
+        self.shared.caps()
     }
 
     /// Videokaarten waarmee een proefcodering echt lukte. De eerste aanroep doet de proef; daarna is het direct.
     pub fn hardware(&self) -> Vec<super::HwBackend> {
-        self.shared.hw().clone()
+        self.shared.hw().cloned().unwrap_or_default()
     }
 
     pub fn add(&self, request: JobRequest) -> Result<u64> {
         validate_media_path(&request.input)?;
         request.settings.validate()?;
-        self.shared.caps.check(&request.settings)?;
+        self.shared.caps()?.check(&request.settings)?;
         let snap = {
             let mut st = self.shared.state.lock().unwrap();
             if st.shutdown {
@@ -669,6 +678,17 @@ mod tests {
         assert_eq!(s.state, JobState::Cancelled);
         assert!(!s.paused);
         assert!(std::fs::read_dir(&out).map(|d| d.count()).unwrap_or(0) == 0);
+    }
+
+    #[test]
+    fn creating_the_manager_does_not_start_ffmpeg_until_it_is_needed() {
+        let m = TaskManager::new("/bestaat/niet/ffmpeg".into(), "/bestaat/niet/ffprobe".into(), 1, None, Arc::new(|_| {}))
+            .expect("aanmaken start geen FFmpeg");
+        assert!(m.list().is_empty());
+        assert!(m.hardware().is_empty());
+        // pas bij het eerste gebruik blijkt dat FFmpeg ontbreekt, met een duidelijke melding
+        let err = m.capabilities().unwrap_err().to_string();
+        assert!(err.to_lowercase().contains("ffmpeg"), "{err}");
     }
 
     #[test]

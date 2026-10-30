@@ -149,10 +149,17 @@ pub fn run() {
                 logging::info("de vorige sessie is onverwacht gestopt (zie crash-vorige.log)");
             }
             app.manage(StartupInfo(Mutex::new(previous_crash)));
+            let t0 = std::time::Instant::now();
             let tools = Tools::discover(app.path().resource_dir().ok().as_deref());
+            let t_tools = t0.elapsed();
             logging::info(&format!("tools: ffmpeg={:?} ffprobe={:?} vlc={:?}", tools.ffmpeg, tools.ffprobe, tools.vlc_dir));
             let sink = Arc::new(TauriSink::new(app.handle().clone()));
             let state = Arc::new(AppState::init(env!("CARGO_PKG_VERSION"), dirs, tools, sink, vec![])?);
+            logging::info(&format!(
+                "opstarten: tools zoeken {} ms, rest van de kern {} ms",
+                t_tools.as_millis(),
+                t0.elapsed().saturating_sub(t_tools).as_millis()
+            ));
             for w in &state.warnings {
                 logging::info(&format!("waarschuwing: {w}"));
             }

@@ -76,7 +76,7 @@ pub struct Diagnostics {
 }
 
 pub fn diagnostics(st: &AppState, app_version: &str) -> Result<Diagnostics> {
-    let caps = st.tasks.as_ref().map(|t| t.capabilities());
+    let caps = st.tasks.as_ref().and_then(|t| t.capabilities().ok());
     let mut encoders: Vec<String> = caps
         .map(|c| c.encoders.iter().filter(|e| e.starts_with("lib") || *e == "aac" || *e == "flac").cloned().collect())
         .unwrap_or_default();

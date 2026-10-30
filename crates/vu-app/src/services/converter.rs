@@ -191,7 +191,7 @@ fn opt(id: &str, label: &str, available: bool, audio_only: bool) -> Option_ {
 
 /// Wat de gebruikte FFmpeg-build werkelijk kan; de interface toont alleen beschikbare keuzes.
 pub fn capabilities(st: &AppState) -> Result<CapabilityView> {
-    let caps = st.require_tasks()?.capabilities();
+    let caps = st.require_tasks()?.capabilities()?;
     let c = |c: Container, label: &str| opt(c.ext(), label, caps.container_available(c), c.is_audio_only());
     let cpu_threads = std::thread::available_parallelism().map(|n| n.get() as u32).unwrap_or(1);
     let gpus: Vec<Option_> =
