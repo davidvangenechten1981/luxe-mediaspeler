@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, system } from "../../api/client";
-import type { AppSettings, Diagnostics, HwDecoding, IntegrationStatus, Media, Theme } from "../../api/types";
+import type { AppSettings, Diagnostics, DuplicateGroup, HwDecoding, IntegrationStatus, Theme } from "../../api/types";
 import { Icon } from "../../components/Icon";
 import { Button, ConfirmDialog, IconButton, Modal, Select, Slider, Spinner, Switch, TextInput } from "../../components/ui";
 import { ACTION_LABELS, eventToAccelerator } from "../../lib/shortcuts";
@@ -112,28 +112,43 @@ function Play() {
   );
 }
 
-function DuplicatesDialog({ onClose }: { onClose: () => void }) {
-  const groups = useAsync<Media[][]>(() => api.libraryDuplicates(), []);
+export function DuplicatesDialog({ onClose }: { onClose: () => void }) {
+  const groups = useAsync<DuplicateGroup[]>(() => api.libraryDuplicates(), []);
   const bump = useLibrary((s) => s.bump);
+  const remove = async (ids: number[]) => {
+    try {
+      await Promise.all(ids.map((id) => api.libraryRemoveMedia(id)));
+      groups.reload();
+      bump();
+    } catch (e) {
+      reportError(e);
+    }
+  };
   return (
     <Modal title="Dubbele bestanden" wide onClose={onClose} footer={<Button onClick={onClose}>Sluiten</Button>}>
       {groups.loading && <Spinner />}
       {groups.data?.length === 0 && <p className="muted">Geen dubbele bestanden gevonden. We vergelijken grootte en duur.</p>}
       <div className="col" style={{ gap: "var(--s-4)" }}>
-        {groups.data?.map((g, i) => (
-          <div key={i} className="card">
-            <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: 6 }}>{g.length} bestanden van {formatBytes(g[0]!.size)}</div>
-            {g.map((m) => (
+        {groups.data?.map((g) => (
+          <div key={g.keep_id} className="card">
+            <div className="row" style={{ justifyContent: "space-between", marginBottom: 6 }}>
+              <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{g.items.length} bestanden van {formatBytes(g.items[0]!.size)}</span>
+              <Button size="sm" onClick={() => void remove(g.items.filter((m) => m.id !== g.keep_id).map((m) => m.id))}>Alleen het aanbevolen bestand bewaren</Button>
+            </div>
+            {g.items.map((m) => (
               <div key={m.id} className="list-item">
-                <span className="grow ellipsis" title={m.path}>{mediaTitle(m)}<span className="faint"> — {m.path}</span></span>
+                <span className="grow ellipsis" title={m.path}>
+                  {m.id === g.keep_id && <span className="chip" style={{ marginRight: 6 }}>Aanbevolen</span>}
+                  {mediaTitle(m)}<span className="faint"> — {m.path}</span>
+                </span>
                 <IconButton icon="folder" label="Tonen in Verkenner" size={15} onClick={() => void revealInFolder(m.path).catch(reportError)} />
-                <IconButton icon="trash" label="Uit bibliotheek verwijderen" size={15} onClick={async () => { try { await api.libraryRemoveMedia(m.id); groups.reload(); bump(); } catch (e) { reportError(e); } }} />
+                <IconButton icon="trash" label="Uit bibliotheek verwijderen" size={15} onClick={() => void remove([m.id])} />
               </div>
             ))}
           </div>
         ))}
       </div>
-      <p className="field__hint" style={{ marginTop: "var(--s-3)" }}>Verwijderen haalt een bestand alleen uit de bibliotheek. Op schijf wordt niets gewist.</p>
+      <p className="field__hint" style={{ marginTop: "var(--s-3)" }}>Verwijderen haalt een bestand alleen uit de bibliotheek. Op schijf wordt niets gewist. De aanbeveling kiest een favoriet, dan het vaakst afgespeelde, dan het kortste pad.</p>
     </Modal>
   );
 }

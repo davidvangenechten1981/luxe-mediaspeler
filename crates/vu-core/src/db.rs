@@ -339,6 +339,26 @@ pub struct TrackPref {
     pub subtitle_off: bool,
 }
 
+/// Een groep dubbele bestanden met de aanbeveling welk exemplaar je bewaart.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct DuplicateGroup {
+    pub keep_id: i64,
+    pub items: Vec<Media>,
+}
+
+/// Welk exemplaar uit een groep dubbelen is het best om te bewaren? Een favoriet gaat voor, dan het vaakst
+/// afgespeelde, dan het kortste pad (meestal de "echte" plek in plaats van een kopie in een submap), dan het oudste.
+pub fn suggest_keep(items: &[Media]) -> Option<i64> {
+    items
+        .iter()
+        .min_by_key(|m| (std::cmp::Reverse(m.favorite), std::cmp::Reverse(m.play_count), m.path.chars().count(), m.added_at, m.id))
+        .map(|m| m.id)
+}
+
+pub fn duplicate_groups(groups: Vec<Vec<Media>>) -> Vec<DuplicateGroup> {
+    groups.into_iter().filter_map(|items| suggest_keep(&items).map(|keep_id| DuplicateGroup { keep_id, items })).collect()
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Bookmark {
     pub id: i64,

@@ -481,3 +481,63 @@ fn searching_a_100k_row_library_stays_fast() {
     assert!(elapsed < std::time::Duration::from_secs(2), "zoeken duurde {elapsed:?}");
     eprintln!("zoeken in 100000 rijen: {elapsed:?}");
 }
+
+fn media_row(path: &str) -> Media {
+    Media {
+        id: 0,
+        path: path.into(),
+        kind: MediaKind::Video,
+        title: None,
+        artist: None,
+        album: None,
+        genre: None,
+        year: None,
+        track: None,
+        duration_ms: 1_000,
+        width: None,
+        height: None,
+        codec: None,
+        container: None,
+        bitrate: None,
+        size: 10,
+        mtime: 1,
+        added_at: 0,
+        missing: false,
+        favorite: false,
+        play_count: 0,
+        last_played: None,
+    }
+}
+
+fn dup(id: i64, path: &str, favorite: bool, plays: u32, added: i64) -> Media {
+    let mut m = media_row(path);
+    m.id = id;
+    m.favorite = favorite;
+    m.play_count = plays;
+    m.added_at = added;
+    m
+}
+
+#[test]
+fn the_suggested_copy_prefers_favorites_then_plays_then_a_short_path_then_the_oldest() {
+    let long = dup(1, "/m/film/kopie/film.mkv", false, 0, 100);
+    let short = dup(2, "/m/film.mkv", false, 0, 200);
+    assert_eq!(suggest_keep(&[long.clone(), short.clone()]), Some(2), "kortste pad");
+    let played = dup(3, "/m/film/kopie/film.mkv", false, 5, 300);
+    assert_eq!(suggest_keep(&[short.clone(), played.clone()]), Some(3), "vaker afgespeeld wint van een korter pad");
+    let fav = dup(4, "/m/film/kopie/x/film.mkv", true, 0, 400);
+    assert_eq!(suggest_keep(&[short.clone(), played, fav]), Some(4), "favoriet wint");
+    let older = dup(5, "/m/ab.mkv", false, 0, 50);
+    let newer = dup(6, "/m/cd.mkv", false, 0, 60);
+    assert_eq!(suggest_keep(&[newer, older]), Some(5), "bij gelijkspel het oudste");
+    assert_eq!(suggest_keep(&[]), None);
+}
+
+#[test]
+fn duplicate_groups_carry_one_recommendation_each() {
+    let groups = vec![vec![dup(1, "/a/een.mkv", false, 0, 1), dup(2, "/b/lang/een.mkv", false, 0, 2)], vec![]];
+    let out = duplicate_groups(groups);
+    assert_eq!(out.len(), 1, "lege groepen vallen weg");
+    assert_eq!(out[0].keep_id, 1);
+    assert_eq!(out[0].items.len(), 2);
+}

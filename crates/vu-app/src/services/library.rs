@@ -58,8 +58,8 @@ pub fn set_favorite(st: &AppState, id: i64, favorite: bool) -> Result<()> {
     st.lock_db()?.set_favorite(id, favorite)
 }
 
-pub fn duplicates(st: &AppState) -> Result<Vec<Vec<Media>>> {
-    st.lock_db()?.find_duplicates()
+pub fn duplicates(st: &AppState) -> Result<Vec<vu_core::db::DuplicateGroup>> {
+    Ok(vu_core::db::duplicate_groups(st.lock_db()?.find_duplicates()?))
 }
 
 pub fn relink(st: &AppState, id: i64, new_path: &str) -> Result<()> {

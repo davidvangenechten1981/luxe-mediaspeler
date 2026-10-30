@@ -493,3 +493,8 @@ export interface TagFields {
   year: number | null;
   track: number | null;
 }
+
+export interface DuplicateGroup {
+  keep_id: number;
+  items: Media[];
+}
