@@ -335,6 +335,7 @@ export interface AppSettings {
   crossfade_ms: number;
   normalize_realtime: boolean;
   replay_gain: "none" | "track" | "album";
+  sync_folder: string | null;
   network_caching_ms: number;
   allow_local_streams: boolean;
   online_metadata: boolean;
@@ -452,4 +453,9 @@ export interface Nfo {
   title: string | null;
   year: number | null;
   plot: string | null;
+}
+
+export interface SyncReport {
+  exported: number;
+  imported: number;
 }

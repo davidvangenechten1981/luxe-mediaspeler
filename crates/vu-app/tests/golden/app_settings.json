@@ -92,6 +92,7 @@
   "subtitle_color": "#ffffff",
   "subtitle_encoding": "",
   "subtitle_scale": 1.0,
+  "sync_folder": null,
   "theme": "dark",
   "ui_scale": 1.0
 }

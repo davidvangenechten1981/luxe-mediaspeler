@@ -692,6 +692,29 @@ impl Database {
             .optional()?)
     }
 
+    /// Alle bewaarde kijkposities (voor synchronisatie tussen pc's).
+    pub fn all_resume(&self) -> Result<Vec<ResumePoint>> {
+        let mut stmt = self.conn.prepare("SELECT location, position_ms, duration_ms, completed, updated_at FROM resume")?;
+        let rows = stmt.query_map([], resume_from_row)?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    pub fn all_media_paths(&self) -> Result<Vec<String>> {
+        let mut stmt = self.conn.prepare("SELECT path FROM media WHERE missing = 0")?;
+        let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Schrijft een kijkpositie met een vast tijdstip (voor synchronisatie; `save_resume` gebruikt de huidige tijd).
+    pub fn set_resume_exact(&self, location: &str, position_ms: u64, duration_ms: u64, completed: bool, updated_at: i64) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO resume (location, position_ms, duration_ms, completed, updated_at) VALUES (?1,?2,?3,?4,?5)
+             ON CONFLICT(location) DO UPDATE SET position_ms=?2, duration_ms=?3, completed=?4, updated_at=?5",
+            params![location, position_ms as i64, duration_ms as i64, completed as i64, updated_at],
+        )?;
+        Ok(())
+    }
+
     /// "Kijk verder": onvoltooide items met een betekenisvolle positie (> 5 s), nieuwste eerst.
     pub fn continue_watching(&self, limit: u32) -> Result<Vec<ResumePoint>> {
         let mut stmt = self.conn.prepare(

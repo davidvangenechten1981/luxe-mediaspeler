@@ -10,6 +10,7 @@ pub mod player;
 pub mod playlists;
 pub mod series;
 pub mod settings;
+pub mod sync;
 pub mod video;
 
 #[cfg(test)]

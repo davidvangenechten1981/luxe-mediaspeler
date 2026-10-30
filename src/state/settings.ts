@@ -25,6 +25,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   crossfade_ms: 0,
   normalize_realtime: false,
   replay_gain: "none",
+  sync_folder: null,
   network_caching_ms: 1500,
   allow_local_streams: false,
   online_metadata: false,

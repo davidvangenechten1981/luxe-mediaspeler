@@ -63,6 +63,8 @@ pub struct AppSettings {
     pub normalize_realtime: bool,
     /// ReplayGain: "none", "track" of "album". Gebruikt de volumegegevens in de tags van je muziek.
     pub replay_gain: String,
+    /// Gedeelde map waarin pc's hun kijkstatus uitwisselen; `None` = uit.
+    pub sync_folder: Option<String>,
     // netwerk en privacy
     pub network_caching_ms: u32,
     pub allow_local_streams: bool,
@@ -144,6 +146,7 @@ impl Default for AppSettings {
             crossfade_ms: 0,
             normalize_realtime: false,
             replay_gain: "none".into(),
+            sync_folder: None,
             network_caching_ms: 1500,
             allow_local_streams: false,
             online_metadata: false,

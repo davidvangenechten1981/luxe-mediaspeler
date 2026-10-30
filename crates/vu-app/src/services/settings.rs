@@ -252,3 +252,25 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod sync_tests {
+    use super::*;
+    use crate::services::testutil::app;
+
+    #[test]
+    fn sync_needs_a_chosen_folder_and_then_writes_the_status_file() {
+        let a = app();
+        assert!(crate::services::sync::run(&a.state).is_err()); // nog geen map gekozen
+        let folder = tempfile::tempdir().unwrap();
+        let mut s = get(&a.state).unwrap().0;
+        s.sync_folder = Some(folder.path().to_string_lossy().into_owned());
+        save(&a.state, &s).unwrap();
+        let r = crate::services::sync::run(&a.state).unwrap();
+        assert_eq!((r.exported, r.imported), (0, 0));
+        assert!(std::fs::read_dir(folder.path())
+            .unwrap()
+            .flatten()
+            .any(|e| e.file_name().to_string_lossy().starts_with("vlc-ultimate-kijkstatus-")));
+    }
+}

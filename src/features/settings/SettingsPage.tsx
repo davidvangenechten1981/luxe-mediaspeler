@@ -155,6 +155,14 @@ function LibrarySettings() {
       <Row title="Scannen bij het opstarten" hint="Zoekt nieuwe en ontbrekende bestanden zodra de app start."><Switch label={(s.scan_on_startup) ? "Aan" : "Uit"} checked={s.scan_on_startup} onChange={(v) => void update({ scan_on_startup: v })} /></Row>
       <Row title="Periodiek scannen" hint="Alleen terwijl de app open is."><Select aria-label="Periodiek scannen" value={s.periodic_scan_minutes ?? ""} onChange={(e) => void update({ periodic_scan_minutes: e.target.value === "" ? null : Number(e.target.value) })}><option value="">Uit</option><option value="15">Elk kwartier</option><option value="60">Elk uur</option><option value="360">Elke 6 uur</option><option value="1440">Elke dag</option></Select></Row>
       <Row title="Bestandsextensies" hint="Alleen deze soorten worden opgenomen. Gescheiden door komma's."><TextInput aria-label="Bestandsextensies" style={{ width: 280 }} defaultValue={s.extensions.join(", ")} onBlur={(e) => void update({ extensions: e.target.value.split(/[\s,;]+/).map((x) => x.replace(/^\./, "").toLowerCase()).filter(Boolean) })} /></Row>
+      <Row title="Kijkstatus delen met een andere pc" hint="Kies een map die beide pc's kunnen zien (bijvoorbeeld op je NAS). Alleen kleine tekstbestandjes worden gedeeld, nooit je bibliotheek.">
+        <div className="row">
+          <TextInput aria-label="Map voor synchronisatie" readOnly value={s.sync_folder ?? ""} placeholder="Uit" style={{ width: 220 }} />
+          <Button onClick={async () => { const d = await pickFolder({ title: "Map voor synchronisatie" }); if (d) void update({ sync_folder: d }); }}>Kiezen…</Button>
+          {s.sync_folder && <IconButton icon="close" label="Synchronisatie uitzetten" size={15} onClick={() => void update({ sync_folder: null })} />}
+          <Button disabled={!s.sync_folder} onClick={async () => { try { const r = await api.syncRun(); toast.success(`Gesynchroniseerd: ${r.imported} bijgewerkt, ${r.exported} gedeeld`); } catch (e) { reportError(e); } }}>Nu synchroniseren</Button>
+        </div>
+      </Row>
       <Row title="Dubbele bestanden" hint="Zoekt bestanden met dezelfde grootte en duur."><Button icon="search" onClick={() => setDups(true)}>Zoeken…</Button></Row>
       {remove && <ConfirmDialog title="Map uit bibliotheek halen?" text={`“${remove}” en de bijbehorende items verdwijnen uit de bibliotheek. Je bestanden blijven op schijf staan.`} confirmLabel="Uit bibliotheek halen" danger onCancel={() => setRemove(null)} onConfirm={async () => { try { const n = await api.libraryRemoveFolder(remove); toast.success(`${n} items verwijderd uit de bibliotheek`); folders.reload(); bump(); } catch (e) { reportError(e); } setRemove(null); }} />}
       {dups && <DuplicatesDialog onClose={() => setDups(false)} />}

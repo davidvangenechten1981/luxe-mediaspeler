@@ -15,6 +15,7 @@ library_scan_start
 library_scan_cancel
 library_scan_running
 series_list
+sync_run
 collections_list
 collection_create
 collection_delete
