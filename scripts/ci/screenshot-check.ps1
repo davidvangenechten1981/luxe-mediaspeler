@@ -10,6 +10,8 @@ Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $err = Join-Path $OutDir "$Mode.stderr.txt"
 # De app krijgt het bestand als gewoon argument, net als bij "Openen met" in Verkenner
+# Vaste gegevensmap, zodat de CI de logbestanden van de app kan afdrukken
+$env:VU_DATA_DIR = Join-Path (Resolve-Path $OutDir).Path "appdata"
 $p = Start-Process -FilePath $Exe -ArgumentList "`"$Media`"" -PassThru -RedirectStandardError $err
 Start-Sleep -Seconds 18
 $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
@@ -54,6 +56,7 @@ for ($y = $y0; $y -lt $y0 + $h; $y += 3) {
 $alive = -not $p.HasExited
 "MODE=$Mode screen=$($screen.Width)x$($screen.Height) sampled=$total red=$red green=$green blue=$blue white=$white black=$black accent=$accent processAlive=$alive"
 if (Test-Path $err) { "--- stderr ($Mode) ---"; Get-Content $err }
+Get-ChildItem (Join-Path $env:VU_DATA_DIR "logs") -Filter *.log -ErrorAction SilentlyContinue | ForEach-Object { "--- $($_.Name) ---"; Get-Content $_.FullName -Tail 60 }
 if ($alive) { Stop-Process -Id $p.Id -Force }
 $redPct = [math]::Round(100 * $red / [math]::Max($total, 1))
 "RESULT $Mode video_zichtbaar_pct=$redPct interface_zichtbaar=$($accent -gt 5) accent=$accent rood=$red"

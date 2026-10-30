@@ -15,13 +15,21 @@ pub struct Launch(pub Mutex<LaunchRequest>);
 /// Het ene toegangspunt van de interface tot de backend (zie vu-app/src/api.rs).
 #[tauri::command(async)]
 pub fn api(state: State<'_, Arc<AppState>>, request: Value) -> Result<Value, String> {
-    vu_app::api::handle_json(&state, request)
+    let name = request.get("type").and_then(Value::as_str).unwrap_or("?").to_string();
+    let result = vu_app::api::handle_json(&state, request);
+    // Alleen mislukte aanroepen worden gelogd (naam en foutmelding), zodat problemen te herleiden zijn
+    if let Err(e) = &result {
+        crate::logging::info(&format!("api {name} mislukt: {e}"));
+    }
+    result
 }
 
 /// Bestanden die bij het starten zijn meegegeven; worden één keer uitgeleverd.
 #[tauri::command]
 pub fn take_launch_files(launch: State<'_, Launch>) -> LaunchRequest {
-    std::mem::take(&mut *launch.0.lock().unwrap_or_else(|e| e.into_inner()))
+    let req = std::mem::take(&mut *launch.0.lock().unwrap_or_else(|e| e.into_inner()));
+    crate::logging::info(&format!("startbestanden opgehaald door de interface: {}", req.files.len()));
+    req
 }
 
 #[tauri::command]
