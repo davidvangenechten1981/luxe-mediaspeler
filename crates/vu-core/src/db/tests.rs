@@ -459,3 +459,25 @@ fn an_empty_library_has_zero_stats() {
     let st = d.library_stats().unwrap();
     assert_eq!((st.video_count, st.audio_count, st.total_duration_ms, st.total_plays), (0, 0, 0, 0));
 }
+
+#[test]
+fn searching_a_100k_row_library_stays_fast() {
+    // Meting voor punt "snel zoeken": met een gewone LIKE-zoekopdracht moet 100.000 rijen ruim binnen een seconde kunnen.
+    let mut d = Database::open_in_memory().unwrap();
+    d.conn.execute_batch("BEGIN").unwrap();
+    for i in 0..100_000 {
+        let m = NewMedia {
+            title: Some(format!("Nummer {i} van de band {}", i % 500)),
+            artist: Some(format!("Artiest {}", i % 800)),
+            ..media(&format!("/m/{i}.mp3"), MediaKind::Audio)
+        };
+        d.upsert_media(&m).unwrap();
+    }
+    d.conn.execute_batch("COMMIT").unwrap();
+    let t = std::time::Instant::now();
+    let hits = d.query_media(&MediaQuery { text: Some("band 42".into()), limit: Some(200), ..Default::default() }).unwrap();
+    let elapsed = t.elapsed();
+    assert!(!hits.is_empty());
+    assert!(elapsed < std::time::Duration::from_secs(2), "zoeken duurde {elapsed:?}");
+    eprintln!("zoeken in 100000 rijen: {elapsed:?}");
+}

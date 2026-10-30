@@ -68,6 +68,7 @@ thumbnail
 thumbnail_strip
 clear_thumbnails
 cover_art
+nfo_get
 video_aspect
 video_crop
 video_adjust

@@ -30,7 +30,9 @@ export function Thumb({ media, width = 320 }: { media: Media; width?: number }) 
     let alive = true;
     const at = Math.min(Math.max(media.duration_ms * 0.1, 1000), 60_000);
     // Muziek toont de albumhoes (map-afbeelding of ingebed); zonder hoes blijft het kleurvlak staan.
-    const load = media.kind === "audio" ? api.coverArt(media.path) : limited(() => api.thumbnail(media.path, Math.round(at), width));
+    // Video: eerst een lokale poster naast het bestand, anders een beeld uit de film.
+    const frame = () => limited(() => api.thumbnail(media.path, Math.round(at), width));
+    const load = media.kind === "audio" ? api.coverArt(media.path) : api.coverArt(media.path).then((p) => p ?? frame());
     void load
       .then((p) => (p ? fileSrc(p) : null))
       .then((u) => u && alive && setSrc(u))

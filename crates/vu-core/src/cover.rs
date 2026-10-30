@@ -22,6 +22,28 @@ pub fn find_folder_cover(dir: &Path) -> Option<PathBuf> {
     found.into_iter().next().map(|(_, p)| p)
 }
 
+/// Poster naast een video: `<naam>-poster.jpg`, `<naam>.jpg` of `poster.jpg` in dezelfde map.
+pub fn find_video_poster(video: &Path) -> Option<PathBuf> {
+    let dir = video.parent()?;
+    let stem = video.file_stem()?.to_str()?.to_lowercase();
+    let wanted = [format!("{stem}-poster"), stem.clone(), "poster".to_string()];
+    let mut found: Vec<(usize, PathBuf)> = Vec::new();
+    for entry in std::fs::read_dir(dir).ok()?.flatten() {
+        let path = entry.path();
+        let (Some(s), Some(ext)) = (path.file_stem().and_then(|s| s.to_str()), path.extension().and_then(|e| e.to_str())) else { continue };
+        if !EXTS.contains(&ext.to_lowercase().as_str()) {
+            continue;
+        }
+        if let Some(rank) = wanted.iter().position(|w| *w == s.to_lowercase()) {
+            if entry.metadata().is_ok_and(|m| m.is_file() && m.len() > 0 && m.len() <= MAX_BYTES) {
+                found.push((rank, path));
+            }
+        }
+    }
+    found.sort();
+    found.into_iter().next().map(|(_, p)| p)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -54,5 +76,23 @@ mod tests {
         std::fs::write(d.path().join("cover.jpg"), b"").unwrap();
         assert!(find_folder_cover(d.path()).is_none());
         assert!(find_folder_cover(&d.path().join("bestaat-niet")).is_none());
+    }
+
+    #[test]
+    fn finds_a_poster_for_a_specific_video_before_the_generic_one() {
+        let d = tempfile::tempdir().unwrap();
+        touch(d.path(), "poster.jpg");
+        touch(d.path(), "Film.2020-poster.PNG");
+        touch(d.path(), "Andere.jpg");
+        let v = d.path().join("Film.2020.mkv");
+        assert_eq!(find_video_poster(&v).unwrap().file_name().unwrap(), "Film.2020-poster.PNG");
+        assert_eq!(find_video_poster(&d.path().join("Nieuw.mkv")).unwrap().file_name().unwrap(), "poster.jpg");
+    }
+
+    #[test]
+    fn no_poster_gives_none() {
+        let d = tempfile::tempdir().unwrap();
+        touch(d.path(), "notities.txt");
+        assert!(find_video_poster(&d.path().join("x.mkv")).is_none());
     }
 }

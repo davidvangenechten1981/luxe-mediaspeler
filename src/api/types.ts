@@ -447,3 +447,9 @@ export interface FolderStatus {
   path: string;
   online: boolean;
 }
+
+export interface Nfo {
+  title: string | null;
+  year: number | null;
+  plot: string | null;
+}
