@@ -19,6 +19,12 @@ export function hdrLabel(transfer: string | null): string | null {
   return null;
 }
 
+/** Uitleg bij HDR-beeld: de speler zet HDR niet om naar een gewoon scherm, dus het beeld kan flets lijken. */
+export function hdrWarning(transfer: string | null): string | null {
+  const label = hdrLabel(transfer);
+  return label ? `Dit beeld is ${label}. Op een scherm zonder HDR kan het beeld flets lijken; de speler kan dit nog niet omzetten.` : null;
+}
+
 /** "Stereo", "5.1", "7.1" of anders het aantal kanalen. */
 export function channelLabel(channels: number | null, layout: string | null): string | null {
   if (layout) {

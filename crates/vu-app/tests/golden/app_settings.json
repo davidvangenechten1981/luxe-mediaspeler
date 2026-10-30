@@ -2,6 +2,7 @@
   "accent": "#6d5dfc",
   "allow_local_streams": false,
   "always_on_top": false,
+  "audio_passthrough": false,
   "autoplay_next_delay_s": 10,
   "compact": false,
   "convert_output_dir": null,

@@ -75,7 +75,7 @@ const jobShape: Shape<JobSnapshot> = {
 const settingsShape: Shape<AppSettings> = {
   theme: true, accent: true, ui_scale: true, compact: true, always_on_top: true, language: true, seek_short_s: true,
   seek_long_s: true, default_volume: true, resume_playback: true, hw_decoding: true, preferred_audio_languages: true,
-  preferred_subtitle_languages: true, subtitle_scale: true, subtitle_color: true, subtitle_encoding: true, autoplay_next_delay_s: true, crossfade_ms: true, normalize_realtime: true, replay_gain: true, sync_folder: true,
+  preferred_subtitle_languages: true, subtitle_scale: true, subtitle_color: true, subtitle_encoding: true, autoplay_next_delay_s: true, crossfade_ms: true, normalize_realtime: true, replay_gain: true, sync_folder: true, audio_passthrough: true,
   network_caching_ms: true, allow_local_streams: true, online_metadata: true, online_subtitle_search: true, scan_on_startup: true,
   periodic_scan_minutes: true, extensions: true, convert_output_dir: true, convert_template: true, convert_overwrite: true,
   convert_parallel: true, shortcuts: true,

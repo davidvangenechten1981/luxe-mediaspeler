@@ -1,5 +1,5 @@
 import type { StreamInfo } from "../api/types";
-import { audioDetails, channelLabel, hdrLabel, videoDetails } from "./mediaDetails";
+import { audioDetails, channelLabel, hdrLabel, hdrWarning, videoDetails } from "./mediaDetails";
 
 const base: StreamInfo = {
   index: 0, kind: "video", codec: "hevc", language: null, title: null, width: 3840, height: 2160, fps: 23.976, channels: null,
@@ -60,5 +60,17 @@ describe("audioDetails", () => {
   it("schrijft samplefrequenties met komma", () => {
     const a: StreamInfo = { ...base, kind: "audio", codec: "flac", codec_long: null, channels: 2, channel_layout: "stereo", sample_rate: 44100, bitrate: null, width: null, height: null, fps: null, language: null, profile: null, pix_fmt: null, bit_depth: 16, color_space: null, color_transfer: null };
     expect(audioDetails(a).lines).toEqual(["Stereo", "44,1 kHz", "16 bit"]);
+  });
+});
+
+describe("hdrWarning", () => {
+  it("waarschuwt bij HDR-beeld dat het op een gewoon scherm flets kan lijken", () => {
+    expect(hdrWarning("smpte2084")).toMatch(/HDR10/);
+    expect(hdrWarning("smpte2084")).toMatch(/flets/);
+    expect(hdrWarning("arib-std-b67")).toMatch(/HLG/);
+  });
+  it("zwijgt bij gewoon beeld", () => {
+    expect(hdrWarning("bt709")).toBeNull();
+    expect(hdrWarning(null)).toBeNull();
   });
 });

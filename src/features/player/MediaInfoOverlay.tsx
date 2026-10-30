@@ -1,7 +1,7 @@
 import type { MediaInfo } from "../../api/types";
 import { IconButton } from "../../components/ui";
 import { formatBitrate, formatBytes, formatDuration, formatRate, stem } from "../../lib/format";
-import { audioDetails, videoDetails, type StreamDetails } from "../../lib/mediaDetails";
+import { audioDetails, hdrWarning, videoDetails, type StreamDetails } from "../../lib/mediaDetails";
 import { usePlayer } from "../../state/player";
 import { useSettings } from "../../state/settings";
 
@@ -47,6 +47,7 @@ export function MediaInfoOverlay({ info, loading, onClose }: { info: MediaInfo |
             <dt>Totale bitrate</dt><dd>{formatBitrate(info.bitrate)}</dd>
           </dl>
           {video.map((s) => <Block key={s.index} label="Video" details={videoDetails(s)} />)}
+          {video.map((s) => hdrWarning(s.color_transfer) && <p key={`hdr${s.index}`} className="info-overlay__note">{hdrWarning(s.color_transfer)}</p>)}
           {audio.map((s) => <Block key={s.index} label={audio.length > 1 ? `Audio ${s.index}` : "Audio"} details={audioDetails(s)} />)}
           {subs.length > 0 && (
             <div className="info-overlay__block">

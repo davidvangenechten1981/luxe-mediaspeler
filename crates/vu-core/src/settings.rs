@@ -63,6 +63,8 @@ pub struct AppSettings {
     pub normalize_realtime: bool,
     /// ReplayGain: "none", "track" of "album". Gebruikt de volumegegevens in de tags van je muziek.
     pub replay_gain: String,
+    /// Stuurt AC3/DTS ongewijzigd naar een versterker (S/PDIF/HDMI). Equalizer, ReplayGain en volume werken dan niet.
+    pub audio_passthrough: bool,
     /// Gedeelde map waarin pc's hun kijkstatus uitwisselen; `None` = uit.
     pub sync_folder: Option<String>,
     // netwerk en privacy
@@ -146,6 +148,7 @@ impl Default for AppSettings {
             crossfade_ms: 0,
             normalize_realtime: false,
             replay_gain: "none".into(),
+            audio_passthrough: false,
             sync_folder: None,
             network_caching_ms: 1500,
             allow_local_streams: false,
@@ -253,7 +256,11 @@ impl AppSettings {
 
     /// LibVLC-opties voor het geluid. Ze gelden vanaf het opstarten van de speler.
     pub fn audio_vlc_args(&self) -> Vec<String> {
-        vec![format!("--audio-replay-gain-mode={}", self.replay_gain)]
+        let mut args = vec![format!("--audio-replay-gain-mode={}", self.replay_gain)];
+        if self.audio_passthrough {
+            args.push("--spdif".into());
+        }
+        args
     }
 
     /// Controleert en normaliseert. Geeft een duidelijke fout bij onmogelijke waarden.
@@ -534,6 +541,15 @@ mod tests {
         assert_eq!(s.audio_vlc_args(), ["--audio-replay-gain-mode=album"]);
         s.replay_gain = "luid".into();
         assert!(s.validate().is_err());
+    }
+
+    #[test]
+    fn passthrough_adds_the_spdif_option_and_is_off_by_default() {
+        let mut s = AppSettings::default();
+        assert!(!s.audio_passthrough);
+        assert!(!s.audio_vlc_args().iter().any(|a| a == "--spdif"));
+        s.audio_passthrough = true;
+        assert!(s.audio_vlc_args().contains(&"--spdif".to_string()));
     }
 
     #[test]

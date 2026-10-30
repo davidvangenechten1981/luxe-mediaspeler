@@ -341,6 +341,7 @@ export interface AppSettings {
   crossfade_ms: number;
   normalize_realtime: boolean;
   replay_gain: "none" | "track" | "album";
+  audio_passthrough: boolean;
   sync_folder: string | null;
   network_caching_ms: number;
   allow_local_streams: boolean;

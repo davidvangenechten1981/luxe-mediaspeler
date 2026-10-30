@@ -100,6 +100,7 @@ function Play() {
           <option value="album">Per album</option>
         </Select>
       </Row>
+      <Row title="Doorgeven van AC3/DTS-geluid" hint="Stuurt surround-geluid ongewijzigd naar je versterker of tv. Equalizer, ReplayGain en volume werken dan niet. Wordt toegepast na het opnieuw starten van de app."><Switch label={s.audio_passthrough ? "Aan" : "Uit"} checked={s.audio_passthrough} onChange={(v) => void update({ audio_passthrough: v })} /></Row>
       <Row title="Tekenset ondertitels" hint="Alleen aanpassen als letters met accenten er fout uitzien. Wordt toegepast na het opnieuw starten van de app.">
         <select aria-label="Tekenset ondertitels" value={s.subtitle_encoding} onChange={(e) => void update({ subtitle_encoding: e.target.value })}>
           <option value="">Automatisch</option>
