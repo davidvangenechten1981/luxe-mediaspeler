@@ -8,6 +8,9 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
+/// Houdt audioframes klein (geen opvulling met stilte aan het eind).
+const FRAME_LIMIT_FILTER: &str = "asetnsamples=n=4096:p=0";
+
 #[derive(Debug, Clone, Default)]
 pub struct Capabilities {
     pub encoders: HashSet<String>,
@@ -347,6 +350,9 @@ pub fn build_args(input: &Path, output: &Path, s: &Settings, info: &MediaInfo, c
                 chain.push(format!("aresample={rate}"));
             }
             if !chain.is_empty() {
+                // Sommige filters (limiter, resampler) leveren zeer grote frames; encoders als FLAC (max. 65535)
+                // weigeren die op nieuwere FFmpeg-versies. Kleine frames werken overal.
+                chain.push(FRAME_LIMIT_FILTER.to_string());
                 push(&mut args, &["-af", &chain.join(",")]);
             }
         }
@@ -582,7 +588,16 @@ mod tests {
         let rate = info.streams.iter().find(|st| st.kind == StreamKind::Audio).and_then(|a| a.sample_rate).unwrap();
         let p = plan(&s, AUDIO_JSON).unwrap();
         let af = p.args.windows(2).find(|w| w[0] == "-af").map(|w| w[1].clone()).unwrap();
-        assert!(af.ends_with(&format!("loudnorm=I=-16:TP=-1.5:LRA=11,aresample={rate}")), "{af}");
+        assert!(af.ends_with(&format!("loudnorm=I=-16:TP=-1.5:LRA=11,aresample={rate},{FRAME_LIMIT_FILTER}")), "{af}");
+    }
+
+    #[test]
+    fn every_audio_filter_chain_ends_with_a_frame_size_limit() {
+        let mut s = profile("high_quality");
+        s.equalizer = Some(crate::audio::EqConfig { preamp_db: -2.0, bands_db: [0.0; 10] });
+        let p = plan(&s, VIDEO_JSON).unwrap();
+        let af = p.args.windows(2).find(|w| w[0] == "-af").map(|w| w[1].clone()).unwrap();
+        assert!(af.ends_with(FRAME_LIMIT_FILTER), "{af}");
     }
 
     #[test]
