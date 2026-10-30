@@ -34,6 +34,8 @@ Add-Type -Namespace Win -Name Cap -MemberDefinition @"
 [DllImport("gdi32.dll")] public static extern bool DeleteObject(IntPtr h);
 [DllImport("gdi32.dll")] public static extern bool DeleteDC(IntPtr hDC);
 "@
+# Het venster is gecentreerd; we meten het hele scherm. Op een belaste runner verschijnt het beeld soms later: maximaal 4 pogingen, 3 s uit elkaar.
+for ($attempt = 1; $attempt -le 4; $attempt++) {
 $hdcScreen = [Win.Cap]::GetDC([IntPtr]::Zero)
 $hdcMem = [Win.Cap]::CreateCompatibleDC($hdcScreen)
 $hBmp = [Win.Cap]::CreateCompatibleBitmap($hdcScreen, $screen.Width, $screen.Height)
@@ -46,7 +48,6 @@ $bmp = [System.Drawing.Image]::FromHbitmap($hBmp)
 $png = Join-Path $OutDir "$Mode.png"
 $bmp.Save($png, [System.Drawing.Imaging.ImageFormat]::Png)
 
-# Het venster is gecentreerd; we meten het hele scherm
 $x0 = 0; $y0 = 0; $w = $screen.Width; $h = $screen.Height
 $accent = 0; $red = 0; $green = 0; $blue = 0; $white = 0; $black = 0; $total = 0
 for ($y = $y0; $y -lt $y0 + $h; $y += 3) {
@@ -60,6 +61,10 @@ for ($y = $y0; $y -lt $y0 + $h; $y += 3) {
     elseif ($c.R -gt 230 -and $c.G -gt 230 -and $c.B -gt 230) { $white++ }
     elseif ($c.R -lt 25 -and $c.G -lt 25 -and $c.B -lt 25) { $black++ }
   }
+}
+  if ($red -gt 0) { break }
+  "Poging $attempt: nog geen videobeeld, opnieuw proberen"
+  Start-Sleep -Seconds 3
 }
 $alive = -not $p.HasExited
 "MODE=$Mode screen=$($screen.Width)x$($screen.Height) sampled=$total red=$red green=$green blue=$blue white=$white black=$black accent=$accent processAlive=$alive"
