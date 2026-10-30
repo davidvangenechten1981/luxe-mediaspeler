@@ -2,7 +2,7 @@
 
 use serde::Serialize;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct Tools {
@@ -21,7 +21,7 @@ fn exe_name(base: &str) -> String {
 }
 
 fn works(path: &Path) -> bool {
-    Command::new(path).arg("-version").stdin(Stdio::null()).output().map(|o| o.status.success()).unwrap_or(false)
+    vu_core::proc::quiet(path).arg("-version").stdin(Stdio::null()).output().map(|o| o.status.success()).unwrap_or(false)
 }
 
 fn find_in_path(name: &str) -> Option<PathBuf> {
@@ -63,7 +63,7 @@ pub struct ToolVersions {
 
 /// Eerste regel van `-version`, voor het diagnosescherm.
 pub fn version_line(path: &Path) -> Option<String> {
-    let out = Command::new(path).arg("-version").stdin(Stdio::null()).output().ok()?;
+    let out = vu_core::proc::quiet(path).arg("-version").stdin(Stdio::null()).output().ok()?;
     String::from_utf8_lossy(&out.stdout).lines().next().map(str::to_string)
 }
 

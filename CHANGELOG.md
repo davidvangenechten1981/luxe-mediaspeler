@@ -7,3 +7,4 @@
 - Slapen voorkomen tijdens afspelen, venster onthouden, crashmelding en diagnoserapport, herstart-knop, opruimen bij verwijderen.
 - Series met gezien-status, songteksten offline, albumhoes en filmposter/NFO, meest gespeeld, recent toegevoegd, statistiek.
 - NAS-bescherming, ReplayGain, AC3/DTS-doorgifte, kijkstatus delen tussen pc's, intro/aftiteling overslaan, tags bewerken, HDR-waarschuwing.
+- Geen zwarte consolevensters meer die kort oplichten bij ffprobe/ffmpeg (alle hulpprogramma's starten zonder venster).

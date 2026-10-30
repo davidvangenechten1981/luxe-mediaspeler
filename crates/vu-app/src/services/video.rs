@@ -58,7 +58,7 @@ pub fn thumbnail(st: &AppState, path: &str, at_ms: u64, width: u32) -> Result<Pa
         return Ok(out);
     }
     let tmp = out.with_extension("tmp.jpg");
-    let mut cmd = Command::new(ffmpeg);
+    let mut cmd = vu_core::proc::quiet(ffmpeg);
     cmd.args(["-hide_banner", "-loglevel", "error", "-nostdin", "-ss", &format!("{:.3}", at_ms as f64 / 1000.0), "-i"])
         .arg(&p)
         .args(["-frames:v", "1", "-vf", &format!("scale={width}:-2"), "-q:v", "4", "-y"])

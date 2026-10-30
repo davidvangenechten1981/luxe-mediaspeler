@@ -8,6 +8,7 @@ pub mod m3u;
 pub mod nfo;
 pub mod player;
 pub mod probe;
+pub mod proc;
 pub mod scanner;
 pub mod series;
 pub mod settings;

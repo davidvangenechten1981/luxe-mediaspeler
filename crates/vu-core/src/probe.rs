@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StreamInfo {
@@ -207,7 +207,7 @@ pub fn parse_ffprobe_json(json: &str) -> Result<MediaInfo> {
 
 /// Voert ffprobe uit op een bestand. `ffprobe` is het pad of de naam van het programma.
 pub fn probe_file(ffprobe: &Path, file: &Path) -> Result<MediaInfo> {
-    let out = Command::new(ffprobe)
+    let out = crate::proc::quiet(ffprobe)
         .args(["-v", "error", "-show_format", "-show_streams", "-show_chapters", "-of", "json", "--"])
         .arg(file)
         .stdin(Stdio::null())

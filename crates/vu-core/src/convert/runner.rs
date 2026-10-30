@@ -10,7 +10,7 @@ use crate::validate::{ensure_not_same_file, sanitize_file_name};
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::time::Duration;
@@ -155,7 +155,7 @@ pub fn run_conversion(
     let plan = build_args(input, &temp, settings, info, tools.caps)?;
     let _ = std::fs::remove_file(&temp); // restant van een eerdere, afgebroken poging
 
-    let mut child = Command::new(tools.ffmpeg)
+    let mut child = crate::proc::quiet(tools.ffmpeg)
         .args(&plan.args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -294,6 +294,7 @@ mod tests {
     use super::*;
     use crate::convert::{builtin_profiles, AudioCodec, VideoCodec};
     use crate::probe::{probe_file, StreamKind};
+    use std::process::Command;
 
     fn settings(id: &str) -> Settings {
         builtin_profiles().into_iter().find(|p| p.id == id).unwrap().settings

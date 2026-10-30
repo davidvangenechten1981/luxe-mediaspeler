@@ -6,7 +6,7 @@ use crate::error::{CoreError, Result};
 use crate::probe::{MediaInfo, StreamInfo, StreamKind};
 use std::collections::HashSet;
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 /// Houdt audioframes klein (geen opvulling met stilte aan het eind).
 const FRAME_LIMIT_FILTER: &str = "asetnsamples=n=4096:p=0";
@@ -47,7 +47,7 @@ impl Capabilities {
 
     pub fn detect(ffmpeg: &Path) -> Result<Capabilities> {
         let run = |arg: &str| -> Result<String> {
-            let out = Command::new(ffmpeg)
+            let out = crate::proc::quiet(ffmpeg)
                 .args(["-hide_banner", arg])
                 .stdin(Stdio::null())
                 .output()

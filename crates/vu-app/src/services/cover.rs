@@ -3,7 +3,6 @@
 use crate::services::video::{fnv1a, run_with_timeout};
 use crate::state::AppState;
 use std::path::PathBuf;
-use std::process::Command;
 use std::time::Duration;
 use vu_core::cover::{find_folder_cover, find_video_poster};
 use vu_core::db::MediaKind;
@@ -42,7 +41,7 @@ pub fn get(st: &AppState, path: &str) -> Result<Option<PathBuf>> {
         return Ok(Some(out));
     }
     let tmp = out.with_extension("tmp.jpg");
-    let mut cmd = Command::new(ffmpeg);
+    let mut cmd = vu_core::proc::quiet(ffmpeg);
     cmd.args(["-hide_banner", "-loglevel", "error", "-nostdin", "-i"])
         .arg(&media)
         .args(["-map", "0:v:0", "-frames:v", "1", "-vf", "scale=600:-2", "-q:v", "3", "-y"])
@@ -74,6 +73,7 @@ pub fn nfo(_st: &AppState, path: &str) -> Result<Option<Nfo>> {
 mod tests {
     use super::*;
     use crate::services::testutil::{app, fixture};
+    use std::process::Command;
 
     #[test]
     fn uses_a_folder_image_when_present() {
