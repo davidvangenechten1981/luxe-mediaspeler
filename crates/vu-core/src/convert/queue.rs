@@ -564,7 +564,10 @@ mod tests {
         std::thread::sleep(Duration::from_millis(800));
         let t = Instant::now();
         m.shutdown();
-        assert!(t.elapsed() < Duration::from_secs(10));
+        // Veiligheidsgrens tegen een vastgelopen afsluiting; ruim, want op een overbelaste CI-runner
+        // (alle tests starten tegelijk zware ffmpeg-processen) kost starten en opruimen soms tientallen seconden.
+        // De echte controle is dat de taak geannuleerd is en niet is afgemaakt.
+        assert!(t.elapsed() < Duration::from_secs(30), "afsluiten duurde {:?}", t.elapsed());
         assert_eq!(m.get(id).unwrap().state, JobState::Cancelled);
         assert!(std::fs::read_dir(&out).map(|d| d.count()).unwrap_or(0) == 0);
         assert!(m.add(request(&lang, &out, "remux_mkv")).is_err()); // na afsluiten geen nieuwe taken
