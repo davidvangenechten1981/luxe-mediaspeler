@@ -144,6 +144,7 @@ impl AppState {
         // Ondertitelgrootte en -kleur gelden vanaf het starten van de speler (LibVLC-opties)
         let mut vlc_args = vlc_args;
         vlc_args.extend(app_settings.subtitle_vlc_args());
+        vlc_args.extend(app_settings.audio_vlc_args());
         let player = PlayerHost::start(&tools, vlc_args, db.clone(), sink.clone(), &app_settings);
         if let Err(e) = &player {
             warnings.push(format!("De speler is niet beschikbaar: {e}"));

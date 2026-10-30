@@ -334,6 +334,7 @@ export interface AppSettings {
   autoplay_next_delay_s: number;
   crossfade_ms: number;
   normalize_realtime: boolean;
+  replay_gain: "none" | "track" | "album";
   network_caching_ms: number;
   allow_local_streams: boolean;
   online_metadata: boolean;

@@ -61,6 +61,8 @@ pub struct AppSettings {
     // audio
     pub crossfade_ms: u32,
     pub normalize_realtime: bool,
+    /// ReplayGain: "none", "track" of "album". Gebruikt de volumegegevens in de tags van je muziek.
+    pub replay_gain: String,
     // netwerk en privacy
     pub network_caching_ms: u32,
     pub allow_local_streams: bool,
@@ -141,6 +143,7 @@ impl Default for AppSettings {
             autoplay_next_delay_s: 10,
             crossfade_ms: 0,
             normalize_realtime: false,
+            replay_gain: "none".into(),
             network_caching_ms: 1500,
             allow_local_streams: false,
             online_metadata: false,
@@ -245,6 +248,11 @@ impl AppSettings {
         args
     }
 
+    /// LibVLC-opties voor het geluid. Ze gelden vanaf het opstarten van de speler.
+    pub fn audio_vlc_args(&self) -> Vec<String> {
+        vec![format!("--audio-replay-gain-mode={}", self.replay_gain)]
+    }
+
     /// Controleert en normaliseert. Geeft een duidelijke fout bij onmogelijke waarden.
     pub fn validate(&mut self) -> Result<()> {
         let bad = |m: &str| Err(CoreError::Invalid(m.to_string()));
@@ -253,6 +261,9 @@ impl AppSettings {
         }
         if !is_hex_color(&self.subtitle_color) {
             return bad("De ondertitelkleur moet de vorm #rrggbb hebben");
+        }
+        if !["none", "track", "album"].contains(&self.replay_gain.as_str()) {
+            return bad("ReplayGain moet uit, per nummer of per album zijn");
         }
         if !self.subtitle_encoding.is_empty() && !SUBTITLE_ENCODINGS.contains(&self.subtitle_encoding.as_str()) {
             return bad("Onbekende tekenset voor ondertitels");
@@ -508,6 +519,18 @@ mod tests {
         s.subtitle_encoding = "Windows-1252".into();
         assert!(s.validate().is_ok());
         assert!(s.subtitle_vlc_args().contains(&"--subsdec-encoding=Windows-1252".to_string()));
+    }
+
+    #[test]
+    fn replay_gain_is_off_by_default_and_maps_to_the_libvlc_option() {
+        let mut s = AppSettings::default();
+        assert_eq!(s.replay_gain, "none");
+        assert_eq!(s.audio_vlc_args(), ["--audio-replay-gain-mode=none"]);
+        s.replay_gain = "album".into();
+        assert!(s.validate().is_ok());
+        assert_eq!(s.audio_vlc_args(), ["--audio-replay-gain-mode=album"]);
+        s.replay_gain = "luid".into();
+        assert!(s.validate().is_err());
     }
 
     #[test]

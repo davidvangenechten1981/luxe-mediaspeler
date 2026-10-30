@@ -93,6 +93,13 @@ function Play() {
       <Row title="Voorkeurstalen ondertitels" hint="Leeg laten = geen ondertitels automatisch aanzetten."><TextInput aria-label="Voorkeurstalen ondertitels" defaultValue={langs(s.preferred_subtitle_languages)} style={{ width: 200 }} onBlur={(e) => void update({ preferred_subtitle_languages: parse(e.target.value) })} /></Row>
       <Row title="Ondertitelgrootte" hint="Wordt toegepast na het opnieuw starten van de app."><div className="row" style={{ width: 240 }}><div className="grow"><Slider label="Ondertitelgrootte" min={0.5} max={3} step={0.1} bigStep={0.5} value={s.subtitle_scale} format={(v) => `${Math.round(v * 100)}%`} onChange={() => undefined} onCommit={(v) => void update({ subtitle_scale: Math.round(v * 10) / 10 })} /></div><span className="mono muted" style={{ width: 44 }}>{Math.round(s.subtitle_scale * 100)}%</span></div></Row>
       <Row title="Ondertitelkleur" hint="Wordt toegepast na het opnieuw starten van de app."><input type="color" aria-label="Ondertitelkleur" value={s.subtitle_color} onChange={(e) => void update({ subtitle_color: e.target.value })} style={{ width: 40, height: 28, border: 0, background: "none", padding: 0 }} /></Row>
+      <Row title="ReplayGain" hint="Houdt nummers even hard, als je muziek volumegegevens in de tags heeft. Wordt toegepast na het opnieuw starten van de app.">
+        <Select aria-label="ReplayGain" value={s.replay_gain} onChange={(e) => void update({ replay_gain: e.target.value as AppSettings["replay_gain"] })}>
+          <option value="none">Uit</option>
+          <option value="track">Per nummer</option>
+          <option value="album">Per album</option>
+        </Select>
+      </Row>
       <Row title="Tekenset ondertitels" hint="Alleen aanpassen als letters met accenten er fout uitzien. Wordt toegepast na het opnieuw starten van de app.">
         <select aria-label="Tekenset ondertitels" value={s.subtitle_encoding} onChange={(e) => void update({ subtitle_encoding: e.target.value })}>
           <option value="">Automatisch</option>

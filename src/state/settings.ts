@@ -24,6 +24,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   autoplay_next_delay_s: 10,
   crossfade_ms: 0,
   normalize_realtime: false,
+  replay_gain: "none",
   network_caching_ms: 1500,
   allow_local_streams: false,
   online_metadata: false,
@@ -39,7 +40,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 };
 
 /** Instellingen die de speler of wachtrij alleen bij het opstarten inleest. */
-export const RESTART_KEYS: (keyof AppSettings)[] = ["subtitle_scale", "subtitle_color", "subtitle_encoding", "convert_parallel"];
+export const RESTART_KEYS: (keyof AppSettings)[] = ["subtitle_scale", "subtitle_color", "subtitle_encoding", "replay_gain", "convert_parallel"];
 
 interface SettingsState {
   settings: AppSettings;

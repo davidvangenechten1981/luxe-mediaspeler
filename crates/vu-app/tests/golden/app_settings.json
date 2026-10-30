@@ -50,6 +50,7 @@
   "preferred_subtitle_languages": [
     "nld"
   ],
+  "replay_gain": "none",
   "resume_playback": true,
   "scan_on_startup": false,
   "seek_long_s": 30,
