@@ -40,15 +40,16 @@ pub fn save_profile(st: &AppState, name: &str, settings: Settings) -> Result<Pro
     if name.is_empty() || name.chars().count() > 60 {
         return Err(CoreError::Invalid("Geef het profiel een naam van 1 tot 60 tekens".into()));
     }
-    settings.validate()?;
     let mut settings = settings;
-    // Een profiel bevat nooit een bestandsspecifiek ondertitelbestand of knipwerk.
+    // Een profiel bevat nooit een bestandsspecifiek ondertitelbestand of knipwerk; dat halen we eerst weg,
+    // zodat een verouderd pad het opslaan niet kan blokkeren.
     settings.external_subtitle = None;
     settings.external_subtitle_language = None;
     settings.trim_start_ms = None;
     settings.trim_end_ms = None;
     settings.burn_subtitle_track = None;
     settings.burn_external_subtitle = false;
+    settings.validate()?;
     let mut list = user_profiles(st)?;
     let existing = list.iter().position(|p| p.name.eq_ignore_ascii_case(name));
     let id = match existing {

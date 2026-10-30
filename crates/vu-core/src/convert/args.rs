@@ -1052,7 +1052,7 @@ mod tests {
         let p = plan(&s, VIDEO_JSON).unwrap();
         let wanted = format!("subtitles='{}'", escape_filter_path(&sub).unwrap());
         assert!(p.args.iter().any(|a| a.starts_with(&wanted)), "{:?}", p.args);
-        assert!(!has_pair(&p.args, "-map", "1:0") && !p.args.iter().any(|a| *a == sub), "het bestand is geen tweede invoer");
+        assert!(!has_pair(&p.args, "-map", "1:0") && !p.args.contains(&sub), "het bestand is geen tweede invoer");
     }
 
     #[test]
