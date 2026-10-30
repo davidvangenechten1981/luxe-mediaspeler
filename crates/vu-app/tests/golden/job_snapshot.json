@@ -7,6 +7,7 @@
   "input": "/m/a.mkv",
   "mode": "transcode",
   "output": "/o/a.mp4",
+  "paused": false,
   "profile": "Compacte video",
   "speed": 2.5,
   "started_at": 1,

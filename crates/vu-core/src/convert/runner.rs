@@ -146,6 +146,7 @@ pub fn run_conversion(
     settings: &Settings,
     info: &MediaInfo,
     cancel: &AtomicBool,
+    paused: &AtomicBool,
     on_progress: &mut dyn FnMut(Progress),
 ) -> Result<RunOutcome> {
     let dir = final_path.parent().ok_or_else(|| CoreError::Invalid("Ongeldig uitvoerpad".into()))?;
@@ -153,7 +154,7 @@ pub fn run_conversion(
 
     let temp = temp_path_for(final_path);
     let plan = build_args(input, &temp, settings, info, tools.caps)?;
-    let result = execute(tools, plan, &temp, final_path, cancel, on_progress);
+    let result = execute(tools, plan, &temp, final_path, cancel, paused, on_progress);
     // Een videokaart die bij het starten of tijdens het coderen faalt (driver, geheugen, niet-ondersteund formaat)
     // mag de conversie niet laten mislukken: één nieuwe poging met de processor.
     if let (Err(CoreError::Ffmpeg(msg)), Some(backend)) = (&result, hw_used(settings, tools.caps, input, &temp, info)) {
@@ -162,7 +163,7 @@ pub fn run_conversion(
         let mut plan = build_args(input, &temp, &cpu, info, tools.caps)?;
         let first_line = msg.lines().next().unwrap_or("onbekende fout").trim().to_string();
         plan.warnings.push(format!("Coderen met {} mislukte ({first_line}); de processor is gebruikt", backend.label()));
-        return execute(tools, plan, &temp, final_path, cancel, on_progress);
+        return execute(tools, plan, &temp, final_path, cancel, paused, on_progress);
     }
     result
 }
@@ -179,6 +180,7 @@ fn execute(
     temp: &Path,
     final_path: &Path,
     cancel: &AtomicBool,
+    paused: &AtomicBool,
     on_progress: &mut dyn FnMut(Progress),
 ) -> Result<RunOutcome> {
     let temp = temp.to_path_buf();
@@ -222,11 +224,17 @@ fn execute(
     let mut out_time_us: u64 = 0;
     let mut speed: Option<f64> = None;
     let mut cancelled = false;
+    let mut suspended = false;
     loop {
         if cancel.load(Ordering::Relaxed) {
             cancelled = true;
             let _ = child.kill();
             break;
+        }
+        // Pauzeren: het proces staat stil (geen processor, geen schijf) en gaat verder waar het ophield.
+        let want_pause = paused.load(Ordering::Relaxed);
+        if want_pause != suspended && crate::proc::set_suspended(&child, want_pause) {
+            suspended = want_pause;
         }
         match rx.recv_timeout(Duration::from_millis(100)) {
             Ok(line) => {
@@ -340,7 +348,7 @@ mod tests {
     fn convert(env: &Env, input: &Path, out: &Path, s: &Settings, cancel: &AtomicBool) -> (Result<RunOutcome>, Vec<Progress>) {
         let info = probe_file(Path::new("ffprobe"), input).unwrap();
         let mut ticks = vec![];
-        let r = run_conversion(&env.tools(), input, out, s, &info, cancel, &mut |p| ticks.push(p));
+        let r = run_conversion(&env.tools(), input, out, s, &info, cancel, &AtomicBool::new(false), &mut |p| ticks.push(p));
         (r, ticks)
     }
 
@@ -666,7 +674,16 @@ mod tests {
         let bad = dir.path().join("kapot.mkv");
         std::fs::write(&bad, b"dit is geen video").unwrap();
         let out = dir.path().join("uit.mp4");
-        let r = run_conversion(&env.tools(), &bad, &out, &settings("remux_mp4"), &info, &AtomicBool::new(false), &mut |_| {});
+        let r = run_conversion(
+            &env.tools(),
+            &bad,
+            &out,
+            &settings("remux_mp4"),
+            &info,
+            &AtomicBool::new(false),
+            &AtomicBool::new(false),
+            &mut |_| {},
+        );
         match r {
             Err(CoreError::Ffmpeg(m)) => assert!(!m.trim().is_empty()),
             other => panic!("verwachtte een FFmpeg-fout: {other:?}"),
@@ -715,6 +732,7 @@ mod tests {
             &dir.path().join("o.mkv"),
             &settings("remux_mkv"),
             &info,
+            &AtomicBool::new(false),
             &AtomicBool::new(false),
             &mut |_| {},
         );

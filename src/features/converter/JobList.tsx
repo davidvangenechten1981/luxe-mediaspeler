@@ -10,6 +10,11 @@ import { reportError } from "../../state/ui";
 const STATE_LABEL: Record<JobState, string> = { queued: "Wacht", running: "Bezig", done: "Klaar", failed: "Mislukt", cancelled: "Geannuleerd", skipped: "Overgeslagen" };
 const STATE_BADGE: Record<JobState, string> = { queued: "", running: "badge--accent", done: "badge--success", failed: "badge--danger", cancelled: "badge--warning", skipped: "badge--warning" };
 
+/** "Gepauzeerd" gaat voor "Bezig" als het proces stilstaat. */
+export function stateLabel(job: JobSnapshot): string {
+  return job.state === "running" && job.paused ? "Gepauzeerd" : STATE_LABEL[job.state];
+}
+
 export function JobRow({ job }: { job: JobSnapshot }) {
   const refresh = useJobs((s) => s.refresh);
   const act = async (fn: () => Promise<unknown>) => {
@@ -26,18 +31,20 @@ export function JobRow({ job }: { job: JobSnapshot }) {
       <div className="col" style={{ gap: 2, minWidth: 0 }}>
         <div className="row">
           <strong className="ellipsis" title={job.input}>{basename(job.input)}</strong>
-          <span className={`badge ${STATE_BADGE[job.state]}`}>{STATE_LABEL[job.state]}</span>
+          <span className={`badge ${STATE_BADGE[job.state]}`}>{stateLabel(job)}</span>
           <span className="badge">{job.mode === "remux" ? "Remux" : "Opnieuw coderen"}</span>
         </div>
         <span className="muted ellipsis" style={{ fontSize: "var(--fs-xs)" }}>
           {job.profile}
           {job.output ? ` → ${basename(job.output)}` : ""}
-          {job.state === "running" && job.speed ? ` · ${String(Math.round(job.speed * 10) / 10).replace(".", ",")}× sneller dan realtime` : ""}
-          {job.state === "running" && job.eta_s !== null ? ` · nog ${formatEta(job.eta_s)}` : ""}
+          {job.state === "running" && !job.paused && job.speed ? ` · ${String(Math.round(job.speed * 10) / 10).replace(".", ",")}× sneller dan realtime` : ""}
+          {job.state === "running" && !job.paused && job.eta_s !== null ? ` · nog ${formatEta(job.eta_s)}` : ""}
         </span>
       </div>
       <div className="row" style={{ gap: 2 }}>
         {job.state === "done" && job.output && <IconButton icon="folder" label="Tonen in Verkenner" size={17} onClick={() => void revealInFolder(job.output!).catch(reportError)} />}
+        {job.state === "running" && !job.paused && <IconButton icon="pause" label="Pauzeren" size={17} onClick={() => void act(() => api.convertPause(job.id))} />}
+        {job.state === "running" && job.paused && <IconButton icon="play" label="Hervatten" size={17} onClick={() => void act(() => api.convertResume(job.id))} />}
         {active && <IconButton icon="close" label="Annuleren" size={17} onClick={() => void act(() => api.convertCancel(job.id))} />}
         {(job.state === "failed" || job.state === "cancelled" || job.state === "skipped") && <IconButton icon="refresh" label="Opnieuw proberen" size={17} onClick={() => void act(() => api.convertRetry(job.id))} />}
         {job.state !== "running" && <IconButton icon="trash" label="Uit lijst verwijderen" size={17} onClick={() => void act(() => api.convertRemove(job.id))} />}

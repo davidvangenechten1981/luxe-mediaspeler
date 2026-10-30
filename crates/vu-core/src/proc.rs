@@ -35,6 +35,42 @@ pub fn background<S: AsRef<OsStr>>(program: S) -> Command {
     cmd
 }
 
+#[cfg(windows)]
+#[link(name = "ntdll")]
+extern "system" {
+    fn NtSuspendProcess(process: *mut std::ffi::c_void) -> i32;
+    fn NtResumeProcess(process: *mut std::ffi::c_void) -> i32;
+}
+
+/// Pauzeert (`true`) of hervat (`false`) een draaiend proces. Geeft aan of dat gelukt is.
+/// Windows: `NtSuspendProcess`; anders: SIGSTOP/SIGCONT.
+pub fn set_suspended(child: &std::process::Child, suspend: bool) -> bool {
+    #[cfg(windows)]
+    {
+        use std::os::windows::io::AsRawHandle;
+        let handle = child.as_raw_handle();
+        // SAFETY: `handle` is de geldige procesgreep van `child`, die de aanroep overleeft; de functie leest er alleen mee.
+        let status = unsafe {
+            if suspend {
+                NtSuspendProcess(handle)
+            } else {
+                NtResumeProcess(handle)
+            }
+        };
+        status >= 0
+    }
+    #[cfg(not(windows))]
+    {
+        quiet("kill")
+            .args([if suspend { "-STOP" } else { "-CONT" }, &child.id().to_string()])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -47,6 +83,23 @@ mod tests {
         let out = quiet("echo").arg("hallo").output().unwrap();
         assert!(out.status.success());
         assert!(String::from_utf8_lossy(&out.stdout).contains("hallo"));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_process_can_be_paused_and_resumed() {
+        let mut child = quiet("sleep").arg("30").spawn().unwrap();
+        let state = |pid: u32| {
+            std::fs::read_to_string(format!("/proc/{pid}/stat")).unwrap().rsplit(')').next().unwrap().trim().chars().next().unwrap()
+        };
+        assert!(set_suspended(&child, true));
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        assert_eq!(state(child.id()), 'T', "gepauzeerd");
+        assert!(set_suspended(&child, false));
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        assert_ne!(state(child.id()), 'T', "hervat");
+        child.kill().unwrap();
+        let _ = child.wait();
     }
 
     #[test]

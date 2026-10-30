@@ -296,6 +296,12 @@ pub fn list(st: &AppState) -> Result<Vec<JobSnapshot>> {
 pub fn cancel(st: &AppState, id: u64) -> Result<()> {
     st.require_tasks()?.cancel(id)
 }
+pub fn pause(st: &AppState, id: u64) -> Result<()> {
+    st.require_tasks()?.pause(id)
+}
+pub fn resume(st: &AppState, id: u64) -> Result<()> {
+    st.require_tasks()?.resume(id)
+}
 pub fn retry(st: &AppState, id: u64) -> Result<()> {
     st.require_tasks()?.retry(id)
 }

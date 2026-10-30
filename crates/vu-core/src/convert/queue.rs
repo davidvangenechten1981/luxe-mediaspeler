@@ -47,6 +47,8 @@ pub struct JobSnapshot {
     pub speed: Option<f64>,
     pub error: Option<String>,
     pub warnings: Vec<String>,
+    /// De conversie is gepauzeerd (het FFmpeg-proces staat stil) en kan worden hervat.
+    pub paused: bool,
     pub started_at: Option<i64>,
     pub finished_at: Option<i64>,
 }
@@ -55,6 +57,7 @@ struct Job {
     snap: JobSnapshot,
     request: JobRequest,
     cancel: Arc<AtomicBool>,
+    paused: Arc<AtomicBool>,
 }
 
 #[derive(Default)]
@@ -122,7 +125,7 @@ impl Shared {
     }
 }
 
-fn worker(shared: Arc<Shared>, id: u64, request: JobRequest, cancel: Arc<AtomicBool>) {
+fn worker(shared: Arc<Shared>, id: u64, request: JobRequest, cancel: Arc<AtomicBool>, paused: Arc<AtomicBool>) {
     let result = (|| -> Result<(Option<std::path::PathBuf>, Mode, Vec<String>, bool)> {
         let input = validate_media_path(&request.input)?;
         request.settings.validate()?;
@@ -136,7 +139,7 @@ fn worker(shared: Arc<Shared>, id: u64, request: JobRequest, cancel: Arc<AtomicB
         let caps = shared.caps_with_hw();
         let tools = Tools { ffmpeg: &shared.ffmpeg, ffprobe: &shared.ffprobe, caps: &caps };
         let shared2 = shared.clone();
-        let outcome = run_conversion(&tools, &input, &final_path, &request.settings, &info, &cancel, &mut |p: Progress| {
+        let outcome = run_conversion(&tools, &input, &final_path, &request.settings, &info, &cancel, &paused, &mut |p: Progress| {
             shared2.update(id, |s| {
                 s.fraction = p.fraction;
                 s.eta_s = p.eta_s;
@@ -156,6 +159,7 @@ fn worker(shared: Arc<Shared>, id: u64, request: JobRequest, cancel: Arc<AtomicB
             None => None,
             Some(job) => {
                 job.snap.finished_at = Some(finished);
+                job.snap.paused = false;
                 job.snap.speed = None;
                 job.snap.eta_s = None;
                 match result {
@@ -206,10 +210,11 @@ fn coordinator(shared: Arc<Shared>) {
             if let Some(job) = st.jobs.iter_mut().find(|j| j.snap.state == JobState::Queued) {
                 job.snap.state = JobState::Running;
                 job.snap.started_at = Some(now());
-                let (id, req, cancel, snap) = (job.snap.id, job.request.clone(), job.cancel.clone(), job.snap.clone());
+                let (id, req, cancel, paused, snap) =
+                    (job.snap.id, job.request.clone(), job.cancel.clone(), job.paused.clone(), job.snap.clone());
                 st.running += 1;
                 let sh = shared.clone();
-                let handle = std::thread::spawn(move || worker(sh, id, req, cancel));
+                let handle = std::thread::spawn(move || worker(sh, id, req, cancel, paused));
                 st.workers.push(handle);
                 drop(st);
                 shared.emit(&snap);
@@ -294,10 +299,16 @@ impl TaskManager {
                 speed: None,
                 error: None,
                 warnings: vec![],
+                paused: false,
                 started_at: None,
                 finished_at: None,
             };
-            st.jobs.push(Job { snap: snap.clone(), request, cancel: Arc::new(AtomicBool::new(false)) });
+            st.jobs.push(Job {
+                snap: snap.clone(),
+                request,
+                cancel: Arc::new(AtomicBool::new(false)),
+                paused: Arc::new(AtomicBool::new(false)),
+            });
             snap
         };
         self.shared.cv.notify_all();
@@ -338,6 +349,39 @@ impl TaskManager {
         Ok(())
     }
 
+    /// Pauzeert een lopende conversie: het FFmpeg-proces staat stil tot je hervat.
+    pub fn pause(&self, id: u64) -> Result<()> {
+        self.set_paused(id, true)
+    }
+
+    pub fn resume(&self, id: u64) -> Result<()> {
+        self.set_paused(id, false)
+    }
+
+    fn set_paused(&self, id: u64, paused: bool) -> Result<()> {
+        let snap = {
+            let mut st = self.shared.state.lock().unwrap();
+            let job = st.jobs.iter_mut().find(|j| j.snap.id == id).ok_or_else(|| CoreError::NotFound(format!("taak {id}")))?;
+            if job.snap.state != JobState::Running {
+                return Err(CoreError::Invalid("Alleen een lopende conversie kan worden gepauzeerd of hervat".into()));
+            }
+            if job.snap.paused == paused {
+                return Err(CoreError::Invalid(
+                    if paused { "Deze conversie is al gepauzeerd" } else { "Deze conversie is niet gepauzeerd" }.into(),
+                ));
+            }
+            job.paused.store(paused, Ordering::Relaxed);
+            job.snap.paused = paused;
+            if paused {
+                job.snap.speed = None;
+                job.snap.eta_s = None;
+            }
+            job.snap.clone()
+        };
+        self.shared.emit(&snap);
+        Ok(())
+    }
+
     /// Zet een mislukte of geannuleerde taak opnieuw in de wachtrij.
     pub fn retry(&self, id: u64) -> Result<()> {
         let snap = {
@@ -347,6 +391,7 @@ impl TaskManager {
                 return Err(CoreError::Invalid("Alleen mislukte, geannuleerde of overgeslagen taken kunnen opnieuw".into()));
             }
             job.cancel = Arc::new(AtomicBool::new(false));
+            job.paused = Arc::new(AtomicBool::new(false));
             let s = &mut job.snap;
             (s.state, s.fraction, s.eta_s, s.speed, s.error, s.output) = (JobState::Queued, None, None, None, None, None);
             (s.warnings, s.started_at, s.finished_at) = (vec![], None, None);
@@ -570,6 +615,70 @@ mod tests {
         assert!(std::fs::read_dir(&out).map(|d| d.count()).unwrap_or(0) == 0, "er mag niets achterblijven");
         assert!(m.remove(running).is_ok());
         assert!(m.cancel(queued).is_err()); // al afgerond
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_running_conversion_can_be_paused_stays_still_and_finishes_after_resuming() {
+        if !have_ffmpeg() {
+            return;
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("uit");
+        let src = dir.path().join("bron.mkv");
+        make_video(&src, 40, "1280x720");
+        let (m, _) = manager(1, None);
+        let mut slow = request(&src, &out, "high_quality");
+        slow.settings.video = crate::convert::VideoCodec::H265;
+        slow.settings.hw_accel = crate::convert::HwAccel::Off;
+        let id = m.add(slow).unwrap();
+        wait_for(&m, id, |s| s.state == JobState::Running && s.fraction.is_some());
+        m.pause(id).unwrap();
+        assert!(m.get(id).unwrap().paused);
+        std::thread::sleep(Duration::from_millis(600)); // laat lopende voortgangsregels binnenkomen
+        let frozen = m.get(id).unwrap().fraction;
+        std::thread::sleep(Duration::from_millis(1500));
+        assert_eq!(m.get(id).unwrap().fraction, frozen, "tijdens pauze mag de voortgang niet lopen");
+        assert!(m.pause(id).is_err(), "dubbel pauzeren is een fout");
+        m.resume(id).unwrap();
+        assert!(!m.get(id).unwrap().paused);
+        wait_for(&m, id, |s| s.fraction.zip(frozen).is_some_and(|(a, b)| a > b) || finished(s));
+        m.cancel(id).unwrap();
+        assert_eq!(wait_for(&m, id, finished).state, JobState::Cancelled);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_paused_conversion_can_still_be_cancelled() {
+        if !have_ffmpeg() {
+            return;
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("uit");
+        let src = dir.path().join("bron.mkv");
+        make_video(&src, 40, "1280x720");
+        let (m, _) = manager(1, None);
+        let mut slow = request(&src, &out, "high_quality");
+        slow.settings.video = crate::convert::VideoCodec::H265;
+        slow.settings.hw_accel = crate::convert::HwAccel::Off;
+        let id = m.add(slow).unwrap();
+        wait_for(&m, id, |s| s.state == JobState::Running && s.fraction.is_some());
+        m.pause(id).unwrap();
+        m.cancel(id).unwrap();
+        let s = wait_for(&m, id, finished);
+        assert_eq!(s.state, JobState::Cancelled);
+        assert!(!s.paused);
+        assert!(std::fs::read_dir(&out).map(|d| d.count()).unwrap_or(0) == 0);
+    }
+
+    #[test]
+    fn only_running_jobs_can_be_paused() {
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("uit");
+        let (m, _) = manager(1, None);
+        assert!(m.pause(999).is_err());
+        assert!(m.resume(999).is_err());
+        let _ = (dir, out);
     }
 
     #[test]

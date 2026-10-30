@@ -77,6 +77,8 @@ video_crop
 video_adjust
 video_deinterlace
 video_rotation
+convert_pause
+convert_resume
 convert_profiles
 convert_profile_save
 convert_profile_delete

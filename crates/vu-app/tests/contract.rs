@@ -141,6 +141,7 @@ fn golden_json_shapes_are_stable() {
             speed: Some(2.5),
             error: None,
             warnings: vec!["let op".into()],
+            paused: false,
             started_at: Some(1),
             finished_at: None,
         })

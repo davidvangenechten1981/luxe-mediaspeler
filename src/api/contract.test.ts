@@ -70,7 +70,7 @@ const convertShape: Shape<ConvertSettings> = {
 };
 const jobShape: Shape<JobSnapshot> = {
   id: true, input: true, output: true, profile: true, state: true, mode: true, fraction: true, eta_s: true, speed: true,
-  error: true, warnings: true, started_at: true, finished_at: true,
+  error: true, warnings: true, paused: true, started_at: true, finished_at: true,
 };
 const settingsShape: Shape<AppSettings> = {
   theme: true, accent: true, ui_scale: true, compact: true, always_on_top: true, language: true, seek_short_s: true,

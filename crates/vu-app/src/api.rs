@@ -103,6 +103,8 @@ pub enum Request {
     VideoDeinterlace { mode: String },
     VideoRotation { rotation: video::RotationChoice },
     // converter
+    ConvertPause { id: u64 },
+    ConvertResume { id: u64 },
     ConvertProfiles,
     ConvertProfileSave { name: String, settings: vu_core::convert::Settings },
     ConvertProfileDelete { id: String },
@@ -236,6 +238,8 @@ pub fn handle(st: &AppState, req: Request) -> Result<Value> {
         VideoDeinterlace { mode } => video::set_deinterlace(st, &mode).and_then(|_| unit()),
         VideoRotation { rotation } => video::set_rotation(st, rotation).and_then(|_| unit()),
 
+        ConvertPause { id } => converter::pause(st, id).and_then(|_| unit()),
+        ConvertResume { id } => converter::resume(st, id).and_then(|_| unit()),
         ConvertProfiles => json_of(converter::profiles(st)?),
         ConvertProfileSave { name, settings } => json_of(converter::save_profile(st, &name, settings)?),
         ConvertProfileDelete { id } => converter::delete_profile(st, &id).and_then(|_| unit()),

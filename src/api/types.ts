@@ -297,6 +297,7 @@ export interface JobSnapshot {
   speed: number | null;
   error: string | null;
   warnings: string[];
+  paused: boolean;
   started_at: number | null;
   finished_at: number | null;
 }
