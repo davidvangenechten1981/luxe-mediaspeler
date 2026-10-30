@@ -63,7 +63,7 @@ for ($y = $y0; $y -lt $y0 + $h; $y += 3) {
   }
 }
   if ($red -gt 0) { break }
-  "Poging $attempt: nog geen videobeeld, opnieuw proberen"
+  "Poging ${attempt}: nog geen videobeeld, opnieuw proberen"
   Start-Sleep -Seconds 3
 }
 $alive = -not $p.HasExited
