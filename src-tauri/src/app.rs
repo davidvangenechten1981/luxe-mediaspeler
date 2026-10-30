@@ -141,7 +141,11 @@ pub fn run() {
             commands::restart_app
         ])
         .setup(|app| {
-            let base = std::env::var_os("VU_DATA_DIR").map(PathBuf::from).map(Ok).unwrap_or_else(|| app.path().app_data_dir())?;
+            let exe_dir = std::env::current_exe().ok().and_then(|p| p.parent().map(PathBuf::from));
+            let base = crate::portable::resolve(std::env::var_os("VU_DATA_DIR").map(PathBuf::from), exe_dir.as_deref(), || {
+                app.path().app_data_dir().ok()
+            })
+            .ok_or("geen map voor de gegevens gevonden")?;
             let dirs = AppDirs::new(&base)?;
             let previous_crash = logging::take_previous_crash(&dirs.logs);
             logging::init(&dirs.logs);

@@ -37,6 +37,13 @@ Legenda: **Getest** = geautomatiseerde test met echte ffmpeg/libvlc (Linux) en/o
 | HDR-waarschuwing in het infopaneel | Getest; echte HDR-weergave blijft een beperking van LibVLC 3 |
 | Converter: videokaart (NVIDIA/Intel/AMD) en meerdere processorkernen | Argumenten per videokaart en de automatische terugval op de processor zijn getest met echte FFmpeg; een echte videokaart is niet getest (de testmachine heeft er geen): door jou te proberen |
 | Converter: extra profielen (telefoon, Opus, M4A), lagere prioriteit tijdens converteren, aanbevolen aantal gelijktijdige taken | Getest met echte FFmpeg; de lagere prioriteit werkt alleen op Windows en is daar niet apart gemeten |
+| Converter: fragment knippen, voorbeeld van 10 s, grootteschatting, eigen profielen, pauzeren/hervatten, ondertitels inbranden en als .srt opslaan, actie na afloop | Getest met echte FFmpeg (ook pauzeren op een echt proces); slaapstand/afsluiten alleen op Windows en niet uitgevoerd in de tests |
+| Windows-mediabediening (SMTC): titel en knoppen in het volumepaneel | Logica getest; de koppeling met Windows compileert (Windows-cross-check) maar is niet op een echte pc beproefd |
+| Terugval zonder hardwaredecodering bij afspeelfouten; sneller opstarten (FFmpeg-controle uitgesteld) | Sessielogica getest; echte beeldproblemen en meetbare starttijd: door jou te proberen (de opstarttijden staan in het logboek) |
+| Dubbelen opruimen met aanbeveling, slimme lijsten met eigen regels, posterwand | Getest |
+| Kijkstatus delen automatisch (bij starten en elke 10 min) | Getest met nepklok; twee echte pc's: door jou te proberen |
+| PIN voor de bibliotheek | Getest (hashing, blokkade, schermen); gemak, geen echte beveiliging |
+| Draagbare versie (zip met `portable.txt`) | Logica getest; de zip wordt in de CI gemaakt, maar niet op een USB-stick uitgeprobeerd |
 | Privacy: geen telemetrie, geen externe verbindingen behalve door jou geopende streams | Ontwerp + URL-validatie getest |
 
 ## Niet gemaakt / bewust verborgen
@@ -52,6 +59,6 @@ Legenda: **Getest** = geautomatiseerde test met echte ffmpeg/libvlc (Linux) en/o
 - Casten, UPnP/DLNA, webafstandsbediening (open netwerkpoorten of multicast)
 - Online ondertitels, filmgegevens en songteksten (API-sleutels of accounts nodig)
 - Echte HDR-tonemapping, gapless/crossfade (LibVLC 3 kan dit niet)
-- SMTC (Windows-mediabediening met titel en hoes): mediatoetsen werken al, maar de SMTC-overlay is niet gemaakt omdat die niet zonder echte Windows-pc te testen is
-- Sneller opstarten (venster eerder tonen) en automatische terugval bij hardwaredecoder-problemen: niet gemaakt, te riskant zonder handmatige test
-- Internetradio, podcasts, audio-cd, portable versie, 24p-schermwissel, PIN op de bibliotheek
+- SMTC met albumhoes (alleen titel en knoppen zijn gemaakt)
+- Het venster nog eerder tonen tijdens het opstarten (alleen de FFmpeg-controle is uitgesteld)
+- Internetradio, podcasts, audio-cd, 24p-schermwissel

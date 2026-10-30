@@ -1,5 +1,6 @@
 mod launch;
 mod logging;
+mod portable;
 mod shell_integration;
 #[cfg(windows)]
 mod winvideo;

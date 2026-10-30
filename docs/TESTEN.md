@@ -34,3 +34,10 @@ Meld elk probleem met: wat deed je, wat verwachtte je, wat gebeurde er, plus het
 23. **Converter met videokaart**: open Media Converter, kies een video en het profiel "Compacte video". Bij **Videokaart** moet je kaart genoemd worden (bij Automatisch). Zet een conversie in de wachtrij en vergelijk de snelheid ("speed" in de wachtrij) met "Alleen processor". Open Taakbeheer: tijdens het coderen hoort de videokaart (tabblad Prestaties, "Video Encode") te werken.
 24. **Terugval**: kies een videokaart die je pc niet heeft (bijvoorbeeld AMD op een NVIDIA-pc). De conversie moet toch slagen, met een waarschuwing dat de processor is gebruikt.
 25. **Kernen**: zet bij "Processorthreads" 2 en daarna leeg; in Taakbeheer gebruikt het converteren dan 2 threads, respectievelijk alle kernen.
+26. **Fragment en voorbeeld**: kies een video, vul bij "Fragment" 0:10 tot 0:30 in en klik "Voorbeeld (10 s)". Het resultaat ("… (voorbeeld)") speelt 10 seconden.
+27. **Pauzeren**: start een zware conversie (H.265, 4K) en klik op de pauzeknop in de wachtrij. In Taakbeheer moet de processor vrijkomen; na hervatten gaat het door.
+28. **Ondertitels inbranden**: kies een video met ondertitels, kies bij "Ondertitels in het beeld branden" een spoor, zet in de wachtrij en speel het resultaat af: de tekst staat in het beeld.
+29. **Windows-mediabediening**: speel muziek af en open het volumepaneel (of vergrendel Windows): titel en pauzeer/volgende-knoppen staan er en werken.
+30. **PIN**: stel een PIN in (Instellingen → Bibliotheek), herstart de app: de bibliotheekpagina's vragen de PIN. Vijf foute pogingen geven een korte blokkade.
+31. **Slimme lijst**: maak "Nog niet afgespeeld, langer dan 90 minuten" en controleer of hij klopt en bijwerkt als je iets afspeelt.
+32. **Draagbaar**: pak `VLC-Ultimate-draagbaar.zip` (artefact van de CI) uit op een andere plek en start de app; de map `data` verschijnt ernaast en in je Windows-profiel verschijnt niets.

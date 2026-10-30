@@ -88,6 +88,17 @@ jobs:
       - name: Installer bouwen (NSIS)
         run: pnpm tauri build --bundles nsis
 
+      - name: Draagbare versie maken (zip, zonder installatie)
+        shell: pwsh
+        run: |
+          $d = "portable/VLC Ultimate"
+          New-Item -ItemType Directory -Force $d | Out-Null
+          Copy-Item target/release/vlc-ultimate.exe $d
+          Copy-Item resources/ffmpeg, resources/vlc $d -Recurse
+          "Dit bestand maakt de app draagbaar: bibliotheek, instellingen en logboeken komen in de map 'data' naast het programma." | Set-Content "$d/portable.txt"
+          Compress-Archive -Path "$d/*" -DestinationPath "portable/VLC-Ultimate-draagbaar.zip"
+          "Draagbare versie: $([math]::Round((Get-Item portable/VLC-Ultimate-draagbaar.zip).Length/1MB)) MB"
+
       - name: Installeren, starten, schermtest, verwijderen
         shell: pwsh
         run: |
@@ -125,3 +136,4 @@ jobs:
             shots/
             checksums.txt
             target/release/bundle/nsis/*.exe
+            portable/VLC-Ultimate-draagbaar.zip
