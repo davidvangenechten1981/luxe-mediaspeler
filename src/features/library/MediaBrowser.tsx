@@ -12,7 +12,7 @@ import { reportError, toast, useUi } from "../../state/ui";
 import { MediaOverlays, useMediaActions } from "./actions";
 import { Thumb } from "./Thumb";
 
-type ViewMode = "grid" | "list";
+type ViewMode = "grid" | "posters" | "list";
 
 export interface BrowserProps {
   title: string;
@@ -189,6 +189,7 @@ export function MediaBrowser(p: BrowserProps) {
         <span className="toolbar__sep" />
         <div className="segmented" role="group" aria-label="Weergave">
           <IconButton icon="grid" label="Rasterweergave" pressed={mode === "grid"} onClick={() => setMode("grid")} />
+          {p.base.kind !== "audio" && <IconButton icon="film" label="Posterweergave" pressed={mode === "posters"} onClick={() => setMode("posters")} />}
           <IconButton icon="list" label="Lijstweergave" pressed={mode === "list"} onClick={() => setMode("list")} />
         </div>
       </div>
@@ -212,8 +213,8 @@ export function MediaBrowser(p: BrowserProps) {
         </EmptyState>
       )}
 
-      {items.length > 0 && mode === "grid" && (
-        <div className={`grid ${p.music ? "grid--music" : ""}`} role="list">
+      {items.length > 0 && (mode === "grid" || mode === "posters") && (
+        <div className={`grid ${p.music && mode !== "posters" ? "grid--music" : ""} ${mode === "posters" ? "grid--posters" : ""}`} role="list">
           {items.map((m) => (
             <div role="listitem" key={m.id}>
               <button type="button" className={`card-media ${selected.includes(m.id) ? "is-selected" : ""} ${m.missing ? "is-missing" : ""}`} aria-label={`${mediaTitle(m)}${m.missing ? " (bestand ontbreekt)" : ""}`} onClick={(e) => select(m, e)} onDoubleClick={() => !m.missing && playFrom(m)} onContextMenu={(e) => openCtx(e, m)} onKeyDown={(e) => e.key === "Enter" && !m.missing && playFrom(m)}>
