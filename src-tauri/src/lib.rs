@@ -12,6 +12,8 @@ mod commands;
 mod power;
 #[cfg(feature = "core")]
 mod sink;
+#[cfg(all(feature = "core", windows))]
+mod smtc;
 
 pub fn run() {
     #[cfg(feature = "core")]

@@ -24,6 +24,8 @@ impl TauriSink {
             "player://state" => {
                 let state = payload.pointer("/status/state").and_then(Value::as_str).unwrap_or("?");
                 self.power.set(power_need(state, payload.get("location").and_then(Value::as_str)));
+                #[cfg(windows)]
+                crate::smtc::on_player_state(payload);
                 let mut last = self.last_state.lock().unwrap_or_else(|e| e.into_inner());
                 if *last != state {
                     *last = state.to_string();

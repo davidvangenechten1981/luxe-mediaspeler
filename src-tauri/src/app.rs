@@ -191,6 +191,15 @@ pub fn run() {
                     }
                     Err(e) => logging::info(&format!("videovenster: {e}")),
                 }
+                // Windows-mediabediening (titel en knoppen in het volumepaneel en op het vergrendelscherm)
+                let st = state.clone();
+                if let Err(e) = crate::smtc::init(ui, move |key, status| {
+                    if let Some(cmd) = vu_app::media_session::command_for(key, status) {
+                        let _ = vu_app::services::player::command(&st, cmd);
+                    }
+                }) {
+                    logging::info(&format!("mediabediening (SMTC) niet beschikbaar: {e}"));
+                }
             }
 
             // Mediatoetsen (als een andere app ze al gebruikt, slaan we ze stil over)

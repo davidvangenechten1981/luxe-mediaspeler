@@ -2,6 +2,7 @@
 
 pub mod api;
 pub mod events;
+pub mod media_session;
 pub mod player_host;
 pub mod power;
 pub mod services;
