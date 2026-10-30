@@ -10,7 +10,7 @@ Alles draait op je eigen computer: geen account, geen telemetrie, geen externe d
 ## Wat werkt (en hoe het getest is)
 
 Zie [`docs/STATUS.md`](docs/STATUS.md) voor het volledige overzicht: wat is gebouwd, wat is getest, wat gedeeltelijk is en wat ontbreekt.
-Testen doe je met [`docs/TESTEN.md`](docs/TESTEN.md).
+Testen doe je met [`docs/TESTEN.md`](docs/TESTEN.md). Installeren, controleren en verwijderen staat in [`docs/INSTALLEREN.md`](docs/INSTALLEREN.md).
 
 ## Bouwen
 

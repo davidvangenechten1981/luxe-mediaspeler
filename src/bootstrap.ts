@@ -8,7 +8,7 @@ import { useJobs } from "./state/jobs";
 import { useLibrary } from "./state/library";
 import { usePlayer } from "./state/player";
 import { useSettings } from "./state/settings";
-import { reportError, toast } from "./state/ui";
+import { reportError, toast, useUi } from "./state/ui";
 
 export async function bootstrap(): Promise<() => void> {
   const offs: (() => void)[] = [];
@@ -60,6 +60,13 @@ export async function bootstrap(): Promise<() => void> {
     if (launch.files.length > 0) await openLocations(launch.files, launch.enqueue);
   } catch (e) {
     reportError(e);
+  }
+
+  try {
+    const info = await system.startupInfo();
+    if (info.previous_crash) useUi.getState().setCrashText(info.previous_crash);
+  } catch {
+    /* geen opstartinfo (browserweergave) */
   }
 
   const s = useSettings.getState().settings;

@@ -1,0 +1,50 @@
+name: Release
+
+# Maak een release door een tag te pushen:  git tag v0.2.0 && git push origin v0.2.0
+# Zorg dat de CI op die commit groen is; deze workflow bouwt alleen de installer en publiceert hem.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows-installer:
+    name: Installer bouwen en publiceren
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Tools downloaden en controleren (FFmpeg GPL-build en VLC)
+        shell: pwsh
+        run: ./scripts/ci/fetch-tools.ps1
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm tauri build --bundles nsis
+
+      - name: Controlegetallen maken
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem -Recurse target/release/bundle/nsis -Filter *-setup.exe | Select-Object -First 1
+          Copy-Item $setup.FullName "VLC-Ultimate-${{ github.ref_name }}-setup.exe"
+          $h = (Get-FileHash "VLC-Ultimate-${{ github.ref_name }}-setup.exe" -Algorithm SHA256).Hash.ToLower()
+          "$h  VLC-Ultimate-${{ github.ref_name }}-setup.exe" | Out-File SHA256SUMS.txt -Encoding ascii
+          Get-Content checksums.txt | Out-File -Append SHA256SUMS.txt -Encoding utf8
+          Get-Content SHA256SUMS.txt
+
+      - name: Release publiceren
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" "VLC-Ultimate-${{ github.ref_name }}-setup.exe" SHA256SUMS.txt `
+            --title "VLC Ultimate ${{ github.ref_name }}" `
+            --notes "Installer voor Windows 10/11. Controleer het bestand met het controlegetal in SHA256SUMS.txt (zie docs/INSTALLEREN.md). De installer is niet gesigneerd; Windows SmartScreen kan een waarschuwing tonen."

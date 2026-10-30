@@ -37,6 +37,9 @@ interface UiState {
   queueOpen: boolean;
   dialog: "url" | null;
   setDialog: (d: "url" | null) => void;
+  /** Tekst van een eerdere crash (toont de melding bij het opstarten). */
+  crashText: string | null;
+  setCrashText: (t: string | null) => void;
   go: (page: PageId, params?: Record<string, string>) => void;
   toast: (kind: Toast["kind"], text: string) => void;
   dismissToast: (id: number) => void;
@@ -60,6 +63,8 @@ export const useUi = create<UiState>((set, get) => ({
   queueOpen: false,
   dialog: null,
   setDialog: (dialog) => set({ dialog }),
+  crashText: null,
+  setCrashText: (crashText) => set({ crashText }),
   go: (page, params = {}) => set({ page, params }),
   toast: (kind, text) => {
     const id = ++toastId;

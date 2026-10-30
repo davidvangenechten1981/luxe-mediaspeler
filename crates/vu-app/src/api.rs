@@ -112,6 +112,7 @@ pub enum Request {
     SettingsImport { src: String },
     DatabaseBackup { dest: String },
     DatabaseRestore { src: String },
+    DiagnosticsExport { dest: String },
 }
 
 fn json_of<T: serde::Serialize>(v: T) -> Result<Value> {
@@ -231,6 +232,7 @@ pub fn handle(st: &AppState, req: Request) -> Result<Value> {
         }
         SettingsSave { settings: s } => json_of(settings::save(st, &s)?),
         SettingsReset => json_of(settings::reset(st)?),
+        DiagnosticsExport { dest } => settings::export_diagnostics(st, &st.version, &dest).and_then(|_| unit()),
         SettingsExport { dest } => settings::export_file(st, &dest).and_then(|_| unit()),
         SettingsImport { src } => json_of(settings::import_file(st, &src)?),
         DatabaseBackup { dest } => settings::backup_database(st, &dest).and_then(|_| unit()),

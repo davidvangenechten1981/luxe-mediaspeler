@@ -287,10 +287,18 @@ function About() {
 export function SettingsPage() {
   const [section, setSection] = useState<Section>("look");
   const warning = useSettings((s) => s.warning);
+  const needsRestart = useSettings((s) => s.needsRestart);
   const body = { look: <Look />, play: <Play />, library: <LibrarySettings />, convert: <ConvertSettingsSection />, keys: <Shortcuts />, privacy: <Privacy />, windows: <WindowsIntegration />, backup: <Backup />, about: <About /> }[section];
   return (
     <div className="page">
       <div className="page__head"><div><h1>Instellingen</h1></div></div>
+      {needsRestart && (
+        <div className="banner" style={{ marginBottom: "var(--s-4)" }} role="status">
+          <Icon name="info" size={18} />
+          <span className="grow">Sommige wijzigingen gelden pas na het opnieuw starten van de app.</span>
+          <Button variant="primary" onClick={() => void system.restartApp().catch(reportError)}>Nu herstarten</Button>
+        </div>
+      )}
       {warning && <div className="banner" style={{ marginBottom: "var(--s-4)" }} role="alert"><Icon name="warning" size={18} />{warning}</div>}
       <div className="split" style={{ gridTemplateColumns: "minmax(200px, 250px) 1fr" }}>
         <nav className="list" aria-label="Instellingencategorieën">

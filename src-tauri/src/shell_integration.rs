@@ -183,3 +183,26 @@ pub fn set_open_with(_id: &Identity, _exe: &std::path::Path, _enable: bool) -> s
 pub fn set_context_menu(_id: &Identity, _exe: &std::path::Path, _enable: bool) -> std::io::Result<()> {
     Err(std::io::Error::new(std::io::ErrorKind::Unsupported, "Alleen beschikbaar op Windows"))
 }
+
+#[cfg(test)]
+mod uninstall_hook_tests {
+    use super::*;
+
+    /// De uninstaller ruimt het register op met `nsis-hooks.nsh`. Dat script moet alles noemen wat deze module
+    /// kan aanmaken; anders blijven er na verwijderen sporen achter.
+    #[test]
+    fn the_uninstall_hook_removes_everything_this_module_can_register() {
+        let hook = include_str!("../nsis-hooks.nsh");
+        let id = Identity::production();
+        assert!(hook.contains("NSIS_HOOK_POSTUNINSTALL"));
+        for needle in
+            [id.prog_id.as_str(), id.app_key.as_str(), id.app_name.as_str(), id.verb.as_str(), "RegisteredApplications", "OpenWithProgids"]
+        {
+            assert!(hook.contains(needle), "{needle} ontbreekt in nsis-hooks.nsh");
+        }
+        for ext in MEDIA_EXTENSIONS {
+            assert!(hook.contains(&format!(".{ext}\\")), "extensie .{ext} ontbreekt in nsis-hooks.nsh");
+        }
+        assert!(hook.contains(&format!("{}.Enqueue", id.verb)), "het wachtrij-item van het rechtsklikmenu ontbreekt");
+    }
+}

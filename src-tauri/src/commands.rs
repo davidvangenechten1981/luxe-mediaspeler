@@ -12,6 +12,22 @@ use vu_app::AppState;
 
 pub struct Launch(pub Mutex<LaunchRequest>);
 
+/// Wat de interface bij het opstarten moet weten (nu: of de vorige sessie is gecrasht).
+pub struct StartupInfo(pub Mutex<Option<String>>);
+
+/// Geeft eenmalig de tekst van een eerdere crash terug (of niets).
+#[tauri::command]
+pub fn startup_info(info: State<'_, StartupInfo>) -> Value {
+    let crash = info.0.lock().unwrap_or_else(|e| e.into_inner()).take();
+    json!({ "previous_crash": crash })
+}
+
+/// Start de app opnieuw op (bijvoorbeeld voor instellingen die pas na een herstart gelden).
+#[tauri::command]
+pub fn restart_app(app: AppHandle) {
+    app.restart();
+}
+
 /// Het ene toegangspunt van de interface tot de backend (zie vu-app/src/api.rs).
 #[tauri::command(async)]
 pub fn api(state: State<'_, Arc<AppState>>, request: Value) -> Result<Value, String> {

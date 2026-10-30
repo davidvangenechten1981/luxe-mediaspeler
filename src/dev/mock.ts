@@ -342,6 +342,7 @@ async function handle(request: Record<string, unknown>): Promise<unknown> {
 export function installMock(): void {
   setCommandTransport(async (name, args) => {
     if (name === "api") return handle((args as { request: Record<string, unknown> }).request);
+    if (name === "startup_info") return { previous_crash: null };
     if (name === "take_launch_files") return { files: [], enqueue: false };
     if (name === "app_paths") return { data: "–", logs: "–", backups: "–", thumbnails: "–", pictures: null, videos: null, music: null, documents: null, downloads: null };
     if (name === "shell_status") return { supported: false, open_with_registered: false, context_menu_registered: false };

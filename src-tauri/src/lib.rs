@@ -9,6 +9,8 @@ mod app;
 #[cfg(feature = "core")]
 mod commands;
 #[cfg(feature = "core")]
+mod power;
+#[cfg(feature = "core")]
 mod sink;
 
 pub fn run() {

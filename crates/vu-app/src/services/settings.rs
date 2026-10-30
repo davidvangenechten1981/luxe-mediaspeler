@@ -102,10 +102,86 @@ pub fn diagnostics(st: &AppState, app_version: &str) -> Result<Diagnostics> {
     })
 }
 
+/// Laatste `n` regels van een logbestand (leeg als het niet bestaat).
+fn tail_lines(path: &Path, n: usize) -> String {
+    let text = std::fs::read_to_string(path).unwrap_or_default();
+    let lines: Vec<&str> = text.lines().collect();
+    lines[lines.len().saturating_sub(n)..].join("\n")
+}
+
+/// Eén tekstbestand met alles wat nodig is om een probleem te onderzoeken. Bevat geen mediabestanden,
+/// geen instellingen en geen wachtwoorden; wel de paden die in de logs staan.
+pub fn diagnostic_report(st: &AppState, app_version: &str) -> Result<String> {
+    let d = diagnostics(st, app_version)?;
+    let logs = &st.dirs.logs;
+    let mut out = String::new();
+    out.push_str(&format!(
+        "VLC Ultimate - diagnose\nVersie: {}\nSysteem: {} {}\n",
+        d.app_version,
+        std::env::consts::OS,
+        std::env::consts::ARCH
+    ));
+    out.push_str(&format!(
+        "Speler beschikbaar: {}\n",
+        if d.player_available { "ja".to_string() } else { format!("nee ({})", d.player_error.clone().unwrap_or_default()) }
+    ));
+    out.push_str(&format!(
+        "FFmpeg: {}\nffprobe: {}\nLibVLC-map: {}\n",
+        d.ffmpeg.unwrap_or_else(|| "niet gevonden".into()),
+        d.ffprobe.unwrap_or_else(|| "niet gevonden".into()),
+        d.vlc_dir.unwrap_or_else(|| "niet gevonden".into())
+    ));
+    out.push_str(&format!("Databaseschema: {}\nGegevensmap: {}\n", d.schema_version, d.data_dir));
+    for w in &d.warnings {
+        out.push_str(&format!("Waarschuwing: {w}\n"));
+    }
+    out.push_str("\n--- app.log (laatste 200 regels) ---\n");
+    out.push_str(&tail_lines(&logs.join("app.log"), 200));
+    for name in ["crash.log", "crash-vorige.log"] {
+        let t = tail_lines(&logs.join(name), 80);
+        if !t.is_empty() {
+            out.push_str(&format!("\n\n--- {name} ---\n{t}"));
+        }
+    }
+    out.push('\n');
+    Ok(out)
+}
+
+pub fn export_diagnostics(st: &AppState, app_version: &str, dest: &str) -> Result<()> {
+    let dest = validate_path_shape(dest)?;
+    std::fs::write(dest, diagnostic_report(st, app_version)?)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::services::testutil::*;
+
+    #[test]
+    fn the_diagnostic_report_contains_version_log_lines_and_an_earlier_crash() {
+        let app = app();
+        std::fs::create_dir_all(&app.state.dirs.logs).unwrap();
+        std::fs::write(app.state.dirs.logs.join("app.log"), "[2026-10-30 10:00:00] eerste\n[2026-10-30 10:00:01] tweede\n").unwrap();
+        std::fs::write(app.state.dirs.logs.join("crash-vorige.log"), "PANIC: voorbeeld").unwrap();
+        let r = diagnostic_report(&app.state, "9.9.9").unwrap();
+        assert!(r.contains("Versie: 9.9.9"));
+        assert!(r.contains("tweede"));
+        assert!(r.contains("--- crash-vorige.log ---") && r.contains("PANIC: voorbeeld"));
+        let dest = app.dir.path().join("diagnose.txt");
+        export_diagnostics(&app.state, "9.9.9", dest.to_str().unwrap()).unwrap();
+        assert!(std::fs::read_to_string(&dest).unwrap().contains("Versie: 9.9.9"));
+        assert!(export_diagnostics(&app.state, "9.9.9", "relatief.txt").is_err(), "alleen absolute paden");
+    }
+
+    #[test]
+    fn tail_keeps_only_the_last_lines() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("x.log");
+        std::fs::write(&p, "a\nb\nc\nd\n").unwrap();
+        assert_eq!(tail_lines(&p, 2), "c\nd");
+        assert_eq!(tail_lines(&dir.path().join("nietbestaand.log"), 2), "");
+    }
 
     #[test]
     fn saving_validates_and_persists() {

@@ -37,8 +37,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
   shortcuts: {},
 };
 
+/** Instellingen die de speler of wachtrij alleen bij het opstarten inleest. */
+export const RESTART_KEYS: (keyof AppSettings)[] = ["subtitle_scale", "subtitle_color", "convert_parallel"];
+
 interface SettingsState {
   settings: AppSettings;
+  /** Is er iets gewijzigd dat pas na herstarten geldt? */
+  needsRestart: boolean;
   loaded: boolean;
   warning: string | null;
   load: () => Promise<void>;
@@ -60,6 +65,7 @@ export function applyAppearance(s: AppSettings, doc: Document = document, prefer
 
 export const useSettings = create<SettingsState>((set, get) => ({
   settings: DEFAULT_SETTINGS,
+  needsRestart: false,
   loaded: false,
   warning: null,
   load: async () => {
@@ -77,7 +83,9 @@ export const useSettings = create<SettingsState>((set, get) => ({
     const next = { ...get().settings, ...patch };
     try {
       const saved = await api.settingsSave(next);
-      set({ settings: saved });
+      const before = get().settings;
+      const restart = RESTART_KEYS.some((k) => k in patch && saved[k] !== before[k]);
+      set({ settings: saved, needsRestart: get().needsRestart || restart });
       applyAppearance(saved, document, window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? true);
       if ("always_on_top" in patch) void windowApi.setAlwaysOnTop(saved.always_on_top);
       return true;

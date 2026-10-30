@@ -28,8 +28,8 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: http://asset.localhost; connect-src 'self' ipc: http://ipc.localhost",
-      "assetProtocol": { "enable": true, "scope": ["$APPDATA/cache/thumbnails/**", "$APPDATA/**/cache/thumbnails/**"] }
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: http://asset.localhost; connect-src 'self' ipc: http://ipc.localhost; base-uri 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'none'",
+      "assetProtocol": { "enable": true, "scope": ["$APPDATA/nl.vlcultimate.studio/cache/thumbnails/**"] }
     }
   },
   "bundle": {
@@ -41,6 +41,7 @@
     "resources": { "../resources/vlc/": "vlc/", "../resources/ffmpeg/": "ffmpeg/" },
     "windows": {
       "nsis": {
+        "installerHooks": "nsis-hooks.nsh",
         "installMode": "both",
         "languages": ["Dutch", "English"],
         "displayLanguageSelector": true

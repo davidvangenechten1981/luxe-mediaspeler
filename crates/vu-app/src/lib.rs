@@ -3,9 +3,11 @@
 pub mod api;
 pub mod events;
 pub mod player_host;
+pub mod power;
 pub mod services;
 pub mod state;
 pub mod tools;
+pub mod window_state;
 
 pub use events::{EventSink, NullSink};
 pub use state::{AppDirs, AppState};

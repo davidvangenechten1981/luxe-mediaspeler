@@ -10,6 +10,7 @@ import { PlaylistsPage } from "./features/pages/PlaylistsPage";
 import { QueuePage } from "./features/pages/QueuePage";
 import { NowPlayingPage } from "./features/player/NowPlaying";
 import { SettingsPage } from "./features/settings/SettingsPage";
+import { CrashDialog } from "./features/shell/CrashDialog";
 import { PlayerBar } from "./features/shell/PlayerBar";
 import { Sidebar } from "./features/shell/Sidebar";
 import { TitleBar } from "./features/shell/TitleBar";
@@ -60,7 +61,7 @@ function UrlDialog({ onClose }: { onClose: () => void }) {
 }
 
 export function App() {
-  const { page, fullscreen, theater, mini, dialog, setDialog } = useUi();
+  const { page, fullscreen, theater, mini, dialog, setDialog, crashText, setCrashText } = useUi();
   const loaded = useSettings((s) => s.loaded);
   const view = usePlayer((s) => s.view);
   const normalSize = useRef<{ w: number; h: number } | null>(null);
@@ -189,6 +190,7 @@ export function App() {
       </div>
       <PlayerBar />
       {dialog === "url" && <UrlDialog onClose={() => setDialog(null)} />}
+      {crashText && <CrashDialog text={crashText} onClose={() => setCrashText(null)} />}
       <Toasts />
     </div>
   );

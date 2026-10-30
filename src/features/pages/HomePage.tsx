@@ -1,3 +1,4 @@
+import { ToolsBanner } from "./ToolsBanner";
 import { api } from "../../api/client";
 import { Icon, type IconName } from "../../components/Icon";
 import { Button, Spinner } from "../../components/ui";
@@ -33,10 +34,12 @@ export function HomePage() {
   const cont = useAsync(() => api.continueWatching(5), [version]);
   const recent = useAsync(() => api.libraryQuery({ played_only: true, sort: "played", descending: true, limit: 12 }), [version]);
   const added = useAsync(() => api.libraryQuery({ kind: "video", sort: "added", descending: true, limit: 12 }), [version]);
+  const diagnostics = useAsync(() => api.diagnostics(), []);
   const empty = stats.data && stats.data.videos + stats.data.music === 0;
 
   return (
     <div className="page">
+      <ToolsBanner diagnostics={diagnostics.data} />
       <section className="hero">
         <h1>{greeting()}.</h1>
         <p className="muted" style={{ marginTop: 4 }}>

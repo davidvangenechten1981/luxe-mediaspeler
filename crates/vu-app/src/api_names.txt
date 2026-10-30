@@ -85,3 +85,4 @@ settings_export
 settings_import
 database_backup
 database_restore
+diagnostics_export

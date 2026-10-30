@@ -6,10 +6,6 @@ on:
   pull_request:
   workflow_dispatch:
 
-env:
-  FFMPEG_URL: https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip
-  VLC_URL: https://download.videolan.org/pub/videolan/vlc/3.0.21/win64/vlc-3.0.21-win64.7z
-
 jobs:
   frontend:
     name: Frontend (typecheck, tests, lint)
@@ -40,6 +36,23 @@ jobs:
         env:
           VLC_VERBOSE: "0"
 
+  audit:
+    name: Bekende kwetsbaarheden (informatief)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: pnpm audit --prod
+        continue-on-error: true
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo install cargo-audit --locked
+      - run: cargo audit
+        continue-on-error: true
+
   windows:
     name: Windows (tests, installer, schermtest)
     runs-on: windows-latest
@@ -53,30 +66,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
-      - name: Tools downloaden (FFmpeg GPL-build en VLC 3.0.21)
+      - name: Tools downloaden en controleren (FFmpeg GPL-build en VLC 3.0.21)
         shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          New-Item -ItemType Directory -Force dl, resources/ffmpeg, resources/vlc | Out-Null
-          Invoke-WebRequest $env:FFMPEG_URL -OutFile dl/ffmpeg.zip
-          Invoke-WebRequest $env:VLC_URL -OutFile dl/vlc.7z
-          foreach ($f in "dl/ffmpeg.zip", "dl/vlc.7z") {
-            $b = [IO.File]::ReadAllBytes((Resolve-Path $f))[0..1]
-            if ($f.EndsWith("zip") -and -not ($b[0] -eq 0x50 -and $b[1] -eq 0x4B)) { throw "$f is geen zip" }
-            if ($f.EndsWith("7z") -and -not ($b[0] -eq 0x37 -and $b[1] -eq 0x7A)) { throw "$f is geen 7z" }
-          }
-          Expand-Archive dl/ffmpeg.zip dl/ffmpeg
-          $bin = Get-ChildItem dl/ffmpeg -Recurse -Filter ffmpeg.exe | Select-Object -First 1
-          Copy-Item $bin.FullName resources/ffmpeg/
-          Copy-Item (Join-Path $bin.DirectoryName ffprobe.exe) resources/ffmpeg/
-          7z x dl/vlc.7z -odl/vlc -y | Out-Null
-          $v = Get-ChildItem dl/vlc -Directory | Select-Object -First 1
-          Copy-Item (Join-Path $v.FullName libvlc.dll) resources/vlc/
-          Copy-Item (Join-Path $v.FullName libvlccore.dll) resources/vlc/
-          Copy-Item (Join-Path $v.FullName plugins) resources/vlc/plugins -Recurse
-          "SHA-256 van gebruikte downloads:" | Tee-Object checksums.txt
-          Get-FileHash dl/ffmpeg.zip, dl/vlc.7z -Algorithm SHA256 | ForEach-Object { "$($_.Hash)  $(Split-Path $_.Path -Leaf)" } | Tee-Object checksums.txt -Append
-          & resources/ffmpeg/ffmpeg.exe -version | Select-Object -First 1
+        run: ./scripts/ci/fetch-tools.ps1
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
@@ -118,10 +110,17 @@ jobs:
           if ($result -notmatch "interface_zichtbaar=True") { throw "Interface niet zichtbaar: $result" }
           if ($result -notmatch "video_zichtbaar_pct=([1-9]\d*)") { throw "Video niet zichtbaar: $result" }
 
+      - name: Levenscyclus (venster onthouden, verwijderen, register)
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem -Recurse target/release/bundle/nsis -Filter *-setup.exe | Select-Object -First 1
+          ./scripts/ci/lifecycle-check.ps1 -Setup $setup.FullName
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: windows-resultaten
+          retention-days: 30
           path: |
             shots/
             checksums.txt

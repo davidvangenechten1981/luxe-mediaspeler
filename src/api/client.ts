@@ -176,6 +176,7 @@ export const api = {
   settingsGet: () => call<SettingsResponse>(t("settings_get")),
   settingsSave: (settings: AppSettings) => call<AppSettings>(t("settings_save", { settings })),
   settingsReset: () => call<AppSettings>(t("settings_reset")),
+  diagnosticsExport: (dest: string) => call<null>(t("diagnostics_export", { dest })),
   settingsExport: (dest: string) => call<null>(t("settings_export", { dest })),
   settingsImport: (src: string) => call<AppSettings>(t("settings_import", { src })),
   databaseBackup: (dest: string) => call<null>(t("database_backup", { dest })),
@@ -194,6 +195,8 @@ async function cmd<T>(name: string, args?: Record<string, unknown>): Promise<T> 
 export const system = {
   takeLaunchFiles: () => cmd<LaunchRequest>("take_launch_files"),
   appPaths: () => cmd<AppPaths>("app_paths"),
+  startupInfo: () => cmd<{ previous_crash: string | null }>("startup_info"),
+  restartApp: () => cmd<null>("restart_app"),
   shellStatus: () => cmd<IntegrationStatus>("shell_status"),
   shellSet: (kind: "open_with" | "context_menu", enable: boolean) => cmd<IntegrationStatus>("shell_set", { kind, enable }),
   openDefaultApps: () => cmd<null>("open_default_apps"),

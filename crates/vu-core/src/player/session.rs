@@ -212,7 +212,8 @@ pub struct Session<E: Engine> {
     pub preferred_subtitles: Vec<String>,
 }
 
-fn is_audio_location(loc: &str) -> bool {
+/// Is dit item muziek (op bestandsextensie)?
+pub fn is_audio_location(loc: &str) -> bool {
     let ext = Path::new(loc).extension().map(|e| e.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
     ["mp3", "aac", "flac", "wav", "alac", "ogg", "opus", "wma", "aiff", "aif", "m4a"].contains(&ext.as_str())
 }
