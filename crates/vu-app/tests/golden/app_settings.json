@@ -89,6 +89,7 @@
     "volume_up": "ArrowUp"
   },
   "subtitle_color": "#ffffff",
+  "subtitle_encoding": "",
   "subtitle_scale": 1.0,
   "theme": "dark",
   "ui_scale": 1.0

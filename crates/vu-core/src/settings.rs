@@ -54,6 +54,8 @@ pub struct AppSettings {
     pub preferred_subtitle_languages: Vec<String>,
     pub subtitle_scale: f32,
     pub subtitle_color: String,
+    /// Tekenset van externe ondertitelbestanden; leeg = automatisch herkennen.
+    pub subtitle_encoding: String,
     /// Wachttijd na een afgelopen video voordat het volgende item start; 0 = direct.
     pub autoplay_next_delay_s: u32,
     // audio
@@ -135,6 +137,7 @@ impl Default for AppSettings {
             preferred_subtitle_languages: vec!["nld".into()],
             subtitle_scale: 1.0,
             subtitle_color: "#ffffff".into(),
+            subtitle_encoding: String::new(),
             autoplay_next_delay_s: 10,
             crossfade_ms: 0,
             normalize_realtime: false,
@@ -225,13 +228,21 @@ pub fn normalize_accelerator(input: &str) -> Result<String> {
     Ok(out)
 }
 
+/// Tekensets die in de instellingen te kiezen zijn (leeg = automatisch).
+pub const SUBTITLE_ENCODINGS: &[&str] =
+    &["UTF-8", "Windows-1250", "Windows-1251", "Windows-1252", "Windows-1253", "Windows-1254", "ISO-8859-1", "ISO-8859-2", "ISO-8859-15"];
+
 impl AppSettings {
     /// LibVLC-opties voor de ondertitels. Ze gelden vanaf het opstarten van de speler.
     /// Bij VLC betekent een kleiner getal een groter lettertype (16 = normaal).
     pub fn subtitle_vlc_args(&self) -> Vec<String> {
         let rel = (16.0 / self.subtitle_scale.clamp(0.5, 3.0)).round().clamp(4.0, 40.0) as u32;
         let rgb = u32::from_str_radix(self.subtitle_color.trim_start_matches('#'), 16).unwrap_or(0x00ff_ffff);
-        vec![format!("--freetype-rel-fontsize={rel}"), format!("--freetype-color={rgb}")]
+        let mut args = vec![format!("--freetype-rel-fontsize={rel}"), format!("--freetype-color={rgb}")];
+        if !self.subtitle_encoding.is_empty() {
+            args.push(format!("--subsdec-encoding={}", self.subtitle_encoding));
+        }
+        args
     }
 
     /// Controleert en normaliseert. Geeft een duidelijke fout bij onmogelijke waarden.
@@ -242,6 +253,9 @@ impl AppSettings {
         }
         if !is_hex_color(&self.subtitle_color) {
             return bad("De ondertitelkleur moet de vorm #rrggbb hebben");
+        }
+        if !self.subtitle_encoding.is_empty() && !SUBTITLE_ENCODINGS.contains(&self.subtitle_encoding.as_str()) {
+            return bad("Onbekende tekenset voor ondertitels");
         }
         if !(self.ui_scale.is_finite() && (0.75..=2.0).contains(&self.ui_scale)) {
             return bad("De interfaceschaal moet tussen 75% en 200% liggen");
@@ -484,6 +498,22 @@ mod tests {
         assert_eq!(s.subtitle_vlc_args()[0], "--freetype-rel-fontsize=32");
         s.subtitle_scale = 3.0;
         assert_eq!(s.subtitle_vlc_args()[0], "--freetype-rel-fontsize=5");
+    }
+
+    #[test]
+    fn subtitle_encoding_is_automatic_by_default_and_passed_on_when_chosen() {
+        let mut s = AppSettings::default();
+        assert_eq!(s.subtitle_encoding, "");
+        assert!(!s.subtitle_vlc_args().iter().any(|a| a.contains("subsdec-encoding")));
+        s.subtitle_encoding = "Windows-1252".into();
+        assert!(s.validate().is_ok());
+        assert!(s.subtitle_vlc_args().contains(&"--subsdec-encoding=Windows-1252".to_string()));
+    }
+
+    #[test]
+    fn unknown_subtitle_encodings_are_rejected() {
+        let mut s = AppSettings { subtitle_encoding: "x; rm -rf".into(), ..Default::default() };
+        assert!(s.validate().is_err());
     }
 
     #[test]

@@ -330,6 +330,7 @@ export interface AppSettings {
   preferred_subtitle_languages: string[];
   subtitle_scale: number;
   subtitle_color: string;
+  subtitle_encoding: string;
   autoplay_next_delay_s: number;
   crossfade_ms: number;
   normalize_realtime: boolean;

@@ -20,6 +20,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   preferred_subtitle_languages: ["nld"],
   subtitle_scale: 1,
   subtitle_color: "#ffffff",
+  subtitle_encoding: "",
   autoplay_next_delay_s: 10,
   crossfade_ms: 0,
   normalize_realtime: false,
@@ -38,7 +39,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 };
 
 /** Instellingen die de speler of wachtrij alleen bij het opstarten inleest. */
-export const RESTART_KEYS: (keyof AppSettings)[] = ["subtitle_scale", "subtitle_color", "convert_parallel"];
+export const RESTART_KEYS: (keyof AppSettings)[] = ["subtitle_scale", "subtitle_color", "subtitle_encoding", "convert_parallel"];
 
 interface SettingsState {
   settings: AppSettings;
