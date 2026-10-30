@@ -26,13 +26,15 @@ export function Thumb({ media, width = 320 }: { media: Media; width?: number }) 
   }, []);
 
   useEffect(() => {
-    if (!visible || media.kind !== "video" || media.missing) return;
+    if (!visible || media.missing) return;
     let alive = true;
     const at = Math.min(Math.max(media.duration_ms * 0.1, 1000), 60_000);
-    void limited(() => api.thumbnail(media.path, Math.round(at), width))
-      .then((p) => fileSrc(p))
-      .then((u) => alive && setSrc(u))
-      .catch(() => undefined); // geen miniatuur beschikbaar: het kleurvlak blijft
+    // Muziek toont de albumhoes (map-afbeelding of ingebed); zonder hoes blijft het kleurvlak staan.
+    const load = media.kind === "audio" ? api.coverArt(media.path) : limited(() => api.thumbnail(media.path, Math.round(at), width));
+    void load
+      .then((p) => (p ? fileSrc(p) : null))
+      .then((u) => u && alive && setSrc(u))
+      .catch(() => undefined);
     return () => {
       alive = false;
     };

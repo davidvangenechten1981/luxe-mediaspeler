@@ -15,11 +15,11 @@ pub fn media_info(st: &AppState, path: &str) -> Result<MediaInfo> {
     probe_file(st.require_ffprobe()?, &p)
 }
 
-fn fnv1a(data: &[u8]) -> u64 {
+pub(crate) fn fnv1a(data: &[u8]) -> u64 {
     data.iter().fold(0xcbf2_9ce4_8422_2325, |h, b| (h ^ *b as u64).wrapping_mul(0x0100_0000_01b3))
 }
 
-fn run_with_timeout(mut cmd: Command, limit: Duration) -> Result<()> {
+pub(crate) fn run_with_timeout(mut cmd: Command, limit: Duration) -> Result<()> {
     let mut child =
         cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped()).spawn().map_err(|e| CoreError::Ffmpeg(e.to_string()))?;
     let start = Instant::now();

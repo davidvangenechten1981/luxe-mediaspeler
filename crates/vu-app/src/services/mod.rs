@@ -2,6 +2,7 @@
 
 pub mod audio;
 pub mod converter;
+pub mod cover;
 pub mod history;
 pub mod library;
 pub mod lyrics;

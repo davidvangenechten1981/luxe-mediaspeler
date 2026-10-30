@@ -4,7 +4,7 @@
 //! verkeerd getypeerde velden, en elke dienst valideert zijn invoer opnieuw.
 //! Er bestaat geen manier om een shellcommando of een vrij FFmpeg-argument mee te geven.
 
-use crate::services::{audio, converter, history, library, lyrics, player, playlists, series, settings, video};
+use crate::services::{audio, converter, cover, history, library, lyrics, player, playlists, series, settings, video};
 use crate::state::AppState;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -91,6 +91,7 @@ pub enum Request {
     Thumbnail { path: String, at_ms: u64, width: u32 },
     ThumbnailStrip { path: String, count: u32, width: u32 },
     ClearThumbnails,
+    CoverArt { path: String },
     VideoAspect { ratio: Option<String> },
     VideoCrop { ratio: Option<String> },
     VideoAdjust { which: video::AdjustChoice, value: f32 },
@@ -214,6 +215,7 @@ pub fn handle(st: &AppState, req: Request) -> Result<Value> {
         MediaInfo { path } => json_of(video::media_info(st, &path)?),
         Thumbnail { path, at_ms, width } => json_of(video::thumbnail(st, &path, at_ms, width)?),
         ThumbnailStrip { path, count, width } => json_of(video::thumbnail_strip(st, &path, count, width)?),
+        CoverArt { path } => json_of(cover::get(st, &path)?),
         ClearThumbnails => json_of(video::clear_thumbnail_cache(st)?),
         VideoAspect { ratio } => video::set_aspect_ratio(st, ratio.as_deref()).and_then(|_| unit()),
         VideoCrop { ratio } => video::set_crop(st, ratio.as_deref()).and_then(|_| unit()),

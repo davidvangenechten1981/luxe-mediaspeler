@@ -157,6 +157,7 @@ export const api = {
   mediaInfo: (path: string) => call<MediaInfo>(t("media_info", { path })),
   thumbnail: (path: string, at_ms: number, width: number) => call<string>(t("thumbnail", { path, at_ms, width })),
   thumbnailStrip: (path: string, count: number, width: number) => call<[number, string][]>(t("thumbnail_strip", { path, count, width })),
+  coverArt: (path: string) => call<string | null>(t("cover_art", { path })),
   clearThumbnails: () => call<number>(t("clear_thumbnails")),
   videoAspect: (ratio: string | null) => call<null>(t("video_aspect", { ratio })),
   videoCrop: (ratio: string | null) => call<null>(t("video_crop", { ratio })),

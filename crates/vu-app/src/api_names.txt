@@ -66,6 +66,7 @@ lyrics_get
 thumbnail
 thumbnail_strip
 clear_thumbnails
+cover_art
 video_aspect
 video_crop
 video_adjust

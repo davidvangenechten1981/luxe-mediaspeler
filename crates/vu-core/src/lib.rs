@@ -1,5 +1,6 @@
 pub mod audio;
 pub mod convert;
+pub mod cover;
 pub mod db;
 pub mod error;
 pub mod lyrics;
