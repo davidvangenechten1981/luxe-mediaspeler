@@ -276,6 +276,8 @@ pub struct Session<E: Engine> {
     pending_next: Option<u64>,
     next_in_ms: Option<u64>,
     skip_marks: SkipMarks,
+    /// Het einde van het afspelen is al verwerkt; wordt weer onwaar zodra er iets nieuws start.
+    end_reported: bool,
     /// Bestand waarvoor de terugval zonder hardwaredecodering al is geprobeerd.
     hw_fallback_done: Option<String>,
     /// Wachttijd na een afgelopen video voordat het volgende item start; 0 = direct.
@@ -307,6 +309,7 @@ impl<E: Engine> Session<E> {
             pending_next: None,
             next_in_ms: None,
             skip_marks: SkipMarks::default(),
+            end_reported: false,
             hw_fallback_done: None,
             next_delay_ms: 0,
             resume_enabled: true,
@@ -476,6 +479,7 @@ impl<E: Engine> Session<E> {
         self.prefs_pending = true;
         self.last_resume_save_ms = 0;
         self.current_location = Some(item.location.clone());
+        self.end_reported = false;
         self.skip_marks = self.store.skip_marks(&item.location).unwrap_or_default();
         self.events.push(SessionEvent::TrackChanged { index: self.queue.current_index().unwrap_or(0), location: item.location });
         if let Some(p) = resume_ms {
@@ -736,6 +740,11 @@ impl<E: Engine> Session<E> {
     }
 
     fn handle_end(&mut self, now_ms: u64) {
+        // Het einde is al afgehandeld (de engine blijft in de stand "afgelopen" staan): niets meer te doen,
+        // anders wordt "wachtrij afgelopen" elke tik opnieuw gemeld.
+        if self.end_reported && self.pending_next.is_none() {
+            return;
+        }
         if let Some(deadline) = self.pending_next {
             if now_ms < deadline {
                 self.next_in_ms = Some(deadline - now_ms);
@@ -745,6 +754,7 @@ impl<E: Engine> Session<E> {
             self.open_after_end(false);
             return;
         }
+        self.end_reported = true;
         let finished = self.current_location.take();
         let was_video = finished.as_deref().is_some_and(|l| !is_audio_location(l));
         if let Some(loc) = finished {

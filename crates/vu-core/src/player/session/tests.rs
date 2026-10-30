@@ -850,3 +850,32 @@ fn a_new_file_gets_its_own_fallback() {
     s.tick(2_000);
     assert!(s.take_events().contains(&SessionEvent::HwFallback { location: "/m/b.mp3".into() }));
 }
+
+#[test]
+fn the_end_of_the_queue_is_reported_once_not_on_every_tick() {
+    let (mut s, engine, _) = setup(&["a"]);
+    engine.set_state(PlaybackState::Ended, 60_000, 60_000);
+    s.take_events();
+    for t in 0..20 {
+        s.tick(1_000 + t * 250);
+    }
+    let ended = s.take_events().iter().filter(|e| matches!(e, SessionEvent::QueueEnded)).count();
+    assert_eq!(ended, 1, "QueueEnded hoort één keer te komen, ook al blijft de engine in de stand 'afgelopen'");
+}
+
+#[test]
+fn a_new_play_after_the_end_works_and_ends_again_once() {
+    let (mut s, engine, _) = setup(&["a"]);
+    engine.set_state(PlaybackState::Ended, 60_000, 60_000);
+    s.tick(1_000);
+    s.tick(1_250);
+    s.take_events();
+    s.play_items(items(&["b"]), 0).unwrap();
+    engine.set_state(PlaybackState::Ended, 30_000, 30_000);
+    s.take_events();
+    s.tick(5_000);
+    s.tick(5_250);
+    s.tick(5_500);
+    let ended = s.take_events().iter().filter(|e| matches!(e, SessionEvent::QueueEnded)).count();
+    assert_eq!(ended, 1);
+}
