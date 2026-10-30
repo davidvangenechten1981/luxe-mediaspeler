@@ -2,6 +2,7 @@
 //! uitvoering met echte voortgang, en een wachtrij.
 
 pub mod args;
+pub mod estimate;
 pub mod queue;
 pub mod runner;
 
@@ -193,6 +194,11 @@ pub struct Settings {
     /// Aantal processorthreads voor de software-encoders; `None` = de encoder kiest zelf (alle kernen).
     #[serde(default)]
     pub threads: Option<u32>,
+    /// Alleen een deel omzetten: begin en einde in milliseconden van het origineel.
+    #[serde(default)]
+    pub trim_start_ms: Option<u64>,
+    #[serde(default)]
+    pub trim_end_ms: Option<u64>,
 }
 
 impl Settings {
@@ -260,6 +266,11 @@ impl Settings {
                 return bad("De kwaliteit (CRF) moet tussen 0 en 63 liggen");
             }
         }
+        match (self.trim_start_ms, self.trim_end_ms) {
+            (_, Some(0)) => return bad("Het einde van het fragment moet na het begin liggen"),
+            (Some(a), Some(b)) if b <= a => return bad("Het einde van het fragment moet na het begin liggen"),
+            _ => {}
+        }
         if let Some(t) = self.threads {
             if !(1..=128).contains(&t) {
                 return bad("Het aantal threads moet tussen 1 en 128 liggen");
@@ -309,6 +320,8 @@ fn video_profile(
         external_subtitle_language: None,
         hw_accel: HwAccel::Auto,
         threads: None,
+        trim_start_ms: None,
+        trim_end_ms: None,
     };
     f(&mut s);
     Profile { id: id.into(), name: name.into(), description: desc.into(), settings: s }

@@ -13,8 +13,92 @@ use vu_core::scanner::DEFAULT_EXTENSIONS;
 use vu_core::validate::{validate_folder_path, validate_media_path, validate_path_shape};
 use walkdir::WalkDir;
 
-pub fn profiles() -> Vec<Profile> {
-    builtin_profiles()
+const USER_PROFILES_KEY: &str = "convert_user_profiles";
+const MAX_USER_PROFILES: usize = 50;
+
+fn user_profiles(st: &AppState) -> Result<Vec<Profile>> {
+    let raw = st.lock_db()?.get_setting(USER_PROFILES_KEY)?;
+    // Een kapotte opslag mag de converter niet blokkeren: dan zijn er gewoon geen eigen profielen.
+    Ok(raw.and_then(|r| serde_json::from_str(&r).ok()).unwrap_or_default())
+}
+
+fn store_user_profiles(st: &AppState, list: &[Profile]) -> Result<()> {
+    let json = serde_json::to_string(list).map_err(|e| CoreError::Invalid(e.to_string()))?;
+    st.lock_db()?.set_setting(USER_PROFILES_KEY, &json)
+}
+
+/// Ingebouwde profielen gevolgd door je eigen opgeslagen profielen (id begint met `eigen_`).
+pub fn profiles(st: &AppState) -> Result<Vec<Profile>> {
+    let mut all = builtin_profiles();
+    all.extend(user_profiles(st)?);
+    Ok(all)
+}
+
+/// Bewaart instellingen onder een eigen naam. Dezelfde naam overschrijft het oude profiel.
+pub fn save_profile(st: &AppState, name: &str, settings: Settings) -> Result<Profile> {
+    let name = name.trim();
+    if name.is_empty() || name.chars().count() > 60 {
+        return Err(CoreError::Invalid("Geef het profiel een naam van 1 tot 60 tekens".into()));
+    }
+    settings.validate()?;
+    let mut settings = settings;
+    // Een profiel bevat nooit een bestandsspecifiek ondertitelbestand of knipwerk.
+    settings.external_subtitle = None;
+    settings.external_subtitle_language = None;
+    settings.trim_start_ms = None;
+    settings.trim_end_ms = None;
+    let mut list = user_profiles(st)?;
+    let existing = list.iter().position(|p| p.name.eq_ignore_ascii_case(name));
+    let id = match existing {
+        Some(i) => list[i].id.clone(),
+        None => {
+            if list.len() >= MAX_USER_PROFILES {
+                return Err(CoreError::Invalid(format!("Je kunt maximaal {MAX_USER_PROFILES} eigen profielen bewaren")));
+            }
+            let next = list.iter().filter_map(|p| p.id.strip_prefix("eigen_").and_then(|n| n.parse::<u32>().ok())).max().unwrap_or(0) + 1;
+            format!("eigen_{next}")
+        }
+    };
+    let profile = Profile { id, name: name.to_string(), description: "Eigen profiel".into(), settings };
+    match existing {
+        Some(i) => list[i] = profile.clone(),
+        None => list.push(profile.clone()),
+    }
+    store_user_profiles(st, &list)?;
+    Ok(profile)
+}
+
+pub fn delete_profile(st: &AppState, id: &str) -> Result<()> {
+    let mut list = user_profiles(st)?;
+    let before = list.len();
+    list.retain(|p| p.id != id);
+    if list.len() == before {
+        return Err(CoreError::NotFound(format!("eigen profiel '{id}'")));
+    }
+    store_user_profiles(st, &list)
+}
+
+/// Begin en einde (ms) van een voorbeeld van 10 seconden vanaf ongeveer een derde van de film.
+pub fn preview_range(duration_ms: u64) -> (u64, u64) {
+    const LEN: u64 = 10_000;
+    if duration_ms <= LEN {
+        return (0, duration_ms.max(1));
+    }
+    let start = (duration_ms / 3).min(duration_ms - LEN);
+    (start, start + LEN)
+}
+
+#[derive(Debug, Serialize)]
+pub struct Estimate {
+    pub bytes: Option<u64>,
+}
+
+/// Geschatte grootte van het resultaat voor dit bestand met deze instellingen.
+pub fn estimate(st: &AppState, path: &str, settings: &Settings) -> Result<Estimate> {
+    settings.validate()?;
+    let p = validate_media_path(path)?;
+    let info = probe_file(st.require_ffprobe()?, &p)?;
+    Ok(Estimate { bytes: vu_core::convert::estimate::estimate_bytes(settings, &info) })
 }
 
 #[derive(Debug, Serialize)]
@@ -114,6 +198,9 @@ pub struct AddRequest {
     /// Eigen instellingen; heeft voorrang op het profiel.
     pub settings: Option<Settings>,
     pub output: OutputChoice,
+    /// Alleen een voorbeeld van 10 seconden maken, om de kwaliteit te beoordelen.
+    #[serde(default)]
+    pub preview: bool,
 }
 
 const MAX_EXPANDED: usize = 5000;
@@ -155,7 +242,7 @@ pub fn add(st: &AppState, req: AddRequest) -> Result<AddOutcome> {
     let (profile_name, settings) = match (&req.settings, &req.profile_id) {
         (Some(s), _) => ("Eigen profiel".to_string(), s.clone()),
         (None, Some(id)) => {
-            let p = builtin_profiles().into_iter().find(|p| &p.id == id).ok_or_else(|| CoreError::NotFound(format!("profiel '{id}'")))?;
+            let p = profiles(st)?.into_iter().find(|p| &p.id == id).ok_or_else(|| CoreError::NotFound(format!("profiel '{id}'")))?;
             (p.name, p.settings)
         }
         (None, None) => return Err(CoreError::Invalid("Kies een profiel of eigen instellingen".into())),
@@ -168,7 +255,13 @@ pub fn add(st: &AppState, req: AddRequest) -> Result<AddOutcome> {
         .clone()
         .or(app_settings.convert_output_dir.clone())
         .ok_or_else(|| CoreError::Invalid("Kies eerst een uitvoermap".into()))?;
-    let template = req.output.template.clone().unwrap_or(app_settings.convert_template.clone());
+    let mut template = req.output.template.clone().unwrap_or(app_settings.convert_template.clone());
+    let mut profile_name = profile_name;
+    if req.preview {
+        profile_name = format!("{profile_name} (voorbeeld)");
+        template =
+            if template.contains("{name}") { template.replace("{name}", "{name} (voorbeeld)") } else { format!("{template} (voorbeeld)") };
+    }
     let files = expand_inputs(&req.inputs)?;
     if files.is_empty() {
         return Err(CoreError::Invalid("Geen mediabestanden gevonden in de selectie".into()));
@@ -176,9 +269,16 @@ pub fn add(st: &AppState, req: AddRequest) -> Result<AddOutcome> {
     let mut job_ids = vec![];
     let mut rejected = vec![];
     for f in files {
+        let mut file_settings = settings.clone();
+        if req.preview {
+            let duration = st.require_ffprobe().ok().and_then(|ff| probe_file(ff, &f).ok()).map_or(0, |i| i.duration_ms);
+            let (a, b) = preview_range(duration);
+            file_settings.trim_start_ms = Some(a);
+            file_settings.trim_end_ms = Some(b);
+        }
         let jr = JobRequest {
             input: f.to_string_lossy().into_owned(),
-            settings: settings.clone(),
+            settings: file_settings,
             profile_name: profile_name.clone(),
             output: OutputSpec { dir: PathBuf::from(&dir), template: template.clone(), overwrite: req.output.overwrite },
         };
@@ -255,6 +355,8 @@ pub fn add_audio_processing(st: &AppState, req: AudioProcessRequest) -> Result<A
         external_subtitle_language: None,
         hw_accel: Default::default(),
         threads: None,
+        trim_start_ms: None,
+        trim_end_ms: None,
     };
     add(
         st,
@@ -263,6 +365,7 @@ pub fn add_audio_processing(st: &AppState, req: AudioProcessRequest) -> Result<A
             profile_id: None,
             settings: Some(settings),
             output: OutputChoice { template: req.output.template.or(Some("{name} (bewerkt)".into())), ..req.output },
+            preview: false,
         },
     )
 }
@@ -297,6 +400,7 @@ mod tests {
             profile_id: Some(profile.into()),
             settings: None,
             output: OutputChoice { dir: Some(app.dir.path().join("uit").to_string_lossy().into_owned()), template: None, overwrite },
+            preview: false,
         }
     }
 
@@ -327,6 +431,55 @@ mod tests {
     }
 
     #[test]
+    fn user_profiles_are_saved_listed_overwritten_and_deleted() {
+        let app = app();
+        let base = builtin_profiles().into_iter().find(|p| p.id == "compact").unwrap().settings;
+        let n_builtin = profiles(&app.state).unwrap().len();
+        let a = save_profile(&app.state, "Mijn telefoon", Settings { max_height: Some(360), ..base.clone() }).unwrap();
+        assert_eq!(a.id, "eigen_1");
+        let b = save_profile(&app.state, "Voor de tv", base.clone()).unwrap();
+        assert_eq!(b.id, "eigen_2");
+        assert_eq!(profiles(&app.state).unwrap().len(), n_builtin + 2);
+        // dezelfde naam (ook met andere hoofdletters) overschrijft
+        let a2 = save_profile(&app.state, "mijn TELEFOON", Settings { max_height: Some(240), ..base.clone() }).unwrap();
+        assert_eq!(a2.id, "eigen_1");
+        let list = profiles(&app.state).unwrap();
+        assert_eq!(list.len(), n_builtin + 2);
+        assert_eq!(list.iter().find(|p| p.id == "eigen_1").unwrap().settings.max_height, Some(240));
+        delete_profile(&app.state, "eigen_1").unwrap();
+        assert!(delete_profile(&app.state, "eigen_1").is_err());
+        assert!(delete_profile(&app.state, "remux_mkv").is_err()); // ingebouwde profielen blijven
+        assert_eq!(profiles(&app.state).unwrap().len(), n_builtin + 1);
+    }
+
+    #[test]
+    fn user_profiles_refuse_bad_names_and_strip_file_specific_parts() {
+        let app = app();
+        let base = builtin_profiles().into_iter().find(|p| p.id == "compact").unwrap().settings;
+        assert!(save_profile(&app.state, "   ", base.clone()).is_err());
+        assert!(save_profile(&app.state, &"x".repeat(61), base.clone()).is_err());
+        let with_extras =
+            Settings { trim_start_ms: Some(1000), trim_end_ms: Some(2000), external_subtitle: Some("/s/a.srt".into()), ..base };
+        let p = save_profile(&app.state, "Zonder extra", with_extras).unwrap();
+        assert_eq!((p.settings.trim_start_ms, p.settings.trim_end_ms, p.settings.external_subtitle), (None, None, None));
+    }
+
+    #[test]
+    fn a_broken_profile_store_does_not_block_the_converter() {
+        let app = app();
+        app.state.lock_db().unwrap().set_setting(USER_PROFILES_KEY, "{kapot").unwrap();
+        assert_eq!(profiles(&app.state).unwrap().len(), builtin_profiles().len());
+    }
+
+    #[test]
+    fn the_preview_is_ten_seconds_from_about_a_third_in() {
+        assert_eq!(preview_range(300_000), (100_000, 110_000));
+        assert_eq!(preview_range(12_000), (2_000, 12_000));
+        assert_eq!(preview_range(5_000), (0, 5_000));
+        assert_eq!(preview_range(0), (0, 1));
+    }
+
+    #[test]
     fn capabilities_reflect_the_real_ffmpeg_build() {
         let app = app();
         if app.state.tasks.is_none() {
@@ -336,6 +489,29 @@ mod tests {
         assert!(c.containers.iter().any(|o| o.id == "mp4" && o.available));
         assert!(c.video_codecs.iter().any(|o| o.id == "h264" && o.available));
         assert!(c.containers.iter().find(|o| o.id == "mp3").unwrap().audio_only);
+    }
+
+    #[test]
+    fn a_preview_makes_a_short_file_with_voorbeeld_in_its_name_and_the_estimate_is_sane() {
+        let app = app();
+        if app.state.tasks.is_none() {
+            return;
+        }
+        let dir = media_dir(&app);
+        let film = dir.join("film.mkv").to_string_lossy().into_owned();
+        let mut req = request(&app, vec![film.clone()], "compact", Overwrite::Rename);
+        req.preview = true;
+        let out = add(&app.state, req).unwrap();
+        let jobs = wait_done(&app, &out.job_ids);
+        assert!(jobs.iter().all(|j| j.state == vu_core::convert::queue::JobState::Done), "{jobs:?}");
+        let made: Vec<_> = std::fs::read_dir(app.dir.path().join("uit"))
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        assert!(made.iter().any(|n| n.contains("(voorbeeld)")), "{made:?}");
+        let est = estimate(&app.state, &film, &builtin_profiles().into_iter().find(|p| p.id == "compact").unwrap().settings).unwrap();
+        assert!(est.bytes.is_some_and(|b| b > 0));
     }
 
     #[test]

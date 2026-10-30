@@ -153,7 +153,7 @@ pub fn run_conversion(
 
     let temp = temp_path_for(final_path);
     let plan = build_args(input, &temp, settings, info, tools.caps)?;
-    let result = execute(tools, plan, &temp, final_path, info, cancel, on_progress);
+    let result = execute(tools, plan, &temp, final_path, cancel, on_progress);
     // Een videokaart die bij het starten of tijdens het coderen faalt (driver, geheugen, niet-ondersteund formaat)
     // mag de conversie niet laten mislukken: één nieuwe poging met de processor.
     if let (Err(CoreError::Ffmpeg(msg)), Some(backend)) = (&result, hw_used(settings, tools.caps, input, &temp, info)) {
@@ -162,7 +162,7 @@ pub fn run_conversion(
         let mut plan = build_args(input, &temp, &cpu, info, tools.caps)?;
         let first_line = msg.lines().next().unwrap_or("onbekende fout").trim().to_string();
         plan.warnings.push(format!("Coderen met {} mislukte ({first_line}); de processor is gebruikt", backend.label()));
-        return execute(tools, plan, &temp, final_path, info, cancel, on_progress);
+        return execute(tools, plan, &temp, final_path, cancel, on_progress);
     }
     result
 }
@@ -178,7 +178,6 @@ fn execute(
     plan: super::args::Plan,
     temp: &Path,
     final_path: &Path,
-    info: &MediaInfo,
     cancel: &AtomicBool,
     on_progress: &mut dyn FnMut(Progress),
 ) -> Result<RunOutcome> {
@@ -219,6 +218,7 @@ fn execute(
         let _ = std::fs::remove_file(temp);
     };
 
+    let total_ms = plan.duration_ms;
     let mut out_time_us: u64 = 0;
     let mut speed: Option<f64> = None;
     let mut cancelled = false;
@@ -238,16 +238,11 @@ fn execute(
                         "progress" => {
                             let out_ms = out_time_us / 1000;
                             let end = v.trim() == "end";
-                            let fraction = (info.duration_ms > 0).then(|| {
-                                if end {
-                                    1.0
-                                } else {
-                                    (out_ms as f64 / info.duration_ms as f64).clamp(0.0, 0.999)
-                                }
-                            });
+                            let fraction =
+                                (total_ms > 0).then(|| if end { 1.0 } else { (out_ms as f64 / total_ms as f64).clamp(0.0, 0.999) });
                             let eta = match (fraction, speed) {
                                 (Some(f), Some(sp)) if !end => {
-                                    let remaining_ms = (info.duration_ms as f64 * (1.0 - f)).max(0.0);
+                                    let remaining_ms = (total_ms as f64 * (1.0 - f)).max(0.0);
                                     Some((remaining_ms / 1000.0 / sp).round() as u64)
                                 }
                                 _ => None,
@@ -290,7 +285,7 @@ fn execute(
         cleanup(&temp);
         return Err(e.into());
     }
-    on_progress(Progress { fraction: Some(1.0), eta_s: Some(0), speed, out_time_ms: info.duration_ms });
+    on_progress(Progress { fraction: Some(1.0), eta_s: Some(0), speed, out_time_ms: total_ms });
     Ok(RunOutcome { output: final_path.to_path_buf(), mode: plan.mode, warnings: plan.warnings })
 }
 
@@ -424,6 +419,27 @@ mod tests {
                 assert!(info.first_video().is_none(), "profiel {id} hoort alleen audio te zijn");
             }
         }
+    }
+
+    #[test]
+    fn trimming_really_cuts_the_output_and_progress_reaches_one() {
+        if !have_ffmpeg() {
+            return;
+        }
+        let env = Env::new();
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("in.mkv");
+        make_video(&input, 8, "320x180");
+        let out = dir.path().join("uit.mp4");
+        let mut s = settings("compact");
+        s.hw_accel = crate::convert::HwAccel::Off;
+        s.trim_start_ms = Some(2_000);
+        s.trim_end_ms = Some(5_000);
+        let (r, ticks) = convert(&env, &input, &out, &s, &AtomicBool::new(false));
+        r.unwrap();
+        let info = probe_file(Path::new("ffprobe"), &out).unwrap();
+        assert!((2_500..3_700).contains(&info.duration_ms), "duur {}", info.duration_ms);
+        assert_eq!(ticks.last().and_then(|t| t.fraction), Some(1.0));
     }
 
     #[test]

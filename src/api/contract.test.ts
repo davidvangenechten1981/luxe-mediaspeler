@@ -66,7 +66,7 @@ const viewShape: Shape<SessionView> = {
 const convertShape: Shape<ConvertSettings> = {
   container: true, video: true, audio: true, max_height: true, fps: true, video_bitrate_kbps: true, audio_bitrate_kbps: true,
   quality: true, audio_channels: true, subtitles: true, keep_metadata: true, equalizer: true, normalize_audio: true,
-  external_subtitle: true, external_subtitle_language: true, hw_accel: true, threads: true,
+  external_subtitle: true, external_subtitle_language: true, hw_accel: true, threads: true, trim_start_ms: true, trim_end_ms: true,
 };
 const jobShape: Shape<JobSnapshot> = {
   id: true, input: true, output: true, profile: true, state: true, mode: true, fraction: true, eta_s: true, speed: true,

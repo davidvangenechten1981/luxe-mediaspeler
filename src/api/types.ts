@@ -275,6 +275,8 @@ export interface ConvertSettings {
   external_subtitle_language: string | null;
   hw_accel: HwAccel;
   threads: number | null;
+  trim_start_ms: number | null;
+  trim_end_ms: number | null;
 }
 export interface Profile {
   id: string;
@@ -319,6 +321,9 @@ export interface OutputChoice {
   dir?: string | null;
   template?: string | null;
   overwrite: Overwrite;
+}
+export interface Estimate {
+  bytes: number | null;
 }
 export interface AddOutcome {
   job_ids: number[];

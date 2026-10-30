@@ -104,6 +104,9 @@ pub enum Request {
     VideoRotation { rotation: video::RotationChoice },
     // converter
     ConvertProfiles,
+    ConvertProfileSave { name: String, settings: vu_core::convert::Settings },
+    ConvertProfileDelete { id: String },
+    ConvertEstimate { path: String, settings: vu_core::convert::Settings },
     ConvertCapabilities,
     ConvertAdd { request: converter::AddRequest },
     ConvertAddAudio { request: converter::AudioProcessRequest },
@@ -233,7 +236,10 @@ pub fn handle(st: &AppState, req: Request) -> Result<Value> {
         VideoDeinterlace { mode } => video::set_deinterlace(st, &mode).and_then(|_| unit()),
         VideoRotation { rotation } => video::set_rotation(st, rotation).and_then(|_| unit()),
 
-        ConvertProfiles => json_of(converter::profiles()),
+        ConvertProfiles => json_of(converter::profiles(st)?),
+        ConvertProfileSave { name, settings } => json_of(converter::save_profile(st, &name, settings)?),
+        ConvertProfileDelete { id } => converter::delete_profile(st, &id).and_then(|_| unit()),
+        ConvertEstimate { path, settings } => json_of(converter::estimate(st, &path, &settings)?),
         ConvertCapabilities => json_of(converter::capabilities(st)?),
         ConvertAdd { request } => json_of(converter::add(st, request)?),
         ConvertAddAudio { request } => json_of(converter::add_audio_processing(st, request)?),

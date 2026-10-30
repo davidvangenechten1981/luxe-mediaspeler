@@ -161,6 +161,20 @@ fn hw_probe(ffmpeg: &Path, encoder: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// Duur van het deel dat daadwerkelijk wordt omgezet (voor voortgang en schatting). 0 = onbekend.
+pub fn effective_duration_ms(total_ms: u64, start: Option<u64>, end: Option<u64>) -> u64 {
+    if total_ms == 0 {
+        return 0;
+    }
+    let a = start.unwrap_or(0).min(total_ms);
+    let b = end.map_or(total_ms, |e| e.min(total_ms));
+    b.saturating_sub(a)
+}
+
+fn seconds(ms: u64) -> String {
+    format!("{:.3}", ms as f64 / 1000.0)
+}
+
 fn is_cover(s: &StreamInfo) -> bool {
     s.kind == StreamKind::Video && matches!(s.codec.as_str(), "mjpeg" | "png" | "bmp")
 }
@@ -227,6 +241,8 @@ pub struct Plan {
     pub warnings: Vec<String>,
     /// De videokaart die voor het coderen is gekozen; `None` = processor.
     pub hardware: Option<HwBackend>,
+    /// Duur van het deel dat wordt omgezet (na knippen); 0 = onbekend.
+    pub duration_ms: u64,
 }
 
 fn push(args: &mut Vec<String>, items: &[&str]) {
@@ -280,6 +296,11 @@ pub fn build_args(input: &Path, output: &Path, s: &Settings, info: &MediaInfo, c
         }
     }
 
+    if let Some(a) = s.trim_start_ms {
+        if info.duration_ms > 0 && a >= info.duration_ms {
+            return Err(CoreError::Invalid("Het begin van het fragment ligt voorbij het einde van het bestand".into()));
+        }
+    }
     let hw = if video.is_some() { pick_hardware(s, caps, &mut warnings) } else { None };
     let hardware = hw.map(|(b, _)| b);
     let mut args: Vec<String> = vec![];
@@ -288,9 +309,19 @@ pub fn build_args(input: &Path, output: &Path, s: &Settings, info: &MediaInfo, c
         // Decoderen op de videokaart (met automatische terugval op de processor) versnelt het geheel.
         push(&mut args, &["-hwaccel", "auto"]);
     }
+    // Knippen: zoeken vóór de invoer is snel; bij kopiëren valt het begin op het dichtstbijzijnde keyframe.
+    if let Some(a) = s.trim_start_ms.filter(|a| *a > 0) {
+        push(&mut args, &["-ss", &seconds(a)]);
+    }
+    if let Some(b) = s.trim_end_ms {
+        push(&mut args, &["-t", &seconds(b.saturating_sub(s.trim_start_ms.unwrap_or(0)))]);
+    }
     push(&mut args, &["-i"]);
     args.push(input.to_string_lossy().into_owned());
     if let Some(sub) = &s.external_subtitle {
+        if let Some(a) = s.trim_start_ms.filter(|a| *a > 0) {
+            push(&mut args, &["-ss", &seconds(a)]);
+        }
         push(&mut args, &["-i", sub]);
     }
 
@@ -455,7 +486,13 @@ pub fn build_args(input: &Path, output: &Path, s: &Settings, info: &MediaInfo, c
     push(&mut args, &["-f", s.container.muxer(), "-y"]);
     args.push(output.to_string_lossy().into_owned());
 
-    Ok(Plan { args, mode: s.mode(), warnings, hardware })
+    Ok(Plan {
+        args,
+        mode: s.mode(),
+        warnings,
+        hardware,
+        duration_ms: effective_duration_ms(info.duration_ms, s.trim_start_ms, s.trim_end_ms),
+    })
 }
 
 fn thread_args(args: &mut Vec<String>, s: &Settings) {
@@ -885,5 +922,69 @@ mod tests {
         assert!(s.validate().is_err());
         s.threads = Some(16);
         assert!(s.validate().is_ok());
+    }
+
+    // ---------- knippen ----------
+
+    #[test]
+    fn trimming_seeks_before_the_input_and_limits_the_duration() {
+        let mut s = profile("compact");
+        s.trim_start_ms = Some(500);
+        s.trim_end_ms = Some(2_000);
+        let p = plan(&s, VIDEO_JSON).unwrap();
+        let ss = p.args.iter().position(|a| a == "-ss").expect("-ss");
+        let input = p.args.iter().position(|a| a == "-i").unwrap();
+        assert!(ss < input);
+        assert_eq!(p.args[ss + 1], "0.500");
+        assert!(has_pair(&p.args, "-t", "1.500"));
+    }
+
+    #[test]
+    fn only_a_start_or_only_an_end_works_too() {
+        let mut s = profile("compact");
+        s.trim_start_ms = Some(500);
+        let p = plan(&s, VIDEO_JSON).unwrap();
+        assert!(has_pair(&p.args, "-ss", "0.500") && !p.args.iter().any(|a| a == "-t"));
+        s.trim_start_ms = None;
+        s.trim_end_ms = Some(1_000);
+        let p = plan(&s, VIDEO_JSON).unwrap();
+        assert!(has_pair(&p.args, "-t", "1.000") && !p.args.iter().any(|a| a == "-ss"));
+    }
+
+    #[test]
+    fn an_external_subtitle_is_shifted_along_with_the_trim() {
+        let mut s = profile("remux_mkv");
+        s.trim_start_ms = Some(500);
+        s.external_subtitle = Some("/s/ondertitel.srt".into());
+        let p = plan(&s, VIDEO_JSON).unwrap();
+        assert_eq!(p.args.iter().filter(|a| *a == "-ss").count(), 2);
+    }
+
+    #[test]
+    fn impossible_trims_are_refused() {
+        let mut s = profile("compact");
+        s.trim_start_ms = Some(10_000);
+        s.trim_end_ms = Some(10_000);
+        assert!(s.validate().is_err());
+        s.trim_end_ms = Some(5_000);
+        assert!(s.validate().is_err());
+        s.trim_start_ms = Some(0);
+        s.trim_end_ms = Some(0);
+        assert!(s.validate().is_err());
+        // begin voorbij het einde van het bestand
+        let mut s = profile("compact");
+        s.trim_start_ms = Some(86_400_000);
+        let err = plan(&s, VIDEO_JSON).unwrap_err().to_string();
+        assert!(err.contains("voorbij"), "{err}");
+    }
+
+    #[test]
+    fn the_effective_duration_follows_the_trim() {
+        assert_eq!(effective_duration_ms(60_000, None, None), 60_000);
+        assert_eq!(effective_duration_ms(60_000, Some(10_000), None), 50_000);
+        assert_eq!(effective_duration_ms(60_000, None, Some(20_000)), 20_000);
+        assert_eq!(effective_duration_ms(60_000, Some(10_000), Some(30_000)), 20_000);
+        assert_eq!(effective_duration_ms(60_000, Some(10_000), Some(90_000)), 50_000); // einde voorbij het bestand
+        assert_eq!(effective_duration_ms(0, Some(10_000), None), 0); // onbekende duur blijft onbekend
     }
 }

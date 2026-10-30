@@ -36,6 +36,7 @@ import type {
   Playlist,
   PlaylistItem,
   Profile,
+  Estimate,
   QueueItem,
   RotationChoice,
   SessionView,
@@ -175,9 +176,12 @@ export const api = {
   videoRotation: (rotation: RotationChoice) => call<null>(t("video_rotation", { rotation })),
 
   // converter
+  convertProfileSave: (name: string, settings: ConvertSettings) => call<Profile>(t("convert_profile_save", { name, settings })),
+  convertProfileDelete: (id: string) => call<null>(t("convert_profile_delete", { id })),
+  convertEstimate: (path: string, settings: ConvertSettings) => call<Estimate>(t("convert_estimate", { path, settings })),
   convertProfiles: () => call<Profile[]>(t("convert_profiles")),
   convertCapabilities: () => call<CapabilityView>(t("convert_capabilities")),
-  convertAdd: (request: { inputs: string[]; profile_id: string | null; settings: ConvertSettings | null; output: OutputChoice }) =>
+  convertAdd: (request: { inputs: string[]; profile_id: string | null; settings: ConvertSettings | null; output: OutputChoice; preview?: boolean }) =>
     call<AddOutcome>(t("convert_add", { request })),
   convertAddAudio: (request: { inputs: string[]; container: Container; equalizer: EqConfig | null; normalize: boolean; output: OutputChoice }) =>
     call<AddOutcome>(t("convert_add_audio", { request })),

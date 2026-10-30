@@ -18,6 +18,8 @@
     "quality": 28,
     "subtitles": "keep",
     "threads": null,
+    "trim_end_ms": null,
+    "trim_start_ms": null,
     "video": "h264",
     "video_bitrate_kbps": null
   }

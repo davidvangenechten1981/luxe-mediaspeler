@@ -78,6 +78,9 @@ video_adjust
 video_deinterlace
 video_rotation
 convert_profiles
+convert_profile_save
+convert_profile_delete
+convert_estimate
 convert_capabilities
 convert_add
 convert_add_audio

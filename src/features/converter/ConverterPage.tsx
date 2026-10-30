@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../../api/client";
 import type { Container, ConvertSettings, MediaInfo, Overwrite } from "../../api/types";
 import { Icon } from "../../components/Icon";
-import { Button, ConfirmDialog, Field, IconButton, Select, Switch, TextInput } from "../../components/ui";
+import { Button, ConfirmDialog, Field, IconButton, Modal, Select, Switch, TextInput } from "../../components/ui";
 import { basename, formatBytes, formatDuration } from "../../lib/format";
 import { hwChoices, hwHint, threadsHint } from "../../lib/hardware";
 import { MEDIA_FILTER, SUBTITLE_FILTER, pickFiles, pickFolder } from "../../lib/platform";
@@ -10,6 +10,7 @@ import { useJobs } from "../../state/jobs";
 import { useSettings } from "../../state/settings";
 import { reportError, toast, useUi } from "../../state/ui";
 import { JobList } from "./JobList";
+import { TrimFields } from "./TrimFields";
 
 const CUSTOM = "__custom";
 
@@ -34,6 +35,9 @@ export function ConverterPage() {
   const [confirmReplace, setConfirmReplace] = useState(false);
   const [info, setInfo] = useState<MediaInfo | null>(null);
   const [over, setOver] = useState(false);
+  const [estimate, setEstimate] = useState<number | null>(null);
+  const [saveName, setSaveName] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => { if (!caps) void loadStatic(); void refresh(); }, [caps, loadStatic, refresh]);
   const profile = profiles.find((p) => p.id === profileId);
@@ -57,9 +61,48 @@ export function ConverterPage() {
   const audioOnly = !!settings && containers.find((c) => c.id === settings.container)?.audio_only;
   const canStart = inputs.length > 0 && !!settings && dir.trim() !== "";
 
-  const start = async () => {
+  // Geschatte grootte voor het eerste bestand; vertraagd zodat typen niet elke toets een ffprobe start.
+  useEffect(() => {
+    setEstimate(null);
+    if (!inputs[0] || !settings || /^[a-z]+:\/\//i.test(inputs[0])) return;
+    let alive = true;
+    const t = setTimeout(() => {
+      api.convertEstimate(inputs[0]!, settings).then((e) => alive && setEstimate(e.bytes), () => alive && setEstimate(null));
+    }, 400);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [inputs, settings]);
+
+  const saveProfile = async () => {
+    if (!settings || saveName === null) return;
     try {
-      const r = await api.convertAdd({ inputs, profile_id: profileId === CUSTOM ? null : profileId, settings: profileId === CUSTOM ? custom : null, output: { dir, template, overwrite } });
+      const p = await api.convertProfileSave(saveName, settings);
+      await loadStatic();
+      setCustom(null);
+      setProfileId(p.id);
+      toast.success(`Profiel “${p.name}” opgeslagen`);
+      setSaveName(null);
+    } catch (e) {
+      reportError(e);
+    }
+  };
+  const deleteProfile = async () => {
+    try {
+      await api.convertProfileDelete(profileId);
+      await loadStatic();
+      setProfileId("compact");
+      toast.success("Profiel verwijderd");
+    } catch (e) {
+      reportError(e);
+    }
+    setConfirmDelete(false);
+  };
+
+  const start = async (preview = false) => {
+    try {
+      const r = await api.convertAdd({ inputs, profile_id: profileId === CUSTOM ? null : profileId, settings: profileId === CUSTOM ? custom : null, output: { dir, template, overwrite }, preview });
       await refresh();
       toast.success(`${r.job_ids.length} ${r.job_ids.length === 1 ? "taak" : "taken"} toegevoegd aan de wachtrij`);
       if (r.rejected.length) toast.warning(`${r.rejected.length} bestanden zijn overgeslagen: ${r.rejected[0]![1]}`);
@@ -125,6 +168,10 @@ export function ConverterPage() {
               <option value={CUSTOM}>Eigen profiel…</option>
             </Select>
           </Field>
+          <div className="row">
+            <Button size="sm" onClick={() => setSaveName("")} disabled={!settings}>Profiel opslaan…</Button>
+            {profileId.startsWith("eigen_") && <Button size="sm" variant="danger" onClick={() => setConfirmDelete(true)}>Profiel verwijderen</Button>}
+          </div>
 
           {settings && (
             <>
@@ -179,6 +226,8 @@ export function ConverterPage() {
                   </>
                 )}
               </div>
+              <TrimFields key={inputs[0] ?? "geen"} start={settings.trim_start_ms} end={settings.trim_end_ms} onChange={(a, b) => set({ trim_start_ms: a, trim_end_ms: b })} />
+              {estimate !== null && <p className="field__hint" role="status">Geschatte grootte van het resultaat: ongeveer {formatBytes(estimate)} (een schatting; bij constante kwaliteit hangt het af van de beelden).</p>}
               {!audioOnly && (
                 <div className="form-grid">
                   <Field label="Ondertitels in het bestand" htmlFor="cv-subs">
@@ -214,7 +263,10 @@ export function ConverterPage() {
             </Select>
           </Field>
           {overwrite === "replace" && <div className="banner banner--danger"><Icon name="warning" size={18} />Bestaande bestanden met dezelfde naam worden overschreven.</div>}
-          <div><Button variant="primary" size="lg" icon="convert" disabled={!canStart} onClick={() => void start()}>Toevoegen aan wachtrij</Button></div>
+          <div className="row">
+            <Button variant="primary" size="lg" icon="convert" disabled={!canStart} onClick={() => void start()}>Toevoegen aan wachtrij</Button>
+            <Button size="lg" disabled={!canStart} onClick={() => void start(true)} title="Zet alleen 10 seconden om, om de kwaliteit te beoordelen">Voorbeeld (10 s)</Button>
+          </div>
           {!canStart && <span className="field__hint">{inputs.length === 0 ? "Kies eerst bestanden of een map." : dir.trim() === "" ? "Kies een uitvoermap." : ""}</span>}
         </section>
       </div>
@@ -224,6 +276,14 @@ export function ConverterPage() {
         <JobList />
       </section>
 
+      {saveName !== null && (
+        <Modal title="Profiel opslaan" onClose={() => setSaveName(null)} footer={<><Button variant="ghost" onClick={() => setSaveName(null)}>Annuleren</Button><Button variant="primary" disabled={saveName.trim() === ""} onClick={() => void saveProfile()}>Opslaan</Button></>}>
+          <Field label="Naam van het profiel" htmlFor="cv-profile-name" hint="Een bestaand profiel met dezelfde naam wordt vervangen.">
+            <TextInput id="cv-profile-name" value={saveName} maxLength={60} onChange={(e) => setSaveName(e.target.value)} placeholder="Bijvoorbeeld: Voor mijn telefoon" />
+          </Field>
+        </Modal>
+      )}
+      {confirmDelete && <ConfirmDialog title="Profiel verwijderen?" text="Dit eigen profiel wordt verwijderd. Je bestanden blijven ongewijzigd." confirmLabel="Verwijderen" danger onCancel={() => setConfirmDelete(false)} onConfirm={() => void deleteProfile()} />}
       {confirmReplace && <ConfirmDialog title="Bestanden vervangen?" text="Als er al een bestand met dezelfde naam in de uitvoermap staat, wordt dat overschreven. Dit kun je niet ongedaan maken." confirmLabel="Vervangen" danger onCancel={() => setConfirmReplace(false)} onConfirm={() => (setOverwrite("replace"), setConfirmReplace(false))} />}
     </div>
   );
