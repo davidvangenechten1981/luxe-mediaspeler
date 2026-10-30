@@ -8,6 +8,8 @@ struct EngineInner {
     opened: Vec<(String, OpenOptions)>,
     fail: HashSet<String>,
     calls: Vec<String>,
+    /// De engine kent hardwaredecodering en kan die (eenmalig) uitzetten.
+    hw_on: bool,
 }
 
 #[derive(Clone, Default)]
@@ -118,6 +120,12 @@ impl Engine for FakeEngine {
     }
     fn set_equalizer(&mut self, _eq: Option<&EqConfig>) -> Result<()> {
         Ok(())
+    }
+    fn disable_hw_decoding(&mut self) -> bool {
+        self.with(|i| {
+            i.calls.push("hw_uit".into());
+            std::mem::replace(&mut i.hw_on, false)
+        })
     }
     fn status(&self) -> EngineStatus {
         self.with(|i| i.status.clone())
@@ -792,4 +800,53 @@ fn an_end_before_the_start_is_refused_and_marks_can_be_cleared() {
     s.clear_skip_marks();
     assert_eq!(store.0.lock().unwrap().marks["/m/a.mp3"], SkipMarks::default());
     assert_eq!(s.view().skip_offer, None);
+}
+
+#[test]
+fn a_playback_error_retries_once_without_hardware_decoding_at_the_same_position() {
+    let (mut s, engine, _) = setup(&["a"]);
+    engine.with(|i| i.hw_on = true);
+    engine.set_state(PlaybackState::Error, 12_000, 60_000);
+    let opens_before = engine.with(|i| i.opened.len());
+    s.tick(1_000);
+    assert_eq!(engine.with(|i| i.opened.len()), opens_before + 1, "opnieuw geopend");
+    assert_eq!(engine.with(|i| i.opened.last().unwrap().1.start_ms), 12_000);
+    assert!(s.take_events().contains(&SessionEvent::HwFallback { location: "/m/a.mp3".into() }));
+}
+
+#[test]
+fn the_fallback_happens_once_per_file_and_never_loops() {
+    let (mut s, engine, _) = setup(&["a"]);
+    engine.with(|i| i.hw_on = true);
+    engine.set_state(PlaybackState::Error, 0, 60_000);
+    s.tick(1_000);
+    let opens = engine.with(|i| i.opened.len());
+    engine.set_state(PlaybackState::Error, 0, 60_000); // faalt opnieuw
+    s.tick(2_000);
+    s.tick(3_000);
+    assert_eq!(engine.with(|i| i.opened.len()), opens, "geen tweede poging voor hetzelfde bestand");
+}
+
+#[test]
+fn without_hardware_decoding_an_error_is_left_alone() {
+    let (mut s, engine, _) = setup(&["a"]);
+    engine.set_state(PlaybackState::Error, 0, 0); // hw_on is false: er valt niets uit te zetten
+    let opens = engine.with(|i| i.opened.len());
+    s.tick(1_000);
+    assert_eq!(engine.with(|i| i.opened.len()), opens);
+    assert!(!s.take_events().iter().any(|e| matches!(e, SessionEvent::HwFallback { .. })));
+}
+
+#[test]
+fn a_new_file_gets_its_own_fallback() {
+    let (mut s, engine, _) = setup(&["a", "b"]);
+    engine.with(|i| i.hw_on = true);
+    engine.set_state(PlaybackState::Error, 0, 0);
+    s.tick(1_000);
+    s.skip_next().unwrap();
+    engine.with(|i| i.hw_on = true);
+    engine.set_state(PlaybackState::Error, 0, 0);
+    s.take_events();
+    s.tick(2_000);
+    assert!(s.take_events().contains(&SessionEvent::HwFallback { location: "/m/b.mp3".into() }));
 }

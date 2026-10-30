@@ -135,6 +135,7 @@ export type SessionEvent =
   | { type: "resume_applied"; position_ms: number }
   | { type: "ab_loop_jump"; to_ms: number }
   | { type: "open_failed"; location: string; message: string }
+  | { type: "hw_fallback"; location: string }
   | { type: "queue_ended" };
 
 export type PlayerCommand =

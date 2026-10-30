@@ -197,6 +197,15 @@ impl VlcEngine {
         Ok(())
     }
 
+    /// Zet hardwaredecodering uit (voor het opnieuw openen). `false` als dat al zo was.
+    pub fn hw_decoding_off(&mut self) -> bool {
+        if self.hw_decoding == "none" {
+            return false;
+        }
+        self.hw_decoding = "none".into();
+        true
+    }
+
     /// Opnieuw openen op de huidige positie, zodat een mediaoptie (bijv. rotatie) van kracht wordt.
     fn reopen_here(&mut self) -> Result<()> {
         let Some((loc, mut opts)) = self.last_open.clone() else {
@@ -550,6 +559,10 @@ impl Engine for VlcEngine {
                 }
             }
         }
+    }
+
+    fn disable_hw_decoding(&mut self) -> bool {
+        self.hw_decoding_off()
     }
 
     fn status(&self) -> EngineStatus {

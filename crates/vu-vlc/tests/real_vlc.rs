@@ -311,3 +311,10 @@ fn libvlc_accepts_the_subtitle_options_we_generate() {
         panic!("libvlc weigert de ondertitelopties: {e}");
     }
 }
+
+#[test]
+fn hardware_decoding_can_be_switched_off_exactly_once() {
+    let Some(mut e) = engine() else { return };
+    assert!(e.disable_hw_decoding(), "standaard staat hardwaredecodering aan (any)");
+    assert!(!e.disable_hw_decoding(), "daarna is er niets meer om uit te zetten");
+}

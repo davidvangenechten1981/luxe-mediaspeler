@@ -77,6 +77,11 @@ pub trait Engine: Send {
     fn next_frame(&mut self) -> Result<()>;
     fn take_snapshot(&mut self, path: &Path) -> Result<()>;
     fn set_equalizer(&mut self, eq: Option<&EqConfig>) -> Result<()>;
+    /// Zet hardwaredecodering uit voor volgende pogingen. Geeft `true` als er iets is veranderd,
+    /// `false` als dit niet kan of al uit staat.
+    fn disable_hw_decoding(&mut self) -> bool {
+        false
+    }
     fn status(&self) -> EngineStatus;
 }
 
@@ -164,10 +169,24 @@ impl<T: Persistence + ?Sized> Persistence for std::sync::Arc<T> {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SessionEvent {
-    TrackChanged { index: usize, location: String },
-    ResumeApplied { position_ms: u64 },
-    AbLoopJump { to_ms: u64 },
-    OpenFailed { location: String, message: String },
+    TrackChanged {
+        index: usize,
+        location: String,
+    },
+    ResumeApplied {
+        position_ms: u64,
+    },
+    AbLoopJump {
+        to_ms: u64,
+    },
+    OpenFailed {
+        location: String,
+        message: String,
+    },
+    /// Het afspelen faalde met hardwaredecodering; opnieuw gestart zonder.
+    HwFallback {
+        location: String,
+    },
     QueueEnded,
 }
 
@@ -257,6 +276,8 @@ pub struct Session<E: Engine> {
     pending_next: Option<u64>,
     next_in_ms: Option<u64>,
     skip_marks: SkipMarks,
+    /// Bestand waarvoor de terugval zonder hardwaredecodering al is geprobeerd.
+    hw_fallback_done: Option<String>,
     /// Wachttijd na een afgelopen video voordat het volgende item start; 0 = direct.
     pub next_delay_ms: u64,
     pub resume_enabled: bool,
@@ -286,6 +307,7 @@ impl<E: Engine> Session<E> {
             pending_next: None,
             next_in_ms: None,
             skip_marks: SkipMarks::default(),
+            hw_fallback_done: None,
             next_delay_ms: 0,
             resume_enabled: true,
             network_caching_ms: None,
@@ -690,7 +712,26 @@ impl<E: Engine> Session<E> {
                 }
             }
             PlaybackState::Ended => self.handle_end(now_ms),
+            PlaybackState::Error => self.try_hw_fallback(st.time_ms),
             _ => {}
+        }
+    }
+
+    /// Faalt het afspelen met hardwaredecodering (zwart beeld, driverfout), dan één keer opnieuw op dezelfde
+    /// plek zonder. Per bestand maar één poging, zodat een echt kapot bestand niet blijft herstarten.
+    fn try_hw_fallback(&mut self, at_ms: u64) {
+        let Some(loc) = self.current_location.clone() else { return };
+        if self.hw_fallback_done.as_deref() == Some(loc.as_str()) {
+            return;
+        }
+        self.hw_fallback_done = Some(loc.clone());
+        if !self.engine.disable_hw_decoding() {
+            return;
+        }
+        let opts = OpenOptions { start_ms: at_ms, network_caching_ms: self.network_caching_ms, audio_visual: is_audio_location(&loc) };
+        if self.engine.open(&loc, &opts).is_ok() && self.engine.play().is_ok() {
+            self.prefs_pending = true;
+            self.events.push(SessionEvent::HwFallback { location: loc });
         }
     }
 

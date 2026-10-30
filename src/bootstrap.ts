@@ -22,6 +22,7 @@ export async function bootstrap(): Promise<() => void> {
     }),
     await onPlayerEvent((e) => {
       if (e.type === "open_failed") toast.error(e.message);
+      if (e.type === "hw_fallback") toast.info("Het beeld startte niet met hardwaredecodering. Het bestand is opnieuw gestart zonder; stel dit zo nodig in bij Instellingen.");
       else if (e.type === "track_changed") useLibrary.getState().bump();
     }),
     await onScanProgress((p) => {
