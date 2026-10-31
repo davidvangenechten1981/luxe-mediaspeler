@@ -65,3 +65,6 @@ Legenda: **Getest** = geautomatiseerde test met echte ffmpeg/libvlc (Linux) en/o
 
 - Series: ontbrekende afleveringen worden per seizoen getoond (alleen gaten tussen aflevering 1 en de hoogste aanwezige). Niet op een echte bibliotheek geprobeerd.
 - Profielen (databaseschema 5): kijkstatus ("Kijk verder", gezien, hervatpositie) en geschiedenis zijn per profiel; bibliotheek, lijsten, favorieten en de afspeelteller van een bestand blijven gedeeld. Wisselen en beheren in Instellingen → Profielen (de pagina herlaadt na wisselen). Een bestaande database wordt profiel "Standaard". Nog niet gedaan: kinderslot per profiel. Niet op een echte pc geprobeerd.
+- Converter: veld "Doelgrootte (MB)" rekent de videobitrate uit voor het gekozen bestand (met 2% marge). Het blijft een benadering; bij meerdere bestanden geldt de duur van het eerste.
+- Toegankelijkheid: schakelaar "Hoog contrast" (Instellingen). Alleen visueel beoordeeld in code, niet op een echt scherm.
+- Bleek al aanwezig: slaaptimer, automatische reservekopie, export/import van instellingen, diagnose-export, periodiek opnieuw scannen (map volgen via interval, geen live bestandsbewaking).

@@ -42,6 +42,8 @@ pub struct AppSettings {
     pub accent: String,
     pub ui_scale: f32,
     pub compact: bool,
+    /// Sterker contrast en dikkere randen (toegankelijkheid).
+    pub high_contrast: bool,
     pub always_on_top: bool,
     pub language: String,
     // afspelen
@@ -132,6 +134,7 @@ impl Default for AppSettings {
             accent: "#6d5dfc".into(),
             ui_scale: 1.0,
             compact: false,
+            high_contrast: false,
             always_on_top: false,
             language: "nl".into(),
             seek_short_s: 5,
@@ -398,6 +401,12 @@ pub fn import_json(text: &str) -> Result<AppSettings> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn an_old_settings_file_without_high_contrast_still_loads_with_it_off() {
+        let s: super::AppSettings = serde_json::from_str(r#"{"compact": true}"#).unwrap();
+        assert!(s.compact && !s.high_contrast);
+    }
+
     use super::*;
 
     #[test]

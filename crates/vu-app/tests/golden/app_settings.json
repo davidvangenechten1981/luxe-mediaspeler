@@ -37,6 +37,7 @@
     "aif",
     "m4a"
   ],
+  "high_contrast": false,
   "hw_decoding": "auto",
   "language": "nl",
   "network_caching_ms": 1500,

@@ -345,6 +345,7 @@ export interface AppSettings {
   accent: string;
   ui_scale: number;
   compact: boolean;
+  high_contrast: boolean;
   always_on_top: boolean;
   language: string;
   seek_short_s: number;

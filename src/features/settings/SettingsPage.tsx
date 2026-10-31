@@ -69,6 +69,7 @@ function Look() {
         </div>
       </Row>
       <Row title="Interfaceschaal" hint="Maakt tekst en knoppen groter of kleiner."><div className="row" style={{ width: 240 }}><div className="grow"><Slider label="Interfaceschaal" min={0.75} max={2} step={0.05} bigStep={0.25} value={s.ui_scale} format={(v) => `${Math.round(v * 100)}%`} onChange={() => undefined} onCommit={(v) => void update({ ui_scale: Math.round(v * 100) / 100 })} /></div><span className="mono muted" style={{ width: 44 }}>{Math.round(s.ui_scale * 100)}%</span></div></Row>
+      <Row title="Hoog contrast" hint="Duidelijkere tekst en dikkere randen."><Switch label={s.high_contrast ? "Aan" : "Uit"} checked={s.high_contrast} onChange={(v) => void update({ high_contrast: v })} /></Row>
       <Row title="Compacte interface" hint="Minder ruimte tussen elementen."><Switch label={(s.compact) ? "Aan" : "Uit"} checked={s.compact} onChange={(v) => void update({ compact: v })} /></Row>
       <Row title="Altijd op de voorgrond" hint="Houdt het venster boven andere vensters."><Switch label={(s.always_on_top) ? "Aan" : "Uit"} checked={s.always_on_top} onChange={(v) => void update({ always_on_top: v })} /></Row>
     </div>
