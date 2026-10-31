@@ -15,6 +15,10 @@ library_scan_start
 library_scan_cancel
 library_scan_running
 series_list
+profile_list
+profile_create
+profile_switch
+profile_delete
 pin_status
 pin_verify
 pin_set

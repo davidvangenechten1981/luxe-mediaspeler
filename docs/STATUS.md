@@ -64,3 +64,4 @@ Legenda: **Getest** = geautomatiseerde test met echte ffmpeg/libvlc (Linux) en/o
 - Internetradio, podcasts, audio-cd, 24p-schermwissel
 
 - Series: ontbrekende afleveringen worden per seizoen getoond (alleen gaten tussen aflevering 1 en de hoogste aanwezige). Niet op een echte bibliotheek geprobeerd.
+- Profielen (databaseschema 5): kijkstatus ("Kijk verder", gezien, hervatpositie) en geschiedenis zijn per profiel; bibliotheek, lijsten, favorieten en de afspeelteller van een bestand blijven gedeeld. Wisselen en beheren in Instellingen → Profielen (de pagina herlaadt na wisselen). Een bestaande database wordt profiel "Standaard". Nog niet gedaan: kinderslot per profiel. Niet op een echte pc geprobeerd.

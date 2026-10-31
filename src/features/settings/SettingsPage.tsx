@@ -10,6 +10,7 @@ import { useAsync } from "../../lib/useAsync";
 import { useLibrary } from "../../state/library";
 import { LicensesDialog } from "./LicensesDialog";
 import { PinSettings } from "./PinSettings";
+import { ProfileSettings } from "./ProfileSettings";
 import { useJobs } from "../../state/jobs";
 import { useSettings } from "../../state/settings";
 import { reportError, toast } from "../../state/ui";
@@ -181,6 +182,7 @@ function LibrarySettings() {
           <Button disabled={!s.sync_folder} onClick={async () => { try { const r = await api.syncRun(); toast.success(`Gesynchroniseerd: ${r.imported} bijgewerkt, ${r.exported} gedeeld`); } catch (e) { reportError(e); } }}>Nu synchroniseren</Button>
         </div>
       </Row>
+      <Row title="Profielen" hint="Elke persoon krijgt een eigen kijkstatus, geschiedenis en ‘Kijk verder’. De bibliotheek en lijsten blijven gedeeld."><ProfileSettings /></Row>
       <Row title="PIN voor de bibliotheek" hint="Vergrendelt je bibliotheekpagina's bij het starten van de app. Gemak, geen echte beveiliging."><PinSettings /></Row>
       <Row title="Dubbele bestanden" hint="Zoekt bestanden met dezelfde grootte en duur."><Button icon="search" onClick={() => setDups(true)}>Zoeken…</Button></Row>
       {remove && <ConfirmDialog title="Map uit bibliotheek halen?" text={`“${remove}” en de bijbehorende items verdwijnen uit de bibliotheek. Je bestanden blijven op schijf staan.`} confirmLabel="Uit bibliotheek halen" danger onCancel={() => setRemove(null)} onConfirm={async () => { try { const n = await api.libraryRemoveFolder(remove); toast.success(`${n} items verwijderd uit de bibliotheek`); folders.reload(); bump(); } catch (e) { reportError(e); } setRemove(null); }} />}

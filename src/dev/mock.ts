@@ -257,6 +257,9 @@ async function handle(request: Record<string, unknown>): Promise<unknown> {
     case "playlist_add_items": return { added: (r.locations as string[]).length, rejected: [] };
     case "playlist_missing": return [];
     case "history_list": return history;
+    case "profile_list": return { profiles: [{ id: 1, name: "Standaard" }, { id: 2, name: "Kinderen" }], active: 1 };
+    case "profile_create": return 3;
+    case "profile_switch": case "profile_delete": return null;
     case "history_enabled": return true;
     case "library_folder_status": return [{ path: "D:\\Media", online: true }, { path: "\\\\nas\\films", online: false }];
     case "library_stats": return { video_count: library.filter((m) => m.kind === "video").length, audio_count: library.filter((m) => m.kind === "audio").length, total_duration_ms: library.reduce((a, m) => a + m.duration_ms, 0), total_plays: 42 };

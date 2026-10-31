@@ -9,6 +9,7 @@ pub mod lyrics;
 pub mod pin;
 pub mod player;
 pub mod playlists;
+pub mod profiles;
 pub mod series;
 pub mod settings;
 pub mod sync;
