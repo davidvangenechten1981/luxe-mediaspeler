@@ -150,6 +150,14 @@ const MIGRATIONS: &[&str] = &[
         rate REAL NOT NULL
     );
     "#,
+    // 7: bestanden die de bewaakte map al heeft opgepakt
+    r#"
+    CREATE TABLE watch_done (
+        path TEXT NOT NULL,
+        mtime INTEGER NOT NULL,
+        PRIMARY KEY (path, mtime)
+    );
+    "#,
 ];
 
 pub fn now() -> i64 {
@@ -1050,6 +1058,17 @@ impl Database {
             "INSERT INTO rate_prefs (key, rate) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET rate = ?2",
             params![key, f64::from(rate)],
         )?;
+        Ok(())
+    }
+
+    pub fn watch_done(&self) -> Result<std::collections::HashSet<(String, i64)>> {
+        let mut st = self.conn.prepare("SELECT path, mtime FROM watch_done")?;
+        let rows = st.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    pub fn mark_watch_done(&self, path: &str, mtime: i64) -> Result<()> {
+        self.conn.execute("INSERT OR IGNORE INTO watch_done (path, mtime) VALUES (?1, ?2)", params![path, mtime])?;
         Ok(())
     }
 

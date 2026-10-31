@@ -83,6 +83,11 @@ export async function bootstrap(): Promise<() => void> {
     }, s.periodic_scan_minutes * 60_000);
   }
 
+  // Bewaakte map: elke 2 minuten nieuwe bestanden oppakken (doet niets zolang er geen map is gekozen).
+  const watchTimer = setInterval(() => {
+    if (useSettings.getState().settings.watch_dir) void api.watchRun().catch(() => undefined);
+  }, 120_000);
+
   // Kijkstatus delen met een andere pc: meteen en daarna elke 10 minuten, zolang er een map is gekozen.
   const stopSync = startAutoSync({
     folder: () => useSettings.getState().settings.sync_folder,
@@ -93,6 +98,7 @@ export async function bootstrap(): Promise<() => void> {
   return () => {
     offs.forEach((o) => o());
     if (timer) clearInterval(timer);
+    clearInterval(watchTimer);
     stopSync();
   };
 }

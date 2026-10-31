@@ -106,6 +106,7 @@ export const api = {
   tagsGet: (path: string) => call<TagFields>(t("tags_get", { path })),
   tagsSet: (path: string, update: Partial<TagFields>) => call<null>(t("tags_set", { path, update })),
   systemAction: (action: "sleep" | "shutdown") => call<null>(t("system_action", { action })),
+  watchRun: () => call<{ queued: number; rejected: number }>(t("watch_run")),
   syncRun: () => call<SyncReport>(t("sync_run")),
   profileList: () => call<{ profiles: { id: number; name: string }[]; active: number }>(t("profile_list")),
   profileCreate: (name: string) => call<number>(t("profile_create", { name })),

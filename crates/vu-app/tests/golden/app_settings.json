@@ -96,5 +96,7 @@
   "subtitle_scale": 1.0,
   "sync_folder": null,
   "theme": "dark",
-  "ui_scale": 1.0
+  "ui_scale": 1.0,
+  "watch_dir": null,
+  "watch_profile": null
 }

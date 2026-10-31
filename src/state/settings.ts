@@ -28,6 +28,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   replay_gain: "none",
   audio_passthrough: false,
   sync_folder: null,
+  watch_dir: null,
+  watch_profile: null,
   network_caching_ms: 1500,
   allow_local_streams: false,
   online_metadata: false,

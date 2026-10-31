@@ -364,6 +364,8 @@ export interface AppSettings {
   replay_gain: "none" | "track" | "album";
   audio_passthrough: boolean;
   sync_folder: string | null;
+  watch_dir: string | null;
+  watch_profile: string | null;
   network_caching_ms: number;
   allow_local_streams: boolean;
   online_metadata: boolean;

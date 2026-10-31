@@ -11,6 +11,7 @@ import { useLibrary } from "../../state/library";
 import { LicensesDialog } from "./LicensesDialog";
 import { PinSettings } from "./PinSettings";
 import { ProfileSettings } from "./ProfileSettings";
+import { WatchSettings } from "./WatchSettings";
 import { useJobs } from "../../state/jobs";
 import { useSettings } from "../../state/settings";
 import { reportError, toast } from "../../state/ui";
@@ -183,6 +184,7 @@ function LibrarySettings() {
           <Button disabled={!s.sync_folder} onClick={async () => { try { const r = await api.syncRun(); toast.success(`Gesynchroniseerd: ${r.imported} bijgewerkt, ${r.exported} gedeeld`); } catch (e) { reportError(e); } }}>Nu synchroniseren</Button>
         </div>
       </Row>
+      <Row title="Bewaakte map (automatisch converteren)" hint="Nieuwe video's en muziek in deze map worden elke 2 minuten opgepakt en met het gekozen profiel geconverteerd naar je uitvoermap. Een bestand wordt maar één keer opgepakt. Alleen terwijl de app open is."><WatchSettings /></Row>
       <Row title="Profielen" hint="Elke persoon krijgt een eigen kijkstatus, geschiedenis en ‘Kijk verder’. De bibliotheek en lijsten blijven gedeeld."><ProfileSettings /></Row>
       <Row title="PIN voor de bibliotheek" hint="Vergrendelt je bibliotheekpagina's bij het starten van de app. Gemak, geen echte beveiliging."><PinSettings /></Row>
       <Row title="Dubbele bestanden" hint="Zoekt bestanden met dezelfde grootte en duur."><Button icon="search" onClick={() => setDups(true)}>Zoeken…</Button></Row>

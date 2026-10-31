@@ -259,6 +259,7 @@ async function handle(request: Record<string, unknown>): Promise<unknown> {
     case "history_list": return history;
     case "profile_list": return { profiles: [{ id: 1, name: "Standaard" }, { id: 2, name: "Kinderen" }], active: 1 };
     case "profile_create": return 3;
+    case "watch_run": return { queued: 0, rejected: 0 };
     case "profile_switch": case "profile_delete": return null;
     case "history_enabled": return true;
     case "library_folder_status": return [{ path: "D:\\Media", online: true }, { path: "\\\\nas\\films", online: false }];

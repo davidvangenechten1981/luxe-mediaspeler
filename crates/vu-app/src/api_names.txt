@@ -19,6 +19,7 @@ profile_list
 profile_create
 profile_switch
 profile_delete
+watch_run
 pin_status
 pin_verify
 pin_set

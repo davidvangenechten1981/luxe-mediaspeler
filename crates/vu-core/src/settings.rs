@@ -69,6 +69,9 @@ pub struct AppSettings {
     pub audio_passthrough: bool,
     /// Gedeelde map waarin pc's hun kijkstatus uitwisselen; `None` = uit.
     pub sync_folder: Option<String>,
+    /// Bewaakte map: nieuwe bestanden worden automatisch geconverteerd met dit profiel.
+    pub watch_dir: Option<String>,
+    pub watch_profile: Option<String>,
     // netwerk en privacy
     pub network_caching_ms: u32,
     pub allow_local_streams: bool,
@@ -153,6 +156,8 @@ impl Default for AppSettings {
             replay_gain: "none".into(),
             audio_passthrough: false,
             sync_folder: None,
+            watch_dir: None,
+            watch_profile: None,
             network_caching_ms: 1500,
             allow_local_streams: false,
             online_metadata: false,
