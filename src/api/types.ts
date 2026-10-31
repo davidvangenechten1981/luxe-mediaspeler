@@ -452,6 +452,7 @@ export interface Series {
   episodes: SeriesEpisode[];
   watched: number;
   next_media_id: number | null;
+  missing?: { season: number; episode: number }[];
 }
 
 export interface LyricLine {

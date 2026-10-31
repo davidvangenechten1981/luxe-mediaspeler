@@ -62,3 +62,5 @@ Legenda: **Getest** = geautomatiseerde test met echte ffmpeg/libvlc (Linux) en/o
 - SMTC met albumhoes (alleen titel en knoppen zijn gemaakt)
 - Het venster nog eerder tonen tijdens het opstarten (alleen de FFmpeg-controle is uitgesteld)
 - Internetradio, podcasts, audio-cd, 24p-schermwissel
+
+- Series: ontbrekende afleveringen worden per seizoen getoond (alleen gaten tussen aflevering 1 en de hoogste aanwezige). Niet op een echte bibliotheek geprobeerd.

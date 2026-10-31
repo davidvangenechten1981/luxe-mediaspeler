@@ -22,6 +22,27 @@ pub struct Series {
     pub watched: u32,
     /// Id van de eerste aflevering die je nog niet hebt gezien.
     pub next_media_id: Option<i64>,
+    /// Ontbrekende afleveringen: per seizoen alles tussen aflevering 1 en de hoogste die je hebt.
+    pub missing: Vec<MissingEpisode>,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct MissingEpisode {
+    pub season: u32,
+    pub episode: u32,
+}
+
+fn find_missing(episodes: &[SeriesEpisode]) -> Vec<MissingEpisode> {
+    let mut by_season: BTreeMap<u32, Vec<u32>> = BTreeMap::new();
+    for e in episodes {
+        by_season.entry(e.season).or_default().push(e.episode);
+    }
+    let mut out = vec![];
+    for (season, eps) in by_season {
+        let max = eps.iter().copied().max().unwrap_or(0).min(500);
+        out.extend((1..=max).filter(|n| !eps.contains(n)).map(|episode| MissingEpisode { season, episode }));
+    }
+    out
 }
 
 pub fn list(st: &AppState) -> Result<Vec<Series>> {
@@ -41,7 +62,8 @@ pub fn list(st: &AppState) -> Result<Vec<Series>> {
             episodes.sort_by_key(|e| (e.season, e.episode));
             let watched = episodes.iter().filter(|e| e.watched).count() as u32;
             let next_media_id = episodes.iter().find(|e| !e.watched).map(|e| e.media.id);
-            Series { show, episodes, watched, next_media_id }
+            let missing = find_missing(&episodes);
+            Series { show, episodes, watched, next_media_id, missing }
         })
         .collect())
 }
@@ -91,6 +113,22 @@ mod tests {
         assert_eq!(show.watched, 1);
         let next = show.episodes.iter().find(|e| e.media.id == show.next_media_id.unwrap()).unwrap();
         assert_eq!((next.season, next.episode), (1, 2));
+    }
+
+    #[test]
+    fn reports_gaps_per_season_but_not_before_the_first_or_after_the_last_known_episode() {
+        let app = app();
+        {
+            let mut db = app.state.lock_db().unwrap();
+            for p in ["/s/Gat.S01E01.mkv", "/s/Gat.S01E04.mkv", "/s/Gat.S02E02.mkv", "/s/Vol.S01E01.mkv", "/s/Vol.S01E02.mkv"] {
+                db.upsert_media(&video(p)).unwrap();
+            }
+        }
+        let all = list(&app.state).unwrap();
+        let gat = all.iter().find(|s| s.show == "Gat").unwrap();
+        let gaps: Vec<_> = gat.missing.iter().map(|m| (m.season, m.episode)).collect();
+        assert_eq!(gaps, [(1, 2), (1, 3), (2, 1)]);
+        assert!(all.iter().find(|s| s.show == "Vol").unwrap().missing.is_empty());
     }
 
     #[test]

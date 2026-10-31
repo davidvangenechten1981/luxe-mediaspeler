@@ -262,7 +262,7 @@ async function handle(request: Record<string, unknown>): Promise<unknown> {
     case "library_stats": return { video_count: library.filter((m) => m.kind === "video").length, audio_count: library.filter((m) => m.kind === "audio").length, total_duration_ms: library.reduce((a, m) => a + m.duration_ms, 0), total_plays: 42 };
     case "series_list": {
       const eps = library.filter((m) => m.kind === "video").slice(0, 4).map((m, i) => ({ media: m, season: 1 + Math.floor(i / 2), episode: 1 + (i % 2), watched: i < 1 }));
-      return [{ show: "Voorbeeldserie", episodes: eps, watched: 1, next_media_id: eps[1]?.media.id ?? null }];
+      return [{ show: "Voorbeeldserie", episodes: eps, watched: 1, next_media_id: eps[1]?.media.id ?? null, missing: [{ season: 2, episode: 3 }] }];
     }
     case "continue_watching": return library.filter((m) => m.kind === "video").slice(2, 7).map((m, i) => ({ location: m.path, position_ms: m.duration_ms * (0.2 + i * 0.13), duration_ms: m.duration_ms, updated_at: now - i * 7200, media: m, missing: false }));
     case "bookmark_list": return [{ id: 1, location: r.location, position_ms: 600_000, label: "Mooie scène", created_at: now - 4000 }];
