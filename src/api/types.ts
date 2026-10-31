@@ -345,6 +345,8 @@ export interface AppSettings {
   accent: string;
   ui_scale: number;
   compact: boolean;
+  high_contrast: boolean;
+  tv_mode: boolean;
   always_on_top: boolean;
   language: string;
   seek_short_s: number;
@@ -363,6 +365,8 @@ export interface AppSettings {
   replay_gain: "none" | "track" | "album";
   audio_passthrough: boolean;
   sync_folder: string | null;
+  watch_dir: string | null;
+  watch_profile: string | null;
   network_caching_ms: number;
   allow_local_streams: boolean;
   online_metadata: boolean;
@@ -440,6 +444,13 @@ export interface LaunchRequest {
   enqueue: boolean;
 }
 
+export interface Photo {
+  path: string;
+  name: string;
+  modified: number;
+  size: number;
+}
+
 export interface SeriesEpisode {
   media: Media;
   season: number;
@@ -452,6 +463,7 @@ export interface Series {
   episodes: SeriesEpisode[];
   watched: number;
   next_media_id: number | null;
+  missing?: { season: number; episode: number }[];
 }
 
 export interface LyricLine {

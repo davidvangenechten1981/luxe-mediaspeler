@@ -7,6 +7,7 @@ export const PAGES = [
   { id: "music", label: "Muziekbibliotheek", group: "Bibliotheek" },
   { id: "all_media", label: "Alle mediabestanden", group: "Bibliotheek" },
   { id: "series", label: "Series", group: "Bibliotheek" },
+  { id: "photos", label: "Foto's", group: "Bibliotheek" },
   { id: "playlists", label: "Playlists", group: "Bibliotheek" },
   { id: "smart_lists", label: "Slimme lijsten", group: "Bibliotheek" },
   { id: "favorites", label: "Favorieten", group: "Bibliotheek" },

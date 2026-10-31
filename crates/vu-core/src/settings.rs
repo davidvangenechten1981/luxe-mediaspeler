@@ -42,6 +42,10 @@ pub struct AppSettings {
     pub accent: String,
     pub ui_scale: f32,
     pub compact: bool,
+    /// Sterker contrast en dikkere randen (toegankelijkheid).
+    pub high_contrast: bool,
+    /// Tv-modus: grotere interface en bediening met de pijltjestoetsen.
+    pub tv_mode: bool,
     pub always_on_top: bool,
     pub language: String,
     // afspelen
@@ -67,6 +71,9 @@ pub struct AppSettings {
     pub audio_passthrough: bool,
     /// Gedeelde map waarin pc's hun kijkstatus uitwisselen; `None` = uit.
     pub sync_folder: Option<String>,
+    /// Bewaakte map: nieuwe bestanden worden automatisch geconverteerd met dit profiel.
+    pub watch_dir: Option<String>,
+    pub watch_profile: Option<String>,
     // netwerk en privacy
     pub network_caching_ms: u32,
     pub allow_local_streams: bool,
@@ -132,6 +139,8 @@ impl Default for AppSettings {
             accent: "#6d5dfc".into(),
             ui_scale: 1.0,
             compact: false,
+            high_contrast: false,
+            tv_mode: false,
             always_on_top: false,
             language: "nl".into(),
             seek_short_s: 5,
@@ -150,6 +159,8 @@ impl Default for AppSettings {
             replay_gain: "none".into(),
             audio_passthrough: false,
             sync_folder: None,
+            watch_dir: None,
+            watch_profile: None,
             network_caching_ms: 1500,
             allow_local_streams: false,
             online_metadata: false,
@@ -398,6 +409,12 @@ pub fn import_json(text: &str) -> Result<AppSettings> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn an_old_settings_file_without_high_contrast_still_loads_with_it_off() {
+        let s: super::AppSettings = serde_json::from_str(r#"{"compact": true}"#).unwrap();
+        assert!(s.compact && !s.high_contrast);
+    }
+
     use super::*;
 
     #[test]

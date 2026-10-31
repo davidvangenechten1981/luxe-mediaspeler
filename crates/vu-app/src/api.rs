@@ -4,7 +4,10 @@
 //! verkeerd getypeerde velden, en elke dienst valideert zijn invoer opnieuw.
 //! Er bestaat geen manier om een shellcommando of een vrij FFmpeg-argument mee te geven.
 
-use crate::services::{audio, converter, cover, history, library, lyrics, pin, player, playlists, series, settings, sync, tags, video};
+use crate::services::{
+    audio, converter, cover, history, library, lyrics, photos, pin, player, playlists, profiles, series, settings, sync, tags, video,
+    videoprefs, watch,
+};
 use crate::state::AppState;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -35,10 +38,18 @@ pub enum Request {
     LibraryScanCancel,
     LibraryScanRunning,
     SeriesList,
+    ProfileList,
+    ProfileCreate { name: String },
+    ProfileSwitch { id: i64 },
+    ProfileDelete { id: i64 },
     PinStatus,
     PinVerify { pin: String },
     PinSet { new_pin: Option<String>, current: Option<String> },
     SyncRun,
+    WatchRun,
+    PhotosList,
+    VideoPrefsGet { location: String },
+    VideoPrefsSet { location: String, values: std::collections::BTreeMap<String, f32> },
     SystemAction { action: crate::services::system_action::SystemAction },
     TagsGet { path: String },
     TagsSet { path: String, update: vu_core::tags::TagUpdate },
@@ -183,6 +194,14 @@ pub fn handle(st: &AppState, req: Request) -> Result<Value> {
         TagsSet { path, update } => tags::set(st, &path, &update).and_then(|_| unit()),
         SystemAction { action } => crate::services::system_action::run(action).and_then(|_| unit()),
         SyncRun => json_of(sync::run(st)?),
+        VideoPrefsGet { location } => json_of(videoprefs::get(st, &location)?),
+        VideoPrefsSet { location, values } => videoprefs::set(st, &location, &values).and_then(|_| unit()),
+        PhotosList => json_of(photos::list(st)?),
+        WatchRun => json_of(watch::run(st)?),
+        ProfileList => json_of(profiles::list(st)?),
+        ProfileCreate { name } => json_of(profiles::create(st, &name)?),
+        ProfileSwitch { id } => profiles::switch(st, id).and_then(|_| unit()),
+        ProfileDelete { id } => profiles::delete(st, id).and_then(|_| unit()),
         PinStatus => json_of(pin::status(st)?),
         PinVerify { pin } => json_of(pin::verify_pin(st, &pin)?),
         PinSet { new_pin, current } => pin::set_pin(st, new_pin.as_deref(), current.as_deref()).and_then(|_| unit()),
@@ -325,7 +344,7 @@ mod tests {
         let info = call(&app, json!({"type": "app_info"})).unwrap();
         assert_eq!(info["version"], "0.0.0-test");
         let d = call(&app, json!({"type": "diagnostics"})).unwrap();
-        assert_eq!(d["schema_version"], 4);
+        assert_eq!(d["schema_version"], 8);
     }
 
     #[test]

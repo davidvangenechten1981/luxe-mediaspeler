@@ -43,6 +43,11 @@ export function SeriesCard({ series, onChanged }: { series: Series; onChanged?: 
           <span className="chip">Alles gezien</span>
         )}
       </header>
+      {(series.missing?.length ?? 0) > 0 && (
+        <p className="muted" role="note">
+          Ontbreekt: {series.missing!.map((m) => `S${String(m.season).padStart(2, "0")}E${String(m.episode).padStart(2, "0")}`).join(", ")}
+        </p>
+      )}
       {bySeason(series.episodes).map(([season, eps]) => (
         <div key={season} className="list">
           <h3>Seizoen {season}</h3>

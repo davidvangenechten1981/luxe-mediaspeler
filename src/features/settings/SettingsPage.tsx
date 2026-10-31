@@ -10,6 +10,8 @@ import { useAsync } from "../../lib/useAsync";
 import { useLibrary } from "../../state/library";
 import { LicensesDialog } from "./LicensesDialog";
 import { PinSettings } from "./PinSettings";
+import { ProfileSettings } from "./ProfileSettings";
+import { WatchSettings } from "./WatchSettings";
 import { useJobs } from "../../state/jobs";
 import { useSettings } from "../../state/settings";
 import { reportError, toast } from "../../state/ui";
@@ -68,6 +70,8 @@ function Look() {
         </div>
       </Row>
       <Row title="Interfaceschaal" hint="Maakt tekst en knoppen groter of kleiner."><div className="row" style={{ width: 240 }}><div className="grow"><Slider label="Interfaceschaal" min={0.75} max={2} step={0.05} bigStep={0.25} value={s.ui_scale} format={(v) => `${Math.round(v * 100)}%`} onChange={() => undefined} onCommit={(v) => void update({ ui_scale: Math.round(v * 100) / 100 })} /></div><span className="mono muted" style={{ width: 44 }}>{Math.round(s.ui_scale * 100)}%</span></div></Row>
+      <Row title="Tv-modus" hint="Alles groter en te bedienen met de pijltjestoetsen en Enter, bijvoorbeeld vanaf de bank."><Switch label={s.tv_mode ? "Aan" : "Uit"} checked={s.tv_mode} onChange={(v) => void update({ tv_mode: v })} /></Row>
+      <Row title="Hoog contrast" hint="Duidelijkere tekst en dikkere randen."><Switch label={s.high_contrast ? "Aan" : "Uit"} checked={s.high_contrast} onChange={(v) => void update({ high_contrast: v })} /></Row>
       <Row title="Compacte interface" hint="Minder ruimte tussen elementen."><Switch label={(s.compact) ? "Aan" : "Uit"} checked={s.compact} onChange={(v) => void update({ compact: v })} /></Row>
       <Row title="Altijd op de voorgrond" hint="Houdt het venster boven andere vensters."><Switch label={(s.always_on_top) ? "Aan" : "Uit"} checked={s.always_on_top} onChange={(v) => void update({ always_on_top: v })} /></Row>
     </div>
@@ -181,6 +185,8 @@ function LibrarySettings() {
           <Button disabled={!s.sync_folder} onClick={async () => { try { const r = await api.syncRun(); toast.success(`Gesynchroniseerd: ${r.imported} bijgewerkt, ${r.exported} gedeeld`); } catch (e) { reportError(e); } }}>Nu synchroniseren</Button>
         </div>
       </Row>
+      <Row title="Bewaakte map (automatisch converteren)" hint="Nieuwe video's en muziek in deze map worden elke 2 minuten opgepakt en met het gekozen profiel geconverteerd naar je uitvoermap. Een bestand wordt maar één keer opgepakt. Alleen terwijl de app open is."><WatchSettings /></Row>
+      <Row title="Profielen" hint="Elke persoon krijgt een eigen kijkstatus, geschiedenis en ‘Kijk verder’. De bibliotheek en lijsten blijven gedeeld."><ProfileSettings /></Row>
       <Row title="PIN voor de bibliotheek" hint="Vergrendelt je bibliotheekpagina's bij het starten van de app. Gemak, geen echte beveiliging."><PinSettings /></Row>
       <Row title="Dubbele bestanden" hint="Zoekt bestanden met dezelfde grootte en duur."><Button icon="search" onClick={() => setDups(true)}>Zoeken…</Button></Row>
       {remove && <ConfirmDialog title="Map uit bibliotheek halen?" text={`“${remove}” en de bijbehorende items verdwijnen uit de bibliotheek. Je bestanden blijven op schijf staan.`} confirmLabel="Uit bibliotheek halen" danger onCancel={() => setRemove(null)} onConfirm={async () => { try { const n = await api.libraryRemoveFolder(remove); toast.success(`${n} items verwijderd uit de bibliotheek`); folders.reload(); bump(); } catch (e) { reportError(e); } setRemove(null); }} />}

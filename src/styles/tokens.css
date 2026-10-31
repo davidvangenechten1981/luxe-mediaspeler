@@ -88,3 +88,32 @@
     --t-med: 0ms;
   }
 }
+
+/* Hoog contrast: sterkere tekstkleuren, duidelijke randen en een dikkere focusring. */
+:root[data-contrast="high"][data-theme="dark"] {
+  --text-dim: #d6dae6;
+  --text-faint: #b4bbcd;
+  --border: #6b7390;
+  --border-strong: #9aa3c0;
+}
+:root[data-contrast="high"][data-theme="light"] {
+  --text-dim: #20232d;
+  --text-faint: #3a4052;
+  --border: #6b7287;
+  --border-strong: #3a4052;
+}
+:root[data-contrast="high"] :focus-visible {
+  outline: 3px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
+/* Tv-modus: grotere aanraak- en focusdoelen. De lettergrootte wordt in applyAppearance vergroot. */
+:root[data-tv="true"] button,
+:root[data-tv="true"] [role="button"],
+:root[data-tv="true"] select {
+  min-height: 2.75rem;
+}
+:root[data-tv="true"] :focus-visible {
+  outline: 4px solid var(--accent-strong);
+  outline-offset: 3px;
+}

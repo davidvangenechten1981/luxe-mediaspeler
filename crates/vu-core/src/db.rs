@@ -120,6 +120,51 @@ const MIGRATIONS: &[&str] = &[
         credits_start_ms INTEGER
     );
     "#,
+    // 5: gebruikersprofielen met eigen kijkstatus en geschiedenis
+    r#"
+    CREATE TABLE profiles (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE COLLATE NOCASE
+    );
+    INSERT INTO profiles (id, name) VALUES (1, 'Standaard');
+    ALTER TABLE history ADD COLUMN profile_id INTEGER NOT NULL DEFAULT 1;
+    CREATE TABLE resume_new (
+        profile_id INTEGER NOT NULL DEFAULT 1,
+        location TEXT NOT NULL,
+        position_ms INTEGER NOT NULL,
+        duration_ms INTEGER NOT NULL,
+        completed INTEGER NOT NULL DEFAULT 0,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (profile_id, location)
+    );
+    INSERT INTO resume_new (profile_id, location, position_ms, duration_ms, completed, updated_at)
+        SELECT 1, location, position_ms, duration_ms, completed, updated_at FROM resume;
+    DROP TABLE resume;
+    ALTER TABLE resume_new RENAME TO resume;
+    CREATE INDEX idx_resume_updated ON resume(updated_at);
+    "#,
+    // 6: onthouden afspeelsnelheid per bestand of serie
+    r#"
+    CREATE TABLE rate_prefs (
+        key TEXT PRIMARY KEY,
+        rate REAL NOT NULL
+    );
+    "#,
+    // 7: bestanden die de bewaakte map al heeft opgepakt
+    r#"
+    CREATE TABLE watch_done (
+        path TEXT NOT NULL,
+        mtime INTEGER NOT NULL,
+        PRIMARY KEY (path, mtime)
+    );
+    "#,
+    // 8: beeldinstellingen per bestand
+    r#"
+    CREATE TABLE video_prefs (
+        location TEXT PRIMARY KEY,
+        json TEXT NOT NULL
+    );
+    "#,
 ];
 
 pub fn now() -> i64 {
@@ -128,6 +173,7 @@ pub fn now() -> i64 {
 
 pub struct Database {
     conn: Connection,
+    profile: std::cell::Cell<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -364,6 +410,12 @@ pub fn duplicate_groups(groups: Vec<Vec<Media>>) -> Vec<DuplicateGroup> {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Profile {
+    pub id: i64,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Bookmark {
     pub id: i64,
     pub location: String,
@@ -385,8 +437,12 @@ impl Database {
         conn.pragma_update(None, "foreign_keys", true)?;
         let _ = conn.pragma_update(None, "journal_mode", "WAL"); // bij :memory: genegeerd
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
-        let mut db = Database { conn };
+        let mut db = Database { conn, profile: std::cell::Cell::new(1) };
         db.migrate()?;
+        let active = db.get_setting("active_profile")?.and_then(|v| v.parse::<i64>().ok());
+        if let Some(id) = active.filter(|id| db.profile_exists(*id)) {
+            db.profile.set(id);
+        }
         Ok(db)
     }
 
@@ -408,6 +464,52 @@ impl Database {
             tx.pragma_update(None, "user_version", (i + 1) as u32)?;
             tx.commit()?;
         }
+        Ok(())
+    }
+
+    // ---------- profielen ----------
+
+    pub fn profile(&self) -> i64 {
+        self.profile.get()
+    }
+
+    fn profile_exists(&self, id: i64) -> bool {
+        self.conn.query_row("SELECT COUNT(*) FROM profiles WHERE id = ?1", [id], |r| r.get::<_, i64>(0)).unwrap_or(0) > 0
+    }
+
+    pub fn list_profiles(&self) -> Result<Vec<Profile>> {
+        let mut st = self.conn.prepare("SELECT id, name FROM profiles ORDER BY id")?;
+        let rows = st.query_map([], |r| Ok(Profile { id: r.get(0)?, name: r.get(1)? }))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    pub fn create_profile(&mut self, name: &str) -> Result<i64> {
+        let name = clean_name(name)?;
+        self.conn
+            .execute("INSERT INTO profiles (name) VALUES (?1)", [&name])
+            .map_err(|_| CoreError::Invalid("Er bestaat al een profiel met deze naam".into()))?;
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    pub fn set_profile(&mut self, id: i64) -> Result<()> {
+        if !self.profile_exists(id) {
+            return Err(CoreError::NotFound(format!("profiel {id}")));
+        }
+        self.set_setting("active_profile", &id.to_string())?;
+        self.profile.set(id);
+        Ok(())
+    }
+
+    /// Verwijdert een profiel met zijn kijkstatus en geschiedenis. Het standaardprofiel en het actieve profiel blijven.
+    pub fn delete_profile(&mut self, id: i64) -> Result<()> {
+        if id == 1 || id == self.profile() {
+            return Err(CoreError::Invalid("Het standaardprofiel en het actieve profiel kunnen niet worden verwijderd".into()));
+        }
+        let tx = self.conn.transaction()?;
+        tx.execute("DELETE FROM resume WHERE profile_id = ?1", [id])?;
+        tx.execute("DELETE FROM history WHERE profile_id = ?1", [id])?;
+        tx.execute("DELETE FROM profiles WHERE id = ?1", [id])?;
+        tx.commit()?;
         Ok(())
     }
 
@@ -684,30 +786,34 @@ impl Database {
         }
         let t = now();
         let tx = self.conn.transaction()?;
-        tx.execute("INSERT INTO history (location, title, played_at) VALUES (?1, ?2, ?3)", params![location, title, t])?;
+        tx.execute(
+            "INSERT INTO history (location, title, played_at, profile_id) VALUES (?1, ?2, ?3, ?4)",
+            params![location, title, t, self.profile.get()],
+        )?;
         tx.execute("UPDATE media SET play_count = play_count + 1, last_played = ?2 WHERE path = ?1", params![location, t])?;
         tx.commit()?;
         Ok(())
     }
 
     pub fn list_history(&self, limit: u32) -> Result<Vec<HistoryEntry>> {
-        let mut stmt = self.conn.prepare("SELECT id, location, title, played_at FROM history ORDER BY id DESC LIMIT ?1")?;
-        let rows = stmt.query_map([limit.min(1000)], |r| {
+        let mut stmt =
+            self.conn.prepare("SELECT id, location, title, played_at FROM history WHERE profile_id = ?2 ORDER BY id DESC LIMIT ?1")?;
+        let rows = stmt.query_map(params![limit.min(1000), self.profile.get()], |r| {
             Ok(HistoryEntry { id: r.get(0)?, location: r.get(1)?, title: r.get(2)?, played_at: r.get(3)? })
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
     pub fn delete_history_entry(&self, id: i64) -> Result<()> {
-        self.conn.execute("DELETE FROM history WHERE id = ?1", [id])?;
+        self.conn.execute("DELETE FROM history WHERE id = ?1 AND profile_id = ?2", params![id, self.profile.get()])?;
         Ok(())
     }
 
     /// Wist de geschiedenis en de hervatposities. Bibliotheek en favorieten blijven.
     pub fn clear_history(&mut self) -> Result<()> {
         let tx = self.conn.transaction()?;
-        tx.execute("DELETE FROM history", [])?;
-        tx.execute("DELETE FROM resume", [])?;
+        tx.execute("DELETE FROM history WHERE profile_id = ?1", [self.profile.get()])?;
+        tx.execute("DELETE FROM resume WHERE profile_id = ?1", [self.profile.get()])?;
         tx.execute("UPDATE media SET last_played = NULL, play_count = 0", [])?;
         tx.commit()?;
         Ok(())
@@ -722,9 +828,9 @@ impl Database {
             duration_ms > 0 && (position_ms >= duration_ms.saturating_sub(duration_ms / 20) || position_ms + 10_000 >= duration_ms);
         let stored_pos = if completed { 0 } else { position_ms };
         self.conn.execute(
-            "INSERT INTO resume (location, position_ms, duration_ms, completed, updated_at) VALUES (?1,?2,?3,?4,?5)
-             ON CONFLICT(location) DO UPDATE SET position_ms=?2, duration_ms=?3, completed=?4, updated_at=?5",
-            params![location, stored_pos as i64, duration_ms as i64, completed as i64, now()],
+            "INSERT INTO resume (location, position_ms, duration_ms, completed, updated_at, profile_id) VALUES (?1,?2,?3,?4,?5,?6)
+             ON CONFLICT(profile_id, location) DO UPDATE SET position_ms=?2, duration_ms=?3, completed=?4, updated_at=?5",
+            params![location, stored_pos as i64, duration_ms as i64, completed as i64, now(), self.profile.get()],
         )?;
         Ok(())
     }
@@ -733,8 +839,8 @@ impl Database {
         Ok(self
             .conn
             .query_row(
-                "SELECT location, position_ms, duration_ms, completed, updated_at FROM resume WHERE location = ?1",
-                [location],
+                "SELECT location, position_ms, duration_ms, completed, updated_at FROM resume WHERE location = ?1 AND profile_id = ?2",
+                params![location, self.profile.get()],
                 resume_from_row,
             )
             .optional()?)
@@ -742,8 +848,9 @@ impl Database {
 
     /// Alle bewaarde kijkposities (voor synchronisatie tussen pc's).
     pub fn all_resume(&self) -> Result<Vec<ResumePoint>> {
-        let mut stmt = self.conn.prepare("SELECT location, position_ms, duration_ms, completed, updated_at FROM resume")?;
-        let rows = stmt.query_map([], resume_from_row)?;
+        let mut stmt =
+            self.conn.prepare("SELECT location, position_ms, duration_ms, completed, updated_at FROM resume WHERE profile_id = ?1")?;
+        let rows = stmt.query_map([self.profile.get()], resume_from_row)?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
@@ -756,9 +863,9 @@ impl Database {
     /// Schrijft een kijkpositie met een vast tijdstip (voor synchronisatie; `save_resume` gebruikt de huidige tijd).
     pub fn set_resume_exact(&self, location: &str, position_ms: u64, duration_ms: u64, completed: bool, updated_at: i64) -> Result<()> {
         self.conn.execute(
-            "INSERT INTO resume (location, position_ms, duration_ms, completed, updated_at) VALUES (?1,?2,?3,?4,?5)
-             ON CONFLICT(location) DO UPDATE SET position_ms=?2, duration_ms=?3, completed=?4, updated_at=?5",
-            params![location, position_ms as i64, duration_ms as i64, completed as i64, updated_at],
+            "INSERT INTO resume (location, position_ms, duration_ms, completed, updated_at, profile_id) VALUES (?1,?2,?3,?4,?5,?6)
+             ON CONFLICT(profile_id, location) DO UPDATE SET position_ms=?2, duration_ms=?3, completed=?4, updated_at=?5",
+            params![location, position_ms as i64, duration_ms as i64, completed as i64, updated_at, self.profile.get()],
         )?;
         Ok(())
     }
@@ -767,24 +874,24 @@ impl Database {
     pub fn continue_watching(&self, limit: u32) -> Result<Vec<ResumePoint>> {
         let mut stmt = self.conn.prepare(
             "SELECT location, position_ms, duration_ms, completed, updated_at FROM resume
-             WHERE completed = 0 AND position_ms > 5000 ORDER BY updated_at DESC, rowid DESC LIMIT ?1",
+             WHERE profile_id = ?2 AND completed = 0 AND position_ms > 5000 ORDER BY updated_at DESC, rowid DESC LIMIT ?1",
         )?;
-        let rows = stmt.query_map([limit.min(200)], resume_from_row)?;
+        let rows = stmt.query_map(params![limit.min(200), self.profile.get()], resume_from_row)?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
     /// Alle bestanden die als "gezien" zijn gemarkeerd.
     pub fn completed_locations(&self) -> Result<std::collections::HashSet<String>> {
-        let mut st = self.conn.prepare("SELECT location FROM resume WHERE completed = 1")?;
-        let rows = st.query_map([], |r| r.get::<_, String>(0))?;
+        let mut st = self.conn.prepare("SELECT location FROM resume WHERE completed = 1 AND profile_id = ?1")?;
+        let rows = st.query_map([self.profile.get()], |r| r.get::<_, String>(0))?;
         Ok(rows.collect::<std::result::Result<_, _>>()?)
     }
 
     pub fn mark_completed(&self, location: &str, completed: bool) -> Result<()> {
         self.conn.execute(
-            "INSERT INTO resume (location, position_ms, duration_ms, completed, updated_at) VALUES (?1,0,0,?2,?3)
-             ON CONFLICT(location) DO UPDATE SET completed=?2, position_ms=0, updated_at=?3",
-            params![location, completed as i64, now()],
+            "INSERT INTO resume (location, position_ms, duration_ms, completed, updated_at, profile_id) VALUES (?1,0,0,?2,?3,?4)
+             ON CONFLICT(profile_id, location) DO UPDATE SET completed=?2, position_ms=0, updated_at=?3",
+            params![location, completed as i64, now(), self.profile.get()],
         )?;
         Ok(())
     }
@@ -946,6 +1053,46 @@ impl Database {
              ON CONFLICT(location) DO UPDATE SET audio_key=?2, subtitle_key=?3, subtitle_off=?4, updated_at=?5",
             params![location, pref.audio_key, pref.subtitle_key, i64::from(pref.subtitle_off), now()],
         )?;
+        Ok(())
+    }
+
+    pub fn get_rate_pref(&self, key: &str) -> Result<Option<f32>> {
+        Ok(self.conn.query_row("SELECT rate FROM rate_prefs WHERE key = ?1", [key], |r| r.get::<_, f64>(0)).optional()?.map(|r| r as f32))
+    }
+
+    pub fn save_rate_pref(&self, key: &str, rate: f32) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO rate_prefs (key, rate) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET rate = ?2",
+            params![key, f64::from(rate)],
+        )?;
+        Ok(())
+    }
+
+    pub fn watch_done(&self) -> Result<std::collections::HashSet<(String, i64)>> {
+        let mut st = self.conn.prepare("SELECT path, mtime FROM watch_done")?;
+        let rows = st.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    pub fn mark_watch_done(&self, path: &str, mtime: i64) -> Result<()> {
+        self.conn.execute("INSERT OR IGNORE INTO watch_done (path, mtime) VALUES (?1, ?2)", params![path, mtime])?;
+        Ok(())
+    }
+
+    pub fn get_video_prefs(&self, location: &str) -> Result<Option<String>> {
+        Ok(self.conn.query_row("SELECT json FROM video_prefs WHERE location = ?1", [location], |r| r.get(0)).optional()?)
+    }
+
+    pub fn save_video_prefs(&self, location: &str, json: &str) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO video_prefs (location, json) VALUES (?1, ?2) ON CONFLICT(location) DO UPDATE SET json = ?2",
+            params![location, json],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_video_prefs(&self, location: &str) -> Result<()> {
+        self.conn.execute("DELETE FROM video_prefs WHERE location = ?1", [location])?;
         Ok(())
     }
 
@@ -1149,5 +1296,7 @@ fn with_trailing_sep(p: &str) -> String {
     }
 }
 
+#[cfg(test)]
+mod profiles_tests;
 #[cfg(test)]
 mod tests;

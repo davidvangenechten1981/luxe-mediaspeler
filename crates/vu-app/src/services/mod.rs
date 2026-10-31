@@ -6,15 +6,19 @@ pub mod cover;
 pub mod history;
 pub mod library;
 pub mod lyrics;
+pub mod photos;
 pub mod pin;
 pub mod player;
 pub mod playlists;
+pub mod profiles;
 pub mod series;
 pub mod settings;
 pub mod sync;
 pub mod system_action;
 pub mod tags;
 pub mod video;
+pub mod videoprefs;
+pub mod watch;
 
 #[cfg(test)]
 pub mod testutil {

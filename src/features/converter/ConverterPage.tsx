@@ -5,6 +5,7 @@ import { Icon } from "../../components/Icon";
 import { Button, ConfirmDialog, Field, IconButton, Modal, Select, Switch, TextInput } from "../../components/ui";
 import { basename, formatBytes, formatDuration } from "../../lib/format";
 import { hwChoices, hwHint, threadsHint } from "../../lib/hardware";
+import { videoBitrateForSize } from "../../lib/targetSize";
 import { MEDIA_FILTER, SUBTITLE_FILTER, pickFiles, pickFolder } from "../../lib/platform";
 import { useJobs } from "../../state/jobs";
 import { useSettings } from "../../state/settings";
@@ -217,6 +218,12 @@ export function ConverterPage() {
                     <Field label="Beeldsnelheid (fps)" htmlFor="cv-fps"><TextInput id="cv-fps" inputMode="decimal" placeholder="Origineel" value={settings.fps ?? ""} onChange={(e) => set({ fps: num(e.target.value) })} /></Field>
                     <Field label="Kwaliteit (CRF, lager = beter)" htmlFor="cv-q" hint="Leeg = standaard van de codec"><TextInput id="cv-q" inputMode="numeric" placeholder="Standaard" value={settings.quality ?? ""} onChange={(e) => set({ quality: num(e.target.value) })} /></Field>
                     <Field label="Videobitrate (kbit/s)" htmlFor="cv-vb" hint="Heeft voorrang op kwaliteit"><TextInput id="cv-vb" inputMode="numeric" placeholder="Niet instellen" value={settings.video_bitrate_kbps ?? ""} onChange={(e) => set({ video_bitrate_kbps: num(e.target.value) })} /></Field>
+                    <Field label="Doelgrootte (MB)" htmlFor="cv-target" hint={info ? "Berekent de videobitrate voor het gekozen bestand" : "Kies eerst een bestand"}>
+                      <TextInput id="cv-target" inputMode="numeric" placeholder="Niet instellen" disabled={!info} onChange={(e) => {
+                        const v = info ? videoBitrateForSize(Number(e.target.value), info.duration_ms, settings.audio_bitrate_kbps ?? 160) : null;
+                        if (v !== null) set({ video_bitrate_kbps: v });
+                      }} />
+                    </Field>
                     {["h264", "h265", "av1"].includes(settings.video) && (
                       <Field label="Videokaart" htmlFor="cv-hw" hint={hwHint(settings.hw_accel, caps?.hardware.gpus ?? [])}>
                         <Select id="cv-hw" value={settings.hw_accel} onChange={(e) => set({ hw_accel: e.target.value as ConvertSettings["hw_accel"] })}>

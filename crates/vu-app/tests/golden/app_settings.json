@@ -37,6 +37,7 @@
     "aif",
     "m4a"
   ],
+  "high_contrast": false,
   "hw_decoding": "auto",
   "language": "nl",
   "network_caching_ms": 1500,
@@ -95,5 +96,8 @@
   "subtitle_scale": 1.0,
   "sync_folder": null,
   "theme": "dark",
-  "ui_scale": 1.0
+  "tv_mode": false,
+  "ui_scale": 1.0,
+  "watch_dir": null,
+  "watch_profile": null
 }
