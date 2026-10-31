@@ -143,6 +143,13 @@ const MIGRATIONS: &[&str] = &[
     ALTER TABLE resume_new RENAME TO resume;
     CREATE INDEX idx_resume_updated ON resume(updated_at);
     "#,
+    // 6: onthouden afspeelsnelheid per bestand of serie
+    r#"
+    CREATE TABLE rate_prefs (
+        key TEXT PRIMARY KEY,
+        rate REAL NOT NULL
+    );
+    "#,
 ];
 
 pub fn now() -> i64 {
@@ -1030,6 +1037,18 @@ impl Database {
             "INSERT INTO track_prefs (location, audio_key, subtitle_key, subtitle_off, updated_at) VALUES (?1,?2,?3,?4,?5)
              ON CONFLICT(location) DO UPDATE SET audio_key=?2, subtitle_key=?3, subtitle_off=?4, updated_at=?5",
             params![location, pref.audio_key, pref.subtitle_key, i64::from(pref.subtitle_off), now()],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_rate_pref(&self, key: &str) -> Result<Option<f32>> {
+        Ok(self.conn.query_row("SELECT rate FROM rate_prefs WHERE key = ?1", [key], |r| r.get::<_, f64>(0)).optional()?.map(|r| r as f32))
+    }
+
+    pub fn save_rate_pref(&self, key: &str, rate: f32) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO rate_prefs (key, rate) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET rate = ?2",
+            params![key, f64::from(rate)],
         )?;
         Ok(())
     }

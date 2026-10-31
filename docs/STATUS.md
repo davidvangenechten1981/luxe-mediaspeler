@@ -68,3 +68,4 @@ Legenda: **Getest** = geautomatiseerde test met echte ffmpeg/libvlc (Linux) en/o
 - Converter: veld "Doelgrootte (MB)" rekent de videobitrate uit voor het gekozen bestand (met 2% marge). Het blijft een benadering; bij meerdere bestanden geldt de duur van het eerste.
 - Toegankelijkheid: schakelaar "Hoog contrast" (Instellingen). Alleen visueel beoordeeld in code, niet op een echt scherm.
 - Bleek al aanwezig: slaaptimer, automatische reservekopie, export/import van instellingen, diagnose-export, periodiek opnieuw scannen (map volgen via interval, geen live bestandsbewaking).
+- Afspeelsnelheid wordt onthouden per bestand en per serie (databaseschema 6, tabel `rate_prefs`). Een aflevering zonder eigen keuze krijgt de snelheid van zijn serie; een bestand zonder opgeslagen snelheid houdt de huidige snelheid. De snelheid wordt hersteld zodra de sporen bekend zijn (kort na het starten). Niet met echt geluid geprobeerd.

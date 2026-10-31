@@ -244,7 +244,7 @@ mod tests {
         let app = app();
         let d = diagnostics(&app.state, "0.1.0").unwrap();
         assert_eq!(d.app_version, "0.1.0");
-        assert_eq!(d.schema_version, 5);
+        assert_eq!(d.schema_version, 6);
         if app.state.tools.ffmpeg.is_some() {
             assert!(d.ffmpeg.unwrap().starts_with("ffmpeg version"));
             assert!(d.containers.contains(&"mp4".to_string()));

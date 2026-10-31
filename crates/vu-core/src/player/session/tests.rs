@@ -140,6 +140,7 @@ struct StoreInner {
     plays: Vec<String>,
     prefs: HashMap<String, TrackPref>,
     marks: HashMap<String, SkipMarks>,
+    rates: HashMap<String, f32>,
 }
 
 #[derive(Clone, Default)]
@@ -163,6 +164,12 @@ impl Persistence for FakeStore {
     }
     fn save_track_pref(&self, l: &str, p: &TrackPref) {
         self.0.lock().unwrap().prefs.insert(l.into(), p.clone());
+    }
+    fn rate_pref(&self, k: &str) -> Option<f32> {
+        self.0.lock().unwrap().rates.get(k).copied()
+    }
+    fn save_rate_pref(&self, k: &str, r: f32) {
+        self.0.lock().unwrap().rates.insert(k.into(), r);
     }
     fn skip_marks(&self, l: &str) -> Option<SkipMarks> {
         self.0.lock().unwrap().marks.get(l).cloned()
@@ -878,4 +885,49 @@ fn a_new_play_after_the_end_works_and_ends_again_once() {
     s.tick(5_500);
     let ended = s.take_events().iter().filter(|e| matches!(e, SessionEvent::QueueEnded)).count();
     assert_eq!(ended, 1);
+}
+
+// ---------- afspeelsnelheid onthouden ----------
+
+#[test]
+fn a_chosen_speed_is_remembered_for_the_file_and_restored_when_it_plays_again() {
+    let (mut s, engine, store) = setup(&["a"]);
+    with_tracks(&engine);
+    s.set_rate(1.5).unwrap();
+    assert_eq!(store.0.lock().unwrap().rates["/m/a.mp3"], 1.5);
+    engine.with(|i| i.status.rate = 1.0);
+    s.play_items(items(&["a"]), 0).unwrap();
+    with_tracks(&engine);
+    s.tick(1_000);
+    assert_eq!(engine.with(|i| i.status.rate), 1.5);
+}
+
+#[test]
+fn stepping_the_speed_is_remembered_and_unknown_files_keep_the_current_speed() {
+    let (mut s, engine, store) = setup(&["a", "b"]);
+    engine.with(|i| i.status.rate = 1.0);
+    s.step_rate(true).unwrap();
+    assert_eq!(store.0.lock().unwrap().rates["/m/a.mp3"], 1.25);
+    s.skip_next().unwrap();
+    with_tracks(&engine);
+    s.tick(1_000);
+    assert_eq!(engine.with(|i| i.status.rate), 1.25, "b heeft niets opgeslagen: snelheid blijft zoals ze was");
+    assert!(!store.0.lock().unwrap().rates.contains_key("/m/b.mp3"));
+}
+
+#[test]
+fn an_episode_inherits_the_speed_chosen_for_its_series() {
+    let engine = FakeEngine::default();
+    let store = FakeStore::default();
+    let mut s = Session::new(engine.clone(), Box::new(store.clone()), 1);
+    let ep = |n: u32| QueueItem { location: format!("/m/Show.S01E0{n}.mkv"), title: None };
+    s.play_items(vec![ep(1), ep(2)], 0).unwrap();
+    s.take_events();
+    s.set_rate(1.75).unwrap();
+    assert_eq!(store.0.lock().unwrap().rates["serie:show"], 1.75);
+    engine.with(|i| i.status.rate = 1.0);
+    s.skip_next().unwrap();
+    with_tracks(&engine);
+    s.tick(1_000);
+    assert_eq!(engine.with(|i| i.status.rate), 1.75);
 }

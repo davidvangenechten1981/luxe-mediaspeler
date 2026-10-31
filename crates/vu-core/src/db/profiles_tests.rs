@@ -96,3 +96,12 @@ fn renaming_a_file_keeps_every_profiles_position() {
     d.set_profile(1).unwrap();
     assert_eq!(d.get_resume("/n.mkv").unwrap().unwrap().position_ms, 5_000);
 }
+
+#[test]
+fn rate_prefs_roundtrip() {
+    let d = Database::open_in_memory().unwrap();
+    assert_eq!(d.get_rate_pref("/a.mkv").unwrap(), None);
+    d.save_rate_pref("/a.mkv", 1.5).unwrap();
+    d.save_rate_pref("/a.mkv", 2.0).unwrap();
+    assert_eq!(d.get_rate_pref("/a.mkv").unwrap(), Some(2.0));
+}

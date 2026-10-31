@@ -96,6 +96,11 @@ pub trait Persistence: Send + Sync {
         None
     }
     fn save_track_pref(&self, _location: &str, _pref: &TrackPref) {}
+    /// Onthouden afspeelsnelheid voor een bestand (sleutel = pad) of een serie (sleutel = `serie:<naam>`).
+    fn rate_pref(&self, _key: &str) -> Option<f32> {
+        None
+    }
+    fn save_rate_pref(&self, _key: &str, _rate: f32) {}
     fn skip_marks(&self, _location: &str) -> Option<SkipMarks> {
         None
     }
@@ -129,6 +134,14 @@ impl Persistence for Mutex<Database> {
             let _ = db.save_track_pref(location, pref);
         }
     }
+    fn rate_pref(&self, key: &str) -> Option<f32> {
+        self.lock().ok()?.get_rate_pref(key).ok().flatten()
+    }
+    fn save_rate_pref(&self, key: &str, rate: f32) {
+        if let Ok(db) = self.lock() {
+            let _ = db.save_rate_pref(key, rate);
+        }
+    }
     fn skip_marks(&self, location: &str) -> Option<SkipMarks> {
         self.lock().ok()?.get_skip_marks(location).ok().flatten()
     }
@@ -157,6 +170,12 @@ impl<T: Persistence + ?Sized> Persistence for std::sync::Arc<T> {
     }
     fn save_track_pref(&self, location: &str, pref: &TrackPref) {
         (**self).save_track_pref(location, pref)
+    }
+    fn rate_pref(&self, key: &str) -> Option<f32> {
+        (**self).rate_pref(key)
+    }
+    fn save_rate_pref(&self, key: &str, rate: f32) {
+        (**self).save_rate_pref(key, rate)
     }
     fn skip_marks(&self, location: &str) -> Option<SkipMarks> {
         (**self).skip_marks(location)
@@ -574,7 +593,26 @@ impl<E: Engine> Session<E> {
         if !rate.is_finite() || !(0.25..=4.0).contains(&rate) {
             return Err(CoreError::Invalid("De afspeelsnelheid moet tussen 0,25× en 4× liggen".into()));
         }
-        self.engine.set_rate(rate)
+        self.engine.set_rate(rate)?;
+        self.remember_rate(rate);
+        Ok(())
+    }
+
+    /// Onthoudt de snelheid voor dit bestand en, bij een aflevering, voor de hele serie.
+    fn remember_rate(&self, rate: f32) {
+        if let Some(loc) = self.current_location.as_deref() {
+            self.store.save_rate_pref(loc, rate);
+            if let Some(ep) = crate::series::parse_episode(loc) {
+                self.store.save_rate_pref(&format!("serie:{}", ep.show.to_lowercase()), rate);
+            }
+        }
+    }
+
+    fn saved_rate(&self, loc: &str) -> Option<f32> {
+        self.store.rate_pref(loc).or_else(|| {
+            let ep = crate::series::parse_episode(loc)?;
+            self.store.rate_pref(&format!("serie:{}", ep.show.to_lowercase()))
+        })
     }
 
     /// Stap omhoog/omlaag in de vaste snelheidstabel.
@@ -588,7 +626,9 @@ impl<E: Engine> Session<E> {
             (None, true) => RATE_STEPS.iter().copied().find(|r| *r > cur).unwrap_or(4.0),
             (None, false) => RATE_STEPS.iter().rev().copied().find(|r| *r < cur).unwrap_or(0.25),
         };
-        self.engine.set_rate(next)
+        self.engine.set_rate(next)?;
+        self.remember_rate(next);
+        Ok(())
     }
 
     pub fn cycle_audio(&mut self) -> Result<()> {
@@ -680,6 +720,9 @@ impl<E: Engine> Session<E> {
                 self.fail_streak = 0;
                 if self.prefs_pending && (!st.audio_tracks.is_empty() || !st.subtitle_tracks.is_empty()) {
                     self.prefs_pending = false;
+                    if let Some(rate) = self.current_location.as_deref().and_then(|l| self.saved_rate(l)) {
+                        let _ = self.engine.set_rate(rate);
+                    }
                     // Een eerdere keuze van de gebruiker voor dit bestand gaat vóór de algemene voorkeurstalen.
                     let saved = self.current_location.as_deref().and_then(|l| self.store.track_pref(l)).unwrap_or_default();
                     let audio = saved

@@ -335,7 +335,7 @@ mod tests {
         let info = call(&app, json!({"type": "app_info"})).unwrap();
         assert_eq!(info["version"], "0.0.0-test");
         let d = call(&app, json!({"type": "diagnostics"})).unwrap();
-        assert_eq!(d["schema_version"], 5);
+        assert_eq!(d["schema_version"], 6);
     }
 
     #[test]
