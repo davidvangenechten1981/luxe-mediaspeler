@@ -7,7 +7,7 @@ description = "Dynamisch geladen LibVLC-koppeling die de Engine-trait van vu-cor
 
 [dependencies]
 vu-core = { path = "../vu-core" }
-libloading = "0.8"
+libloading = "0.9"
 
 [dev-dependencies]
 tempfile = "3"
