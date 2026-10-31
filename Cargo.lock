@@ -4395,7 +4395,7 @@ dependencies = [
  "vu-app",
  "vu-core",
  "windows 0.58.0",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
  "winreg",
 ]
 
