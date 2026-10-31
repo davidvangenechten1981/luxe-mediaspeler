@@ -5,6 +5,7 @@ import { system } from "./api/client";
 import { onConvertJob, onOpenFiles, onPlayerEvent, onPlayerState, onScanDone, onScanProgress } from "./api/events";
 import { openLocations } from "./lib/actions";
 import { startAutoSync } from "./lib/autoSync";
+import { applyFilePrefs } from "./lib/videoPrefs";
 import { useJobs } from "./state/jobs";
 import { useLibrary } from "./state/library";
 import { useLock } from "./state/lock";
@@ -83,6 +84,16 @@ export async function bootstrap(): Promise<() => void> {
     }, s.periodic_scan_minutes * 60_000);
   }
 
+  // Beeldinstellingen per bestand: bij elk nieuw bestand de bewaarde waarden toepassen (of terugzetten naar neutraal).
+  let lastLoc: string | null = null;
+  const unsubPrefs = usePlayer.subscribe((st) => {
+    const loc = st.view.location ?? null;
+    if (loc && loc !== lastLoc) {
+      lastLoc = loc;
+      void applyFilePrefs(loc).catch(() => undefined);
+    }
+  });
+
   // Bewaakte map: elke 2 minuten nieuwe bestanden oppakken (doet niets zolang er geen map is gekozen).
   const watchTimer = setInterval(() => {
     if (useSettings.getState().settings.watch_dir) void api.watchRun().catch(() => undefined);
@@ -99,6 +110,7 @@ export async function bootstrap(): Promise<() => void> {
     offs.forEach((o) => o());
     if (timer) clearInterval(timer);
     clearInterval(watchTimer);
+    unsubPrefs();
     stopSync();
   };
 }

@@ -105,3 +105,14 @@ fn rate_prefs_roundtrip() {
     d.save_rate_pref("/a.mkv", 2.0).unwrap();
     assert_eq!(d.get_rate_pref("/a.mkv").unwrap(), Some(2.0));
 }
+
+#[test]
+fn video_prefs_roundtrip_and_reset() {
+    let d = Database::open_in_memory().unwrap();
+    assert_eq!(d.get_video_prefs("/a.mkv").unwrap(), None);
+    d.save_video_prefs("/a.mkv", r#"{"brightness":1.2}"#).unwrap();
+    d.save_video_prefs("/a.mkv", r#"{"brightness":1.4}"#).unwrap();
+    assert_eq!(d.get_video_prefs("/a.mkv").unwrap().as_deref(), Some(r#"{"brightness":1.4}"#));
+    d.delete_video_prefs("/a.mkv").unwrap();
+    assert_eq!(d.get_video_prefs("/a.mkv").unwrap(), None);
+}

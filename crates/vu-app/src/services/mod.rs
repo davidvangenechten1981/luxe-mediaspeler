@@ -16,6 +16,7 @@ pub mod sync;
 pub mod system_action;
 pub mod tags;
 pub mod video;
+pub mod videoprefs;
 pub mod watch;
 
 #[cfg(test)]

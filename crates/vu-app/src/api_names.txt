@@ -20,6 +20,8 @@ profile_create
 profile_switch
 profile_delete
 watch_run
+video_prefs_get
+video_prefs_set
 pin_status
 pin_verify
 pin_set

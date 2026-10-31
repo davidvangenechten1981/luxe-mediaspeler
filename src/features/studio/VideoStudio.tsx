@@ -9,6 +9,7 @@ import { SUBTITLE_FILTER, fileSrc, pickFiles } from "../../lib/platform";
 import { useAsync } from "../../lib/useAsync";
 import { usePlayer } from "../../state/player";
 import { reportError, toast, useUi } from "../../state/ui";
+import { markDirty, NEUTRAL, saveFilePrefs } from "../../lib/videoPrefs";
 import { useCurrentInfo } from "../shell/useCurrentInfo";
 
 const ADJUSTS: { id: AdjustChoice; label: string; min: number; max: number; step: number; neutral: number }[] = [
@@ -53,6 +54,12 @@ export function VideoStudioPage() {
   const loc = view.location;
   const video = info?.streams.find((s) => s.kind === "video" && !["mjpeg", "png"].includes(s.codec));
   const [values, setValues] = useState<Record<AdjustChoice, number>>({ brightness: 1, contrast: 1, saturation: 1, gamma: 1, hue: 0 });
+  useEffect(() => {
+    if (!loc) return;
+    let alive = true;
+    void api.videoPrefsGet(loc).then((p) => alive && setValues({ ...NEUTRAL, ...(p ?? {}) })).catch(() => undefined);
+    return () => { alive = false; };
+  }, [loc]);
   const [aspect, setAspect] = useState("");
   const [crop, setCrop] = useState("");
   const [rotation, setRotation] = useState<RotationChoice>("none");
@@ -152,11 +159,11 @@ export function VideoStudioPage() {
             {ADJUSTS.map((a) => (
               <div key={a.id} className="row">
                 <span style={{ width: 100 }} className="muted">{a.label}</span>
-                <div className="grow"><Slider label={a.label} min={a.min} max={a.max} step={a.step} value={values[a.id]} disabled={!video} format={(v) => String(Math.round(v * 100) / 100).replace(".", ",")} onChange={(v) => setValues((s) => ({ ...s, [a.id]: v }))} onCommit={(v) => void guard(() => api.videoAdjust(a.id, v))} /></div>
+                <div className="grow"><Slider label={a.label} min={a.min} max={a.max} step={a.step} value={values[a.id]} disabled={!video} format={(v) => String(Math.round(v * 100) / 100).replace(".", ",")} onChange={(v) => setValues((s) => ({ ...s, [a.id]: v }))} onCommit={(v) => void guard(async () => { await api.videoAdjust(a.id, v); markDirty(); if (loc) await saveFilePrefs(loc, { ...values, [a.id]: v }); })} /></div>
                 <span className="mono faint" style={{ width: 44, textAlign: "right" }}>{String(Math.round(values[a.id] * 100) / 100).replace(".", ",")}</span>
               </div>
             ))}
-            <div><Button size="sm" variant="ghost" icon="refresh" disabled={!video} onClick={() => { const n = Object.fromEntries(ADJUSTS.map((a) => [a.id, a.neutral])) as Record<AdjustChoice, number>; setValues(n); void guard(async () => { for (const a of ADJUSTS) await api.videoAdjust(a.id, a.neutral); }); }}>Beeld herstellen</Button></div>
+            <div><Button size="sm" variant="ghost" icon="refresh" disabled={!video} onClick={() => { const n = Object.fromEntries(ADJUSTS.map((a) => [a.id, a.neutral])) as Record<AdjustChoice, number>; setValues(n); void guard(async () => { for (const a of ADJUSTS) await api.videoAdjust(a.id, a.neutral); if (loc) await saveFilePrefs(loc, {}); }); }}>Beeld herstellen</Button></div>
           </div>
         </Panel>
 

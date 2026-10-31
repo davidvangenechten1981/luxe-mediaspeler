@@ -158,6 +158,13 @@ const MIGRATIONS: &[&str] = &[
         PRIMARY KEY (path, mtime)
     );
     "#,
+    // 8: beeldinstellingen per bestand
+    r#"
+    CREATE TABLE video_prefs (
+        location TEXT PRIMARY KEY,
+        json TEXT NOT NULL
+    );
+    "#,
 ];
 
 pub fn now() -> i64 {
@@ -1069,6 +1076,23 @@ impl Database {
 
     pub fn mark_watch_done(&self, path: &str, mtime: i64) -> Result<()> {
         self.conn.execute("INSERT OR IGNORE INTO watch_done (path, mtime) VALUES (?1, ?2)", params![path, mtime])?;
+        Ok(())
+    }
+
+    pub fn get_video_prefs(&self, location: &str) -> Result<Option<String>> {
+        Ok(self.conn.query_row("SELECT json FROM video_prefs WHERE location = ?1", [location], |r| r.get(0)).optional()?)
+    }
+
+    pub fn save_video_prefs(&self, location: &str, json: &str) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO video_prefs (location, json) VALUES (?1, ?2) ON CONFLICT(location) DO UPDATE SET json = ?2",
+            params![location, json],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_video_prefs(&self, location: &str) -> Result<()> {
+        self.conn.execute("DELETE FROM video_prefs WHERE location = ?1", [location])?;
         Ok(())
     }
 
