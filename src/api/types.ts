@@ -444,6 +444,13 @@ export interface LaunchRequest {
   enqueue: boolean;
 }
 
+export interface Photo {
+  path: string;
+  name: string;
+  modified: number;
+  size: number;
+}
+
 export interface SeriesEpisode {
   media: Media;
   season: number;

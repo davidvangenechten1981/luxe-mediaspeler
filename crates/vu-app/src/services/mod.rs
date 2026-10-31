@@ -6,6 +6,7 @@ pub mod cover;
 pub mod history;
 pub mod library;
 pub mod lyrics;
+pub mod photos;
 pub mod pin;
 pub mod player;
 pub mod playlists;

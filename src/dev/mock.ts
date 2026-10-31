@@ -261,6 +261,7 @@ async function handle(request: Record<string, unknown>): Promise<unknown> {
     case "profile_create": return 3;
     case "video_prefs_get": return null;
     case "video_prefs_set": return null;
+    case "photos_list": return [{ path: "D:\\Foto\\strand.jpg", name: "strand.jpg", modified: now - 100, size: 2_400_000 }];
     case "watch_run": return { queued: 0, rejected: 0 };
     case "profile_switch": case "profile_delete": return null;
     case "history_enabled": return true;

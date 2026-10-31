@@ -5,8 +5,8 @@
 //! Er bestaat geen manier om een shellcommando of een vrij FFmpeg-argument mee te geven.
 
 use crate::services::{
-    audio, converter, cover, history, library, lyrics, pin, player, playlists, profiles, series, settings, sync, tags, video, videoprefs,
-    watch,
+    audio, converter, cover, history, library, lyrics, photos, pin, player, playlists, profiles, series, settings, sync, tags, video,
+    videoprefs, watch,
 };
 use crate::state::AppState;
 use serde::Deserialize;
@@ -47,6 +47,7 @@ pub enum Request {
     PinSet { new_pin: Option<String>, current: Option<String> },
     SyncRun,
     WatchRun,
+    PhotosList,
     VideoPrefsGet { location: String },
     VideoPrefsSet { location: String, values: std::collections::BTreeMap<String, f32> },
     SystemAction { action: crate::services::system_action::SystemAction },
@@ -195,6 +196,7 @@ pub fn handle(st: &AppState, req: Request) -> Result<Value> {
         SyncRun => json_of(sync::run(st)?),
         VideoPrefsGet { location } => json_of(videoprefs::get(st, &location)?),
         VideoPrefsSet { location, values } => videoprefs::set(st, &location, &values).and_then(|_| unit()),
+        PhotosList => json_of(photos::list(st)?),
         WatchRun => json_of(watch::run(st)?),
         ProfileList => json_of(profiles::list(st)?),
         ProfileCreate { name } => json_of(profiles::create(st, &name)?),

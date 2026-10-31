@@ -29,6 +29,7 @@ import { windowApi } from "./lib/platform";
 import { actionFor } from "./lib/shortcuts";
 import { usePlayer } from "./state/player";
 import { useSleep } from "./state/sleep";
+import { PhotosPage } from "./features/pages/PhotosPage";
 import { useTvNav } from "./lib/useTvNav";
 import { useSettings } from "./state/settings";
 import { reportError, useUi, type PageId } from "./state/ui";
@@ -40,6 +41,7 @@ const PAGE_VIEW: Record<PageId, () => ReactElement> = {
   music: MusicPage,
   all_media: AllMediaPage,
   series: SeriesPage,
+  photos: PhotosPage,
   playlists: PlaylistsPage,
   smart_lists: SmartListsPage,
   favorites: FavoritesPage,
