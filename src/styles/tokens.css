@@ -106,3 +106,14 @@
   outline: 3px solid var(--accent-strong);
   outline-offset: 2px;
 }
+
+/* Tv-modus: grotere aanraak- en focusdoelen. De lettergrootte wordt in applyAppearance vergroot. */
+:root[data-tv="true"] button,
+:root[data-tv="true"] [role="button"],
+:root[data-tv="true"] select {
+  min-height: 2.75rem;
+}
+:root[data-tv="true"] :focus-visible {
+  outline: 4px solid var(--accent-strong);
+  outline-offset: 3px;
+}

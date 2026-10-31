@@ -10,6 +10,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   ui_scale: 1,
   compact: false,
   high_contrast: false,
+  tv_mode: false,
   always_on_top: false,
   language: "nl",
   seek_short_s: 5,
@@ -65,10 +66,11 @@ export function applyAppearance(s: AppSettings, doc: Document = document, prefer
   const theme = s.theme === "system" ? (prefersDark ? "dark" : "light") : s.theme;
   root.dataset.theme = theme;
   root.dataset.compact = s.compact ? "true" : "false";
+  root.dataset.tv = s.tv_mode ? "true" : "false";
   root.dataset.contrast = s.high_contrast ? "high" : "normal";
   root.style.setProperty("--accent", s.accent);
   root.style.setProperty("--ui-scale", String(s.ui_scale));
-  root.style.fontSize = `${16 * s.ui_scale}px`;
+  root.style.fontSize = `${16 * s.ui_scale * (s.tv_mode ? 1.4 : 1)}px`;
 }
 
 export const useSettings = create<SettingsState>((set, get) => ({

@@ -44,6 +44,8 @@ pub struct AppSettings {
     pub compact: bool,
     /// Sterker contrast en dikkere randen (toegankelijkheid).
     pub high_contrast: bool,
+    /// Tv-modus: grotere interface en bediening met de pijltjestoetsen.
+    pub tv_mode: bool,
     pub always_on_top: bool,
     pub language: String,
     // afspelen
@@ -138,6 +140,7 @@ impl Default for AppSettings {
             ui_scale: 1.0,
             compact: false,
             high_contrast: false,
+            tv_mode: false,
             always_on_top: false,
             language: "nl".into(),
             seek_short_s: 5,

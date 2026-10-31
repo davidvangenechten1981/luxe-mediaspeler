@@ -346,6 +346,7 @@ export interface AppSettings {
   ui_scale: number;
   compact: boolean;
   high_contrast: boolean;
+  tv_mode: boolean;
   always_on_top: boolean;
   language: string;
   seek_short_s: number;

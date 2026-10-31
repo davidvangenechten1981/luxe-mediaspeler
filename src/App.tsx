@@ -29,6 +29,7 @@ import { windowApi } from "./lib/platform";
 import { actionFor } from "./lib/shortcuts";
 import { usePlayer } from "./state/player";
 import { useSleep } from "./state/sleep";
+import { useTvNav } from "./lib/useTvNav";
 import { useSettings } from "./state/settings";
 import { reportError, useUi, type PageId } from "./state/ui";
 
@@ -76,6 +77,7 @@ function UrlDialog({ onClose }: { onClose: () => void }) {
 export function App() {
   const { page, fullscreen, theater, mini, dialog, setDialog, crashText, setCrashText } = useUi();
   const loaded = useSettings((s) => s.loaded);
+  useTvNav(useSettings((s) => s.settings.tv_mode));
   const view = usePlayer((s) => s.view);
   const lock = useLock();
   const normalSize = useRef<{ w: number; h: number } | null>(null);
