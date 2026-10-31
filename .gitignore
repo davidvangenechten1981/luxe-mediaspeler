@@ -1,0 +1,15 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+vlc/
+*.log
+__pycache__/
+.superpowers/
+/target/
+/resources/vlc/*
+!/resources/vlc/.gitkeep
+/resources/ffmpeg/*
+!/resources/ffmpeg/.gitkeep
+*.egg-info/
+__pycache__/

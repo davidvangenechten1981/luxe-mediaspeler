@@ -1,0 +1,18 @@
+{
+  "error": null,
+  "eta_s": 30,
+  "finished_at": null,
+  "fraction": 0.4,
+  "id": 1,
+  "input": "/m/a.mkv",
+  "mode": "transcode",
+  "output": "/o/a.mp4",
+  "paused": false,
+  "profile": "Compacte video",
+  "speed": 2.5,
+  "started_at": 1,
+  "state": "running",
+  "warnings": [
+    "let op"
+  ]
+}

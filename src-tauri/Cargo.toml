@@ -1,0 +1,45 @@
+[package]
+name = "vlc-ultimate"
+version = "0.1.0"
+description = "VLC Ultimate - Ultimate Studio Edition"
+edition = "2021"
+rust-version = "1.85"
+license = "GPL-3.0-or-later"
+
+[lib]
+name = "vlc_ultimate_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[features]
+default = ["core"]
+# De kern (SQLite, FFmpeg, LibVLC) kan uit voor een snelle Windows-typecontrole op Linux.
+core = ["dep:vu-app", "dep:vu-core"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-global-shortcut = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+vu-app = { path = "../crates/vu-app", optional = true }
+vu-core = { path = "../crates/vu-core", optional = true }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_System_LibraryLoader",
+  "Win32_System_Power",
+  "Win32_System_Threading",
+  "Win32_UI_WindowsAndMessaging",
+] }
+winreg = "0.56"
+windows = { version = "0.58", features = ["Foundation", "Media", "Win32_Foundation", "Win32_System_WinRT"] }
+
+[dev-dependencies]
+tempfile = "3"

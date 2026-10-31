@@ -1,0 +1,28 @@
+{
+  "description": "Kleiner bestand: H.264, maximaal 720p.",
+  "id": "compact",
+  "name": "Compacte video",
+  "settings": {
+    "audio": "aac",
+    "audio_bitrate_kbps": 128,
+    "audio_channels": null,
+    "burn_external_subtitle": false,
+    "burn_subtitle_track": null,
+    "container": "mp4",
+    "equalizer": null,
+    "external_subtitle": null,
+    "external_subtitle_language": null,
+    "fps": null,
+    "hw_accel": "auto",
+    "keep_metadata": true,
+    "max_height": 720,
+    "normalize_audio": false,
+    "quality": 28,
+    "subtitles": "keep",
+    "threads": null,
+    "trim_end_ms": null,
+    "trim_start_ms": null,
+    "video": "h264",
+    "video_bitrate_kbps": null
+  }
+}

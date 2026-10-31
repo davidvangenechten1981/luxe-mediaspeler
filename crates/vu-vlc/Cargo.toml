@@ -1,0 +1,13 @@
+[package]
+name = "vu-vlc"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Dynamisch geladen LibVLC-koppeling die de Engine-trait van vu-core implementeert"
+
+[dependencies]
+vu-core = { path = "../vu-core" }
+libloading = "0.8"
+
+[dev-dependencies]
+tempfile = "3"

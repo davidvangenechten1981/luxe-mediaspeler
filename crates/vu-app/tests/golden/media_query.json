@@ -1,0 +1,21 @@
+{
+  "added_since": null,
+  "added_within_days": null,
+  "album": null,
+  "artist": null,
+  "container": null,
+  "descending": false,
+  "favorite_only": false,
+  "genre": null,
+  "include_missing": false,
+  "kind": null,
+  "limit": null,
+  "max_duration_ms": null,
+  "min_duration_ms": null,
+  "min_height": null,
+  "offset": null,
+  "played_only": false,
+  "sort": "title",
+  "text": null,
+  "unplayed_only": false
+}
