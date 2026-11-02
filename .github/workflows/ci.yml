@@ -127,7 +127,7 @@ jobs:
           $setup = Get-ChildItem -Recurse target/release/bundle/nsis -Filter *-setup.exe | Select-Object -First 1
           ./scripts/ci/lifecycle-check.ps1 -Setup $setup.FullName
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: windows-resultaten
