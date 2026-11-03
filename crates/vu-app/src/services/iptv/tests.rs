@@ -269,6 +269,27 @@ fn an_xtream_source_loads_live_movies_and_series_and_hides_the_credentials() {
     // de gebruikersnaam en het wachtwoord zijn wel (alleen) in de opslag te vinden
     assert!(a.state.secrets.get(&format!("source-{}-xtream", src.id)).unwrap().unwrap().contains("hunter2"));
 
+    // de database bewaart alleen een neutrale verwijzing; de echte URL wordt pas bij het afspelen gebouwd
+    {
+        let db = a.state.lock_db().unwrap();
+        let stored = db.list_iptv_channels(&IptvChannelQuery { include_hidden: true, ..Default::default() }).unwrap();
+        for c in &stored {
+            assert!(!c.url.contains("gebruiker9") && !c.url.contains("hunter2"), "{} bewaart inloggegevens: {}", c.name, c.url);
+        }
+    }
+    if a.state.player.is_ok() {
+        play_channel(&a.state, list[0].id).unwrap();
+        assert!(
+            wait_until(10, || s.hits.lock().unwrap().iter().any(|h| h.starts_with("/live/gebruiker9/hunter2/101.ts"))),
+            "live-URL met inlog"
+        );
+        play_catchup(&a.state, list[0].id, now() - 7200, now() - 3600).unwrap();
+        assert!(
+            wait_until(10, || s.hits.lock().unwrap().iter().any(|h| h.starts_with("/timeshift/gebruiker9/hunter2/60/"))),
+            "timeshift-URL met inlog"
+        );
+    }
+
     // series: afleveringen ophalen, daarna afspelen
     let eps = series_episodes(&a.state, list[3].id).unwrap();
     assert_eq!(eps, vec![EpisodeInfo { id: "9001".into(), season: 1, episode: 1, title: "Begin".into(), extension: "mkv".into() }]);
@@ -286,7 +307,8 @@ fn a_wrong_xtream_login_is_reported_without_the_password() {
     let src = add_xtream(&a.state, "Fout", &s.url(""), "jan", "wrong").unwrap();
     let err = refresh_source(&a.state, src.id).unwrap_err().to_string();
     assert!(err.contains("Inloggen is mislukt"), "{err}");
-    assert!(!err.contains("wrong") || !err.contains("password=wrong"), "{err}");
+    assert!(!err.contains("password=wrong"), "{err}");
+    assert_eq!(err.matches("Ongeldige invoer").count(), 1, "de melding herhaalt het voorvoegsel niet: {err}");
     let stored = sources(&a.state).unwrap()[0].last_error.clone().unwrap();
     assert!(!stored.contains("password=wrong"), "{stored}");
 }
@@ -469,4 +491,9 @@ fn missed_and_cancelled_recordings_get_the_right_status() {
     assert_eq!(planned.status, "planned");
     recording_cancel(&a.state, planned.id).unwrap();
     assert_eq!(a.state.lock_db().unwrap().iptv_recording(planned.id).unwrap().unwrap().status, "cancelled");
+
+    // stoppen verandert een al afgeronde of mislukte opname niet (die status blijft kloppen)
+    recording_cancel(&a.state, id).unwrap();
+    assert_eq!(a.state.lock_db().unwrap().iptv_recording(id).unwrap().unwrap().status, "failed");
+    assert!(recording_cancel(&a.state, 99_999).is_err(), "onbekende opname");
 }

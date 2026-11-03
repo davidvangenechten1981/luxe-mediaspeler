@@ -57,6 +57,27 @@ fn xtream_account(st: &AppState, id: i64) -> Result<xtream::Account> {
     xtream::Account::new(&s.server, &s.username, &s.password)
 }
 
+/// De melding zonder het voorvoegsel "Ongeldige invoer: " (dat zou anders dubbel in de interface komen).
+fn plain_message(e: &CoreError) -> String {
+    let s = e.to_string();
+    s.strip_prefix("Ongeldige invoer: ").map_or_else(|| s.clone(), str::to_string)
+}
+
+/// Zet een opgeslagen verwijzing om in de echte stream-URL. Bij Xtream staat in de database alleen
+/// `xtream:<bron>:<soort>:<id>:<extensie>`; gebruikersnaam en wachtwoord komen uit de Credential Manager.
+fn real_url(st: &AppState, stored: &str) -> Result<String> {
+    let Some(rest) = stored.strip_prefix("xtream:") else { return Ok(stored.to_string()) };
+    let parts: Vec<&str> = rest.split(':').collect();
+    let [source, kind, id, ext] = parts.as_slice() else { return Err(CoreError::Invalid("Onbekende zenderverwijzing".into())) };
+    let source: i64 = source.parse().map_err(|_| CoreError::Invalid("Onbekende zenderverwijzing".into()))?;
+    let acct = xtream_account(st, source)?;
+    match *kind {
+        "live" => Ok(acct.live_url(id, ext)),
+        "movie" => Ok(acct.movie_url(id, ext)),
+        _ => Err(CoreError::Invalid("Onbekende zenderverwijzing".into())),
+    }
+}
+
 fn allow_local(st: &AppState) -> Result<bool> {
     Ok(st.settings()?.allow_local_streams)
 }
@@ -257,7 +278,7 @@ fn load_xtream(st: &AppState, src: &IptvSource) -> Result<Loaded> {
     for s in xtream::parse_live_streams(&call(Some("get_live_streams"))?)? {
         channels.push(NewChannel {
             kind: "live".into(),
-            url: acct.live_url(&s.stream_id, "ts"),
+            url: format!("xtream:{}:live:{}:ts", src.id, s.stream_id),
             group: s.category_id.as_ref().and_then(|c| cats.get(c)).cloned(),
             logo: s.logo,
             tvg_id: s.epg_channel_id,
@@ -275,7 +296,7 @@ fn load_xtream(st: &AppState, src: &IptvSource) -> Result<Loaded> {
             for v in vods {
                 channels.push(NewChannel {
                     kind: "movie".into(),
-                    url: acct.movie_url(&v.stream_id, &v.extension),
+                    url: format!("xtream:{}:movie:{}:{}", src.id, v.stream_id, v.extension),
                     group: v.category_id.as_ref().and_then(|c| vod_cats.get(c)).cloned(),
                     logo: v.poster,
                     remote_id: Some(format!("movie:{}", v.stream_id)),
@@ -318,7 +339,7 @@ pub fn refresh_source(st: &AppState, id: i64) -> Result<RefreshReport> {
             Ok(RefreshReport { source_id: id, channels: n, skipped: loaded.skipped, guide_link_found })
         }
         Err(e) => {
-            let msg = mask::mask_text(&e.to_string());
+            let msg = mask::mask_text(plain_message(&e).as_str());
             st.lock_db()?.set_iptv_source_status(id, None, Some(&msg))?;
             Err(CoreError::Invalid(msg))
         }
@@ -485,7 +506,8 @@ pub fn play_channel(st: &AppState, id: i64) -> Result<IptvChannel> {
         return Err(CoreError::Invalid("Kies eerst een aflevering van deze serie".into()));
     }
     let ua = ch.user_agent.clone().or(source_ua);
-    start_stream(st, format!("iptv://channel/{id}"), ch.name.clone(), &ch.url, ua.as_deref(), ch.referrer.as_deref())?;
+    let url = real_url(st, &ch.url)?;
+    start_stream(st, format!("iptv://channel/{id}"), ch.name.clone(), &url, ua.as_deref(), ch.referrer.as_deref())?;
     st.lock_db()?.touch_iptv_watched(id, now())?;
     Ok(ch)
 }
@@ -533,8 +555,9 @@ pub fn play_catchup(st: &AppState, id: i64, start: i64, stop: i64) -> Result<Ipt
             return Err(CoreError::Invalid(format!("Dit programma ligt buiten het archief van {days} dagen")));
         }
     }
+    let stream_url = real_url(st, &ch.url)?;
     let url = catchup::build_url(&catchup::CatchupRequest {
-        stream_url: &ch.url,
+        stream_url: &stream_url,
         mode: &mode,
         source: ch.catchup_source.as_deref(),
         start,
@@ -670,7 +693,8 @@ fn start_recording(st: &AppState, rec: &IptvRecording) -> Result<()> {
     let target = record::unique_path(&dir, &record::file_name(&rec.channel_name, &rec.title, rec.start));
     let part = PathBuf::from(format!("{}.part", target.display()));
     let remaining = (rec.stop - now()).max(1) as u64;
-    let args = record::build_args(&rec.url, rec.user_agent.as_deref(), rec.referrer.as_deref(), &part, remaining);
+    let url = real_url(st, &rec.url)?;
+    let args = record::build_args(&url, rec.user_agent.as_deref(), rec.referrer.as_deref(), &part, remaining);
     let child = vu_core::proc::background(ffmpeg)
         .args(&args)
         .stdin(Stdio::null())
@@ -767,7 +791,12 @@ pub fn recording_cancel(st: &AppState, id: i64) -> Result<()> {
                 Some(if kept { "Gestopt, het opgenomen deel is bewaard" } else { "Gestopt" }),
             )
         }
-        None => db.set_iptv_recording_status(id, "cancelled", None, None),
+        // geen lopend proces: alleen een geplande (of door een crash blijven hangende) opname kan nog worden gestopt
+        None => match db.iptv_recording(id)? {
+            Some(r) if r.status == "planned" || r.status == "recording" => db.set_iptv_recording_status(id, "cancelled", None, None),
+            Some(_) => Ok(()),
+            None => Err(CoreError::NotFound("opname".into())),
+        },
     }
 }
 
