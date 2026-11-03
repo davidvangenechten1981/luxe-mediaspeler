@@ -33,7 +33,7 @@ function ChannelLogo({ channel }: { channel: IptvChannel }) {
   }, [show, channel.id, channel.logo]);
   return (
     <span aria-hidden="true" style={{ width: 36, height: 36, borderRadius: 8, display: "grid", placeItems: "center", background: "var(--surface-2, rgba(128,128,128,.2))", fontWeight: 600, fontSize: "var(--fs-xs)", flex: "none", overflow: "hidden" }}>
-      {src ? <img src={src} alt="" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} /> : initials(channel.name)}
+      {src ? <img src={src} alt="" onError={() => setSrc(null)} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} /> : initials(channel.name)}
     </span>
   );
 }

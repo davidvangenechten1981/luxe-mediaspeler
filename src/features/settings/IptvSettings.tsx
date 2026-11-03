@@ -46,10 +46,10 @@ export function IptvSettings() {
         </div>
       </Row>
       <Row title="Huidige VPN-status" hint="Dit is een controle op adapternamen en de route van je verkeer; hij is geen garantie.">
-        <span role="status" className={`badge ${vpn?.active ? "badge--success" : ""}`}>
+        <span role="status" className={`badge ${vpn?.active ? "badge--success" : ""}`} style={{ marginBottom: 6, display: "inline-block" }}>
           {!vpn ? "Controleren…" : !vpn.checked ? "Niet te controleren" : vpn.active ? `Actief${vpn.adapter ? ` · ${vpn.adapter}` : ""}` : "Geen VPN"}
         </span>
-        {vpn && <span className="field__hint" style={{ display: "block" }}>{vpn.detail}</span>}
+        {vpn && <span className="field__hint" style={{ display: "block", textAlign: "right" }}>{vpn.detail}</span>}
       </Row>
       <Row title="Map voor opnames" hint="Opnames worden zonder hercoderen bewaard als .ts-bestand.">
         <div className="row">

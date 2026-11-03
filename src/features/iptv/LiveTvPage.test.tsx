@@ -59,6 +59,16 @@ describe("LiveTvPage", () => {
     expect(screen.getByText("TW")).toBeTruthy(); // zonder bestand: initialen
   });
 
+  it("valt terug op initialen als het logobestand niet laadt", async () => {
+    useSettings.setState({ settings: { ...DEFAULT_SETTINGS, iptv_show_logos: true } });
+    vi.spyOn(api, "iptvLogo").mockImplementation(async (id) => (id === 1 ? "C:/cache/thumbnails/logos/een.png" : null));
+    const { container } = render(<LiveTvPage />);
+    await waitFor(() => expect(container.querySelectorAll("img")).toHaveLength(1));
+    fireEvent.error(container.querySelector("img")!);
+    await waitFor(() => expect(container.querySelectorAll("img")).toHaveLength(0));
+    expect(screen.getByText("EE")).toBeTruthy();
+  });
+
   it("toont de VPN-status: actief, ontbrekend en verplicht", async () => {
     const check = vi.spyOn(api, "iptvVpnCheck");
     check.mockResolvedValue({ ...noVpn, active: true, adapter: "NordLynx", detail: "Je internetverkeer loopt via de VPN" });
