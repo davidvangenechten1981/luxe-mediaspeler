@@ -99,6 +99,14 @@ export async function bootstrap(): Promise<() => void> {
     if (useSettings.getState().settings.watch_dir) void api.watchRun().catch(() => undefined);
   }, 120_000);
 
+  // IPTV: elke 30 s geplande opnames starten, klare opnames afronden en herinneringen melden.
+  const iptvTimer = setInterval(() => {
+    void api
+      .iptvTick()
+      .then((r) => r.reminders.forEach((m) => toast.info(`Herinnering: ${m.title} (${m.channel_name}) begint zo`)))
+      .catch(() => undefined);
+  }, 30_000);
+
   // Kijkstatus delen met een andere pc: meteen en daarna elke 10 minuten, zolang er een map is gekozen.
   const stopSync = startAutoSync({
     folder: () => useSettings.getState().settings.sync_folder,
@@ -107,6 +115,7 @@ export async function bootstrap(): Promise<() => void> {
   });
 
   return () => {
+    clearInterval(iptvTimer);
     offs.forEach((o) => o());
     if (timer) clearInterval(timer);
     clearInterval(watchTimer);

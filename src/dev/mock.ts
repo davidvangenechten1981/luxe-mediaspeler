@@ -3,7 +3,7 @@
 
 import { emitLocal, EVENTS } from "../api/events";
 import { setCommandTransport } from "../api/client";
-import type { AppSettings, EqConfig, EqPreset, JobSnapshot, Media, MediaQuery, PlaybackState, Playlist, PlaylistItem, Profile, SessionView } from "../api/types";
+import type { AppSettings, EqConfig, EqPreset, IptvChannel, IptvChannelQuery, IptvProgramme, IptvRecording, IptvReminder, IptvSource, JobSnapshot, Media, MediaQuery, PlaybackState, Playlist, PlaylistItem, Profile, SessionView } from "../api/types";
 import { DEFAULT_SETTINGS } from "../state/settings";
 import { IDLE_VIEW } from "../state/player";
 
@@ -226,6 +226,32 @@ function svgThumb(seed: string): string {
 
 const ok = null;
 
+// ---------- IPTV (nepgegevens voor de browser) ----------
+const iptvSources: IptvSource[] = [
+  { id: 1, name: "Thuis (voorbeeld)", kind: "m3u_file", location: "D:\\Lijsten\\tv.m3u", epg_location: "", user_agent: null, last_refresh: now - 600, last_error: null, channel_count: 6 },
+];
+const iptvChannels: IptvChannel[] = [
+  { name: "Een", group: "Nieuws", number: 1, epg: "een.nl", catchup: 3, kind: "live" },
+  { name: "Twee", group: "Nieuws", number: 2, epg: "twee.nl", catchup: null, kind: "live" },
+  { name: "Sport 1", group: "Sport", number: 3, epg: "sport1", catchup: 7, kind: "live" },
+  { name: "Klassiek FM", group: "Radio", number: 10, epg: null, catchup: null, kind: "live" },
+  { name: "Voorbeeldfilm", group: "Films", number: null, epg: null, catchup: null, kind: "movie" },
+  { name: "Voorbeeldserie", group: "Series", number: null, epg: null, catchup: null, kind: "series" },
+].map((c, i) => ({
+  id: i + 1, source_id: 1, number: c.number, name: c.name, kind: c.kind as IptvChannel["kind"], group: c.group, logo: null, tvg_id: c.epg, radio: c.name === "Klassiek FM",
+  catchup_mode: c.catchup ? "shift" : null, catchup_days: c.catchup, epg_id: c.epg, epg_manual: false, favorite: i === 0, hidden: false, last_watched: null,
+}));
+const hour = Math.floor(now / 3600) * 3600;
+const iptvProgrammes = (epg: string): IptvProgramme[] =>
+  ["Journaal", "Weerbericht", "Film van de week", "Sportmagazine", "Documentaire", "Nachtprogramma"].map((title, i) => ({
+    epg_id: epg, start: hour - 3600 + i * 3600, stop: hour + i * 3600, title: `${title}`, desc: i % 2 ? null : "Een voorbeeldbeschrijving van dit programma.",
+  }));
+const iptvRecordings: IptvRecording[] = [
+  { id: 1, channel_name: "Een", title: "Journaal", start: now - 7200, stop: now - 3600, status: "done", path: "D:\\Opnames\\Een - Journaal.ts", message: null },
+];
+const iptvReminders: IptvReminder[] = [];
+
+
 async function handle(request: Record<string, unknown>): Promise<unknown> {
   const type = request.type as string;
   const r = request as Record<string, never>;
@@ -263,6 +289,47 @@ async function handle(request: Record<string, unknown>): Promise<unknown> {
     case "video_prefs_set": return null;
     case "photos_list": return [{ path: "D:\\Foto\\strand.jpg", name: "strand.jpg", modified: now - 100, size: 2_400_000 }];
     case "watch_run": return { queued: 0, rejected: 0 };
+    case "iptv_sources": return iptvSources;
+    case "iptv_source_add_url": case "iptv_source_add_file": case "iptv_source_add_xtream": return { ...iptvSources[0]!, id: iptvSources.length + 1, name: r.name as string };
+    case "iptv_source_update": return iptvSources[0];
+    case "iptv_source_delete": return null;
+    case "iptv_source_refresh": return { source_id: r.id as number, channels: iptvChannels.length, skipped: 0, guide_link_found: false };
+    case "iptv_guide_refresh": return { programmes: 36, matched: 3, errors: [] };
+    case "iptv_channels": {
+      const q = r.query as IptvChannelQuery;
+      const term = (q.search ?? "").toLowerCase();
+      return iptvChannels.filter((c) => (!q.kind || c.kind === q.kind) && (!q.group || c.group === q.group) && (!q.favorites_only || c.favorite) && (!term || c.name.toLowerCase().includes(term)));
+    }
+    case "iptv_groups": {
+      const counts = new Map<string, number>();
+      iptvChannels.filter((c) => c.kind === r.kind && c.group).forEach((c) => counts.set(c.group!, (counts.get(c.group!) ?? 0) + 1));
+      return [...counts.entries()].map(([name, count]) => ({ name, count }));
+    }
+    case "iptv_channel_favorite": { const c = iptvChannels.find((x) => x.id === r.id); if (c) c.favorite = r.value as boolean; return null; }
+    case "iptv_channel_hide": { const c = iptvChannels.find((x) => x.id === r.id); if (c) c.hidden = r.value as boolean; return null; }
+    case "iptv_recent": return iptvChannels.filter((c) => c.last_watched !== null);
+    case "iptv_play": case "iptv_play_catchup": return iptvChannels.find((x) => x.id === r.id) ?? iptvChannels[0];
+    case "iptv_play_number": return iptvChannels.find((x) => x.number === r.number) ?? iptvChannels[0];
+    case "iptv_zap": { const live = iptvChannels.filter((c) => c.kind === "live"); const i = live.findIndex((c) => c.id === r.from); return live[(i + (r.step as number) + live.length) % live.length]; }
+    case "iptv_series_episodes": return [{ id: "1", season: 1, episode: 1, title: "Begin", extension: "mkv" }, { id: "2", season: 1, episode: 2, title: "Vervolg", extension: "mkv" }];
+    case "iptv_play_episode": return null;
+    case "iptv_now_next": return (r.ids as number[]).flatMap((id) => {
+      const c = iptvChannels.find((x) => x.id === id);
+      if (!c?.epg_id) return [];
+      const list = iptvProgrammes(c.epg_id);
+      return [{ channel_id: id, now: list.find((p) => p.start <= now && p.stop > now) ?? null, next: list.find((p) => p.start > now) ?? null }];
+    });
+    case "iptv_guide": { const c = iptvChannels.find((x) => x.id === r.id); return c?.epg_id ? iptvProgrammes(c.epg_id) : []; }
+    case "iptv_epg_channels": return [{ id: "een.nl", name: "Een" }, { id: "twee.nl", name: "Twee" }];
+    case "iptv_epg_set": return null;
+    case "iptv_search_programmes": return iptvProgrammes("een.nl").filter((p) => p.title.toLowerCase().includes((r.term as string).toLowerCase()));
+    case "iptv_reminder_add": { const m: IptvReminder = { id: iptvReminders.length + 1, channel_id: r.channel_id as number, channel_name: iptvChannels.find((x) => x.id === r.channel_id)?.name ?? "?", title: r.title as string, start: r.start as number, notified: false }; iptvReminders.push(m); return m; }
+    case "iptv_reminders": return iptvReminders;
+    case "iptv_reminder_delete": return null;
+    case "iptv_recording_add": case "iptv_record_now": return { id: iptvRecordings.length + 1, channel_name: "Een", title: (r.title as string | undefined) ?? "Opname", start: now, stop: now + 3600, status: "recording", path: null, message: null };
+    case "iptv_recordings": return iptvRecordings;
+    case "iptv_recording_cancel": case "iptv_recording_delete": return null;
+    case "iptv_tick": return { reminders: [], recordings_changed: false };
     case "profile_switch": case "profile_delete": return null;
     case "history_enabled": return true;
     case "library_folder_status": return [{ path: "D:\\Media", online: true }, { path: "\\\\nas\\films", online: false }];

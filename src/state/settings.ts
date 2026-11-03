@@ -31,6 +31,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   sync_folder: null,
   watch_dir: null,
   watch_profile: null,
+  iptv_record_dir: null,
   network_caching_ms: 1500,
   allow_local_streams: false,
   online_metadata: false,

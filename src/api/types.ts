@@ -367,6 +367,7 @@ export interface AppSettings {
   sync_folder: string | null;
   watch_dir: string | null;
   watch_profile: string | null;
+  iptv_record_dir: string | null;
   network_caching_ms: number;
   allow_local_streams: boolean;
   online_metadata: boolean;
@@ -512,3 +513,65 @@ export interface DuplicateGroup {
   keep_id: number;
   items: Media[];
 }
+
+// ---------- IPTV ----------
+export interface IptvSource {
+  id: number;
+  name: string;
+  kind: "m3u_url" | "m3u_file" | "xtream";
+  location: string;
+  epg_location: string;
+  user_agent: string | null;
+  last_refresh: number | null;
+  last_error: string | null;
+  channel_count: number;
+}
+export type IptvKind = "live" | "movie" | "series" | "episode";
+export interface IptvChannel {
+  id: number;
+  source_id: number;
+  number: number | null;
+  name: string;
+  kind: IptvKind;
+  group: string | null;
+  logo: string | null;
+  tvg_id: string | null;
+  radio: boolean;
+  catchup_mode: string | null;
+  catchup_days: number | null;
+  epg_id: string | null;
+  epg_manual: boolean;
+  favorite: boolean;
+  hidden: boolean;
+  last_watched: number | null;
+}
+export interface IptvChannelQuery {
+  source_id?: number | null;
+  kind?: IptvKind | null;
+  group?: string | null;
+  search?: string | null;
+  favorites_only?: boolean;
+  include_hidden?: boolean;
+  limit?: number | null;
+  offset?: number | null;
+}
+export interface IptvGroup { name: string; count: number }
+export interface IptvProgramme { epg_id: string; start: number; stop: number; title: string; desc: string | null }
+export interface IptvNowNext { channel_id: number; now: IptvProgramme | null; next: IptvProgramme | null }
+export type IptvRecordingStatus = "planned" | "recording" | "done" | "failed" | "cancelled";
+export interface IptvRecording {
+  id: number;
+  channel_name: string;
+  title: string;
+  start: number;
+  stop: number;
+  status: IptvRecordingStatus;
+  path: string | null;
+  message: string | null;
+}
+export interface IptvReminder { id: number; channel_id: number | null; channel_name: string; title: string; start: number; notified: boolean }
+export interface IptvRefreshReport { source_id: number; channels: number; skipped: number; guide_link_found: boolean }
+export interface IptvGuideReport { programmes: number; matched: number; errors: string[] }
+export interface IptvTick { reminders: IptvReminder[]; recordings_changed: boolean }
+export interface IptvEpisode { id: string; season: number; episode: number; title: string; extension: string }
+export interface IptvEpgChannel { id: string; name: string }

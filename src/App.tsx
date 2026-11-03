@@ -30,6 +30,9 @@ import { actionFor } from "./lib/shortcuts";
 import { usePlayer } from "./state/player";
 import { useSleep } from "./state/sleep";
 import { PhotosPage } from "./features/pages/PhotosPage";
+import { GuidePage } from "./features/iptv/GuidePage";
+import { LiveTvPage } from "./features/iptv/LiveTvPage";
+import { RecordingsPage } from "./features/iptv/RecordingsPage";
 import { useTvNav } from "./lib/useTvNav";
 import { useSettings } from "./state/settings";
 import { reportError, useUi, type PageId } from "./state/ui";
@@ -49,6 +52,9 @@ const PAGE_VIEW: Record<PageId, () => ReactElement> = {
   most_played: MostPlayedPage,
   recently_added: RecentlyAddedPage,
   continue: ContinuePage,
+  live_tv: LiveTvPage,
+  tv_guide: GuidePage,
+  recordings: RecordingsPage,
   audio_studio: AudioStudioPage,
   video_studio: VideoStudioPage,
   converter: ConverterPage,
