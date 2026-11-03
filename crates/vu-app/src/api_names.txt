@@ -146,3 +146,5 @@ iptv_recordings
 iptv_recording_cancel
 iptv_recording_delete
 iptv_tick
+iptv_vpn_check
+iptv_logo

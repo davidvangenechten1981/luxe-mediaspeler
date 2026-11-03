@@ -30,6 +30,7 @@ import { actionFor } from "./lib/shortcuts";
 import { usePlayer } from "./state/player";
 import { useSleep } from "./state/sleep";
 import { PhotosPage } from "./features/pages/PhotosPage";
+import { ChannelKeys } from "./features/iptv/channelKeys";
 import { GuidePage } from "./features/iptv/GuidePage";
 import { LiveTvPage } from "./features/iptv/LiveTvPage";
 import { RecordingsPage } from "./features/iptv/RecordingsPage";
@@ -223,6 +224,7 @@ export function App() {
           <div className="content is-video grow" data-tauri-drag-region onDoubleClick={() => useUi.getState().setMini(false)} />
           <PlayerBar />
         </div>
+        <ChannelKeys />
         <Toasts />
       </div>
     );
@@ -243,6 +245,7 @@ export function App() {
       {dialog === "shortcuts" && <ShortcutsDialog onClose={() => setDialog(null)} />}
       {crashText && <CrashDialog text={crashText} onClose={() => setCrashText(null)} />}
       {dropping && <div className="drop-overlay" aria-hidden="true">Laat los om af te spelen</div>}
+      <ChannelKeys />
       <Toasts />
     </div>
   );

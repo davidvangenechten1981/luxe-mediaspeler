@@ -15,7 +15,7 @@ use vu_core::db::{
     IptvChannel, IptvChannelQuery, IptvGroup, IptvProgramme, IptvRecording, IptvReminder, IptvSource, NewChannel, NewRecording, NowNext,
 };
 use vu_core::error::{CoreError, Result};
-use vu_core::iptv::{catchup, epg, mask, playlist, record, xtream};
+use vu_core::iptv::{catchup, epg, localtime, logo, mask, playlist, record, vpn, xtream};
 use vu_core::player::queue::QueueItem;
 use vu_core::validate::{validate_path_shape, validate_stream_url};
 
@@ -91,7 +91,130 @@ fn http_url(st: &AppState, url: &str) -> Result<String> {
 }
 
 fn get(st: &AppState, url: &str, user_agent: Option<&str>) -> Result<Vec<u8>> {
+    vpn_guard(st)?;
     net::fetch(url, user_agent, allow_local(st)?)
+}
+
+// ---------- VPN ----------
+
+const NO_VPN: &str = "Geen VPN actief";
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct VpnCheck {
+    #[serde(flatten)]
+    pub status: vpn::VpnStatus,
+    /// Staat de instelling "alleen met VPN" aan?
+    pub required: bool,
+    /// Is er door deze controle een stream of opname gestopt?
+    pub stopped: bool,
+}
+
+fn vpn_status(st: &AppState) -> Result<(vpn::VpnStatus, bool)> {
+    let s = st.settings()?;
+    let status = (st.vpn_probe)(s.iptv_vpn_name.as_deref().unwrap_or(""));
+    Ok((status, s.iptv_require_vpn))
+}
+
+/// `Some(melding)` als de VPN-eis aanstaat en er geen werkende VPN is.
+fn vpn_blocked(st: &AppState) -> Result<Option<String>> {
+    let (status, required) = vpn_status(st)?;
+    if !required || (status.checked && status.active) {
+        return Ok(None);
+    }
+    Ok(Some(if status.checked {
+        format!("{NO_VPN}: {}. Start je VPN, of zet de VPN-eis uit bij Instellingen → IPTV.", status.detail)
+    } else {
+        format!(
+            "De VPN-controle kon niet worden uitgevoerd ({}). Zet de VPN-eis uit bij Instellingen → IPTV als je zonder controle wilt streamen.",
+            status.detail
+        )
+    }))
+}
+
+fn vpn_guard(st: &AppState) -> Result<()> {
+    match vpn_blocked(st)? {
+        Some(m) => Err(CoreError::Invalid(m)),
+        None => Ok(()),
+    }
+}
+
+/// Stopt alle lopende opnames en bewaart wat is opgenomen. Geeft `true` als er iets gestopt is.
+fn stop_recorders(st: &AppState, why: &str) -> bool {
+    let running: Vec<(i64, Recorder)> = match st.iptv.recorders.lock() {
+        Ok(mut m) => m.drain().collect(),
+        Err(_) => return false,
+    };
+    let any = !running.is_empty();
+    for (id, mut r) in running {
+        let _ = r.child.kill();
+        let _ = r.child.wait();
+        let kept = finalize(&r.part, &r.target);
+        if let Ok(db) = st.lock_db() {
+            let _ = if kept {
+                db.set_iptv_recording_status(
+                    id,
+                    "done",
+                    Some(&r.target.to_string_lossy()),
+                    Some(&format!("{why} Het opgenomen deel is bewaard.")),
+                )
+            } else {
+                db.set_iptv_recording_status(id, "failed", None, Some(why))
+            };
+        }
+    }
+    any
+}
+
+/// Controleert de VPN. Is de VPN verplicht en niet actief, dan stopt dit ook een lopende IPTV-stream en lopende opnames (kill switch).
+pub fn vpn_check(st: &AppState) -> Result<VpnCheck> {
+    let (status, required) = vpn_status(st)?;
+    let mut stopped = false;
+    if required && !(status.checked && status.active) {
+        if let Ok(p) = &st.player {
+            let playing_iptv = p.view().ok().and_then(|v| v.location).is_some_and(|l| l.starts_with("iptv://"));
+            if playing_iptv {
+                let _ = p.with(|s| s.stop());
+                stopped = true;
+            }
+        }
+        stopped |= stop_recorders(st, "Gestopt: de VPN is verbroken.");
+    }
+    Ok(VpnCheck { status, required, stopped })
+}
+
+// ---------- logo's ----------
+
+/// Het bestand van het logo van een zender, als logo's aanstaan en het logo is opgehaald. Anders `None`
+/// (de interface toont dan initialen). Opgehaalde plaatjes staan in een submap van de miniaturencache.
+pub fn logo_path(st: &AppState, id: i64) -> Result<Option<String>> {
+    if !st.settings()?.iptv_show_logos {
+        return Ok(None);
+    }
+    let Some(url) = st.lock_db()?.iptv_channel(id)?.and_then(|c| c.logo).filter(|u| !u.trim().is_empty()) else { return Ok(None) };
+    let dir = st.dirs.thumbnails().join("logos");
+    let name = logo::cache_name(&url);
+    for ext in ["png", "jpg", "gif", "webp"] {
+        let p = dir.join(format!("{name}.{ext}"));
+        if p.is_file() {
+            return Ok(Some(p.to_string_lossy().into_owned()));
+        }
+    }
+    let marker = dir.join(format!("{name}.none"));
+    if marker.exists() || vpn_blocked(st)?.is_some() {
+        return Ok(None);
+    }
+    std::fs::create_dir_all(&dir)?;
+    let fetched = net::fetch_with_limit(&url, None, allow_local(st)?, logo::MAX_LOGO_BYTES as u64);
+    let ext = fetched.as_ref().ok().and_then(|b| logo::sniff_ext(b));
+    let (Ok(bytes), Some(ext)) = (fetched, ext) else {
+        let _ = std::fs::write(&marker, b"");
+        return Ok(None);
+    };
+    let target = dir.join(format!("{name}.{ext}"));
+    let temp = dir.join(format!("{name}.part"));
+    std::fs::write(&temp, &bytes)?;
+    std::fs::rename(&temp, &target)?;
+    Ok(Some(target.to_string_lossy().into_owned()))
 }
 
 // ---------- bronnen ----------
@@ -485,6 +608,7 @@ fn header_options(user_agent: Option<&str>, referrer: Option<&str>) -> Vec<Strin
 }
 
 fn start_stream(st: &AppState, token: String, title: String, url: &str, user_agent: Option<&str>, referrer: Option<&str>) -> Result<()> {
+    vpn_guard(st)?;
     validate_stream_url(url, allow_local(st)?)?;
     let player = st.require_player()?;
     let item =
@@ -690,7 +814,8 @@ fn start_recording(st: &AppState, rec: &IptvRecording) -> Result<()> {
         return Err(CoreError::Invalid("Er is te weinig vrije schijfruimte voor een opname (minder dan 2 GB)".into()));
     }
     let ffmpeg = st.require_ffmpeg()?.to_path_buf();
-    let target = record::unique_path(&dir, &record::file_name(&rec.channel_name, &rec.title, rec.start));
+    let target =
+        record::unique_path(&dir, &record::file_name(&rec.channel_name, &rec.title, rec.start + localtime::offset_secs(rec.start)));
     let part = PathBuf::from(format!("{}.part", target.display()));
     let remaining = (rec.stop - now()).max(1) as u64;
     let url = real_url(st, &rec.url)?;
@@ -767,6 +892,11 @@ pub fn tick(st: &AppState) -> Result<TickResult> {
             changed = true;
         } else if rec.start <= t + 2 {
             changed = true;
+            // zonder VPN (als die verplicht is) wacht een geplande opname tot de VPN terug is
+            if let Some(msg) = vpn_blocked(st)? {
+                st.lock_db()?.set_iptv_recording_status(rec.id, "planned", None, Some(&msg))?;
+                continue;
+            }
             if let Err(e) = start_recording(st, rec) {
                 st.lock_db()?.set_iptv_recording_status(rec.id, "failed", None, Some(&mask::mask_text(&e.to_string())))?;
             }

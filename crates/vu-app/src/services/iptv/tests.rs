@@ -445,6 +445,9 @@ fn recording_needs_a_folder_then_copies_the_stream_to_a_ts_file() {
     let done = wait_for_status(&a, rec.id, "done");
     assert_eq!(done.status, "done", "{:?}", done.message);
     let path = std::path::PathBuf::from(done.path.clone().unwrap());
+    let (y, mo, d, h, mi, _) = utc_parts(done.start + localtime::offset_secs(done.start));
+    let stamp = format!("{y:04}{mo:02}{d:02}-{h:02}{mi:02}");
+    assert!(path.file_name().unwrap().to_string_lossy().contains(&stamp), "de bestandsnaam gebruikt lokale tijd ({stamp}): {path:?}");
     assert!(path.extension().is_some_and(|e| e == "ts") && std::fs::metadata(&path).unwrap().len() > 1000, "{path:?}");
     assert!(!std::path::Path::new(&format!("{}.part", path.display())).exists(), "het .part-bestand is hernoemd");
     assert!(!serde_json::to_string(&recordings(&a.state).unwrap()).unwrap().contains("jan/pw"), "de URL gaat niet naar de interface");
@@ -496,4 +499,198 @@ fn missed_and_cancelled_recordings_get_the_right_status() {
     recording_cancel(&a.state, id).unwrap();
     assert_eq!(a.state.lock_db().unwrap().iptv_recording(id).unwrap().unwrap().status, "failed");
     assert!(recording_cancel(&a.state, 99_999).is_err(), "onbekende opname");
+}
+
+// ---------- VPN ----------
+
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+
+/// Zet een neppe VPN-controle in de app; de teruggegeven schakelaar bepaalt of de VPN "actief" is.
+fn vpn_switch(a: &mut TestApp, checked: bool) -> Arc<AtomicBool> {
+    let active = Arc::new(AtomicBool::new(false));
+    let flag = active.clone();
+    a.state.vpn_probe = Box::new(move |_| vpn::VpnStatus {
+        checked,
+        active: flag.load(Ordering::SeqCst),
+        adapter: flag.load(Ordering::SeqCst).then(|| "TestVPN".to_string()),
+        detail: if flag.load(Ordering::SeqCst) {
+            "Je internetverkeer loopt via de VPN".into()
+        } else {
+            "Geen actieve VPN-adapter gevonden".into()
+        },
+    });
+    active
+}
+
+fn set_require_vpn(a: &TestApp, on: bool) {
+    let mut s = app_settings::get(&a.state).unwrap().0;
+    s.iptv_require_vpn = on;
+    app_settings::save(&a.state, &s).unwrap();
+}
+
+#[test]
+fn nothing_connects_without_a_vpn_when_the_vpn_is_required() {
+    let mut a = app();
+    allow_local_streams(&a);
+    let vpn_on = vpn_switch(&mut a, true);
+    let s =
+        serve(HashMap::from([("/lijst.m3u".to_string(), ("text/plain".to_string(), m3u("http://127.0.0.1:1/live/jan/pw").into_bytes()))]));
+    let src = add_m3u_url(&a.state, "Via link", &s.url("/lijst.m3u"), None, None).unwrap();
+
+    set_require_vpn(&a, true);
+    let err = refresh_source(&a.state, src.id).unwrap_err().to_string();
+    assert!(err.contains("Geen VPN actief"), "{err}");
+    assert!(s.hits.lock().unwrap().is_empty(), "er is niets opgehaald zonder VPN");
+    assert!(refresh_guide(&a.state).is_err());
+    let status = vpn_check(&a.state).unwrap();
+    assert!(status.required && !status.status.active && !status.stopped, "{status:?}");
+
+    // met VPN werkt alles
+    vpn_on.store(true, Ordering::SeqCst);
+    assert_eq!(refresh_source(&a.state, src.id).unwrap().channels, 3);
+    let status = vpn_check(&a.state).unwrap();
+    assert!(status.status.active && status.status.adapter.as_deref() == Some("TestVPN"), "{status:?}");
+
+    // de eis uit: ook zonder VPN
+    vpn_on.store(false, Ordering::SeqCst);
+    set_require_vpn(&a, false);
+    assert_eq!(refresh_source(&a.state, src.id).unwrap().channels, 3);
+    assert!(!vpn_check(&a.state).unwrap().stopped);
+}
+
+#[test]
+fn an_unavailable_vpn_check_blocks_when_required_and_says_why() {
+    let mut a = app();
+    let _ = vpn_switch(&mut a, false);
+    set_require_vpn(&a, true);
+    let file = a.dir.path().join("l.m3u");
+    std::fs::write(&file, m3u("http://prov.example/live/jan/pw")).unwrap();
+    let src = add_m3u_file(&a.state, "L", file.to_str().unwrap(), None).unwrap();
+    refresh_source(&a.state, src.id).unwrap(); // een lokaal bestand gebruikt het netwerk niet
+    let id = all_channels(&a)[0].id;
+    let err = play_channel(&a.state, id).unwrap_err().to_string();
+    assert!(err.contains("VPN-controle kon niet worden uitgevoerd"), "{err}");
+}
+
+#[test]
+fn the_kill_switch_stops_a_live_stream_when_the_vpn_drops() {
+    let mut a = app();
+    if a.state.player.is_err() {
+        eprintln!("OVERGESLAGEN: geen LibVLC beschikbaar");
+        return;
+    }
+    allow_local_streams(&a);
+    let vpn_on = vpn_switch(&mut a, true);
+    vpn_on.store(true, Ordering::SeqCst);
+    set_require_vpn(&a, true);
+    let s = media_server();
+    let list = imported_channels(&a, &s);
+    play_channel(&a.state, list[0].id).unwrap();
+    let token = format!("iptv://channel/{}", list[0].id);
+    assert!(wait_until(10, || current(&a).as_deref() == Some(token.as_str())));
+    assert!(!vpn_check(&a.state).unwrap().stopped, "met VPN blijft de stream lopen");
+
+    vpn_on.store(false, Ordering::SeqCst);
+    let c = vpn_check(&a.state).unwrap();
+    assert!(c.stopped, "{c:?}");
+    assert!(
+        wait_until(10, || !matches!(
+            a.state.player.as_ref().unwrap().view().unwrap().status.state,
+            vu_core::player::session::PlaybackState::Playing
+        )),
+        "de stream is gestopt"
+    );
+    assert!(play_channel(&a.state, list[0].id).is_err(), "opnieuw starten zonder VPN lukt niet");
+}
+
+#[test]
+fn a_planned_recording_waits_for_the_vpn_and_then_starts() {
+    let mut a = app();
+    if a.state.tools.ffmpeg.is_none() {
+        eprintln!("OVERGESLAGEN: geen FFmpeg beschikbaar");
+        return;
+    }
+    allow_local_streams(&a);
+    let vpn_on = vpn_switch(&mut a, true);
+    set_require_vpn(&a, true);
+    let out = a.dir.path().join("opnames");
+    let mut settings = app_settings::get(&a.state).unwrap().0;
+    settings.iptv_record_dir = Some(out.to_string_lossy().into_owned());
+    app_settings::save(&a.state, &settings).unwrap();
+    let s = media_server();
+    let list = imported_channels(&a, &s);
+
+    let rec = record_now(&a.state, list[0].id, 1).unwrap();
+    assert_eq!(rec.status, "planned", "zonder VPN wacht de opname");
+    assert!(rec.message.as_deref().unwrap_or("").contains("Geen VPN actief"), "{:?}", rec.message);
+    assert!(s.hits.lock().unwrap().is_empty());
+
+    vpn_on.store(true, Ordering::SeqCst);
+    let done = wait_for_status(&a, rec.id, "done");
+    assert_eq!(done.status, "done", "{:?}", done.message);
+    assert!(done.path.is_some());
+}
+
+// ---------- logo's ----------
+
+fn png() -> Vec<u8> {
+    let mut b = vec![0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
+    b.extend_from_slice(&[0; 32]);
+    b
+}
+
+#[test]
+fn logos_are_only_fetched_when_enabled_checked_and_cached() {
+    let mut a = app();
+    allow_local_streams(&a);
+    let s = serve(HashMap::from([
+        ("/goed.png".to_string(), ("image/png".to_string(), png())),
+        ("/fout.png".to_string(), ("text/html".to_string(), b"<html>geen plaatje</html>".to_vec())),
+    ]));
+    let list = format!(
+        "#EXTM3U\n#EXTINF:-1 tvg-logo=\"{u}/goed.png\",Goed\nhttp://prov.example/1\n#EXTINF:-1 tvg-logo=\"{u}/fout.png\",Fout\nhttp://prov.example/2\n#EXTINF:-1,Zonder\nhttp://prov.example/3\n",
+        u = format!("http://127.0.0.1:{}", s.port)
+    );
+    let file = a.dir.path().join("l.m3u");
+    std::fs::write(&file, list).unwrap();
+    let src = add_m3u_file(&a.state, "L", file.to_str().unwrap(), None).unwrap();
+    refresh_source(&a.state, src.id).unwrap();
+    let by = |n: &str| all_channels(&a).into_iter().find(|c| c.name == n).unwrap().id;
+    let (goed, fout, zonder) = (by("Goed"), by("Fout"), by("Zonder"));
+
+    // standaard uit: niets ophalen
+    assert_eq!(logo_path(&a.state, goed).unwrap(), None);
+    assert!(s.hits.lock().unwrap().is_empty(), "logo's staan standaard uit: er is geen verbinding gemaakt");
+
+    let mut settings = app_settings::get(&a.state).unwrap().0;
+    settings.iptv_show_logos = true;
+    app_settings::save(&a.state, &settings).unwrap();
+    let path = logo_path(&a.state, goed).unwrap().expect("logo opgehaald");
+    assert!(path.ends_with(".png") && std::fs::metadata(&path).unwrap().len() > 8, "{path}");
+    assert!(path.contains("thumbnails"), "binnen de map die de interface mag lezen: {path}");
+    assert_eq!(logo_path(&a.state, goed).unwrap().as_deref(), Some(path.as_str()));
+    assert_eq!(s.hits.lock().unwrap().len(), 1, "de tweede keer komt uit de cache");
+
+    // geen plaatje: geen bestand en niet nog eens proberen
+    assert_eq!(logo_path(&a.state, fout).unwrap(), None);
+    assert_eq!(logo_path(&a.state, fout).unwrap(), None);
+    assert_eq!(s.hits.lock().unwrap().len(), 2, "een mislukt logo wordt niet steeds opnieuw geprobeerd");
+    assert_eq!(logo_path(&a.state, zonder).unwrap(), None);
+
+    // zonder VPN (als die verplicht is) wordt er niets opgehaald
+    let _ = vpn_switch(&mut a, true);
+    set_require_vpn(&a, true);
+    let other = a.dir.path().join("l2.m3u");
+    std::fs::write(
+        &other,
+        format!("#EXTM3U\n#EXTINF:-1 tvg-logo=\"http://127.0.0.1:{}/goed.png?v=2\",Nieuw\nhttp://prov.example/9\n", s.port),
+    )
+    .unwrap();
+    let src2 = add_m3u_file(&a.state, "L2", other.to_str().unwrap(), None).unwrap();
+    refresh_source(&a.state, src2.id).unwrap();
+    let nieuw = all_channels(&a).into_iter().find(|c| c.name == "Nieuw").unwrap().id;
+    let before = s.hits.lock().unwrap().len();
+    assert_eq!(logo_path(&a.state, nieuw).unwrap(), None);
+    assert_eq!(s.hits.lock().unwrap().len(), before, "geen verbinding zonder VPN");
 }

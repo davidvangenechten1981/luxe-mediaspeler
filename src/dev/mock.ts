@@ -330,6 +330,8 @@ async function handle(request: Record<string, unknown>): Promise<unknown> {
     case "iptv_recordings": return iptvRecordings;
     case "iptv_recording_cancel": case "iptv_recording_delete": return null;
     case "iptv_tick": return { reminders: [], recordings_changed: false };
+    case "iptv_vpn_check": return { checked: true, active: false, adapter: null, detail: "Geen actieve VPN-adapter gevonden", required: false, stopped: false };
+    case "iptv_logo": return null;
     case "profile_switch": case "profile_delete": return null;
     case "history_enabled": return true;
     case "library_folder_status": return [{ path: "D:\\Media", online: true }, { path: "\\\\nas\\films", online: false }];

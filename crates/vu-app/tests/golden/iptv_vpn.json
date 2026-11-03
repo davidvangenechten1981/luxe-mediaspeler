@@ -1,0 +1,8 @@
+{
+  "active": true,
+  "adapter": "NordLynx",
+  "checked": true,
+  "detail": "Je internetverkeer loopt via de VPN",
+  "required": true,
+  "stopped": false
+}

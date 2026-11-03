@@ -22,6 +22,7 @@ import iptvNowNext from "../../crates/vu-app/tests/golden/iptv_now_next.json";
 import iptvRecording from "../../crates/vu-app/tests/golden/iptv_recording.json";
 import iptvReminder from "../../crates/vu-app/tests/golden/iptv_reminder.json";
 import iptvReports from "../../crates/vu-app/tests/golden/iptv_reports.json";
+import iptvVpn from "../../crates/vu-app/tests/golden/iptv_vpn.json";
 import type {
   AppSettings,
   Bookmark,
@@ -40,6 +41,7 @@ import type {
   IptvReminder,
   IptvSource,
   IptvTick,
+  IptvVpn,
   JobSnapshot,
   Media,
   MediaInfo,
@@ -92,7 +94,7 @@ const jobShape: Shape<JobSnapshot> = {
 const settingsShape: Shape<AppSettings> = {
   theme: true, accent: true, ui_scale: true, compact: true, high_contrast: true, tv_mode: true, always_on_top: true, language: true, seek_short_s: true,
   seek_long_s: true, default_volume: true, resume_playback: true, hw_decoding: true, preferred_audio_languages: true,
-  preferred_subtitle_languages: true, subtitle_scale: true, subtitle_color: true, subtitle_encoding: true, autoplay_next_delay_s: true, crossfade_ms: true, normalize_realtime: true, replay_gain: true, sync_folder: true, watch_dir: true, watch_profile: true, iptv_record_dir: true, audio_passthrough: true,
+  preferred_subtitle_languages: true, subtitle_scale: true, subtitle_color: true, subtitle_encoding: true, autoplay_next_delay_s: true, crossfade_ms: true, normalize_realtime: true, replay_gain: true, sync_folder: true, watch_dir: true, watch_profile: true, iptv_record_dir: true, iptv_require_vpn: true, iptv_vpn_name: true, iptv_show_logos: true, audio_passthrough: true,
   network_caching_ms: true, allow_local_streams: true, online_metadata: true, online_subtitle_search: true, scan_on_startup: true,
   periodic_scan_minutes: true, extensions: true, convert_output_dir: true, convert_template: true, convert_overwrite: true,
   convert_parallel: true, shortcuts: true,
@@ -128,6 +130,7 @@ describe("contract met de Rust-backend", () => {
     same<IptvGuideReport>(iptvReports.guide, { programmes: true, matched: true, errors: true });
     same<IptvTick>(iptvReports.tick, { reminders: true, recordings_changed: true });
     same<IptvEpisode>(iptvReports.episode, { id: true, season: true, episode: true, title: true, extension: true });
+    same<IptvVpn>(iptvVpn, { checked: true, active: true, adapter: true, detail: true, required: true, stopped: true });
     expect(JSON.stringify([iptvChannel, iptvRecording])).not.toMatch(/geheim|gebruiker/);
   });
 

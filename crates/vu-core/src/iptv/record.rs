@@ -33,9 +33,10 @@ pub fn free_bytes(dir: &Path) -> Option<u64> {
     fs4::available_space(dir).ok()
 }
 
-/// Bestandsnaam zonder map: `Zender - Titel - 20261103-1015.ts` (veilig voor Windows).
-pub fn file_name(channel: &str, title: &str, start_utc: i64) -> String {
-    let (y, mo, d, h, mi, _) = crate::iptv::catchup::utc_parts(start_utc);
+/// Bestandsnaam zonder map: `Zender - Titel - 20261103-1015.ts` (veilig voor Windows). `start_local` is de starttijd
+/// als lokale tijd (UTC-seconden plus het verschil met de tijdzone, zie `localtime::offset_secs`).
+pub fn file_name(channel: &str, title: &str, start_local: i64) -> String {
+    let (y, mo, d, h, mi, _) = crate::iptv::catchup::utc_parts(start_local);
     let mut name = sanitize_file_name(&format!("{channel} - {title}"));
     name = name.chars().take(120).collect();
     format!("{name} - {y:04}{mo:02}{d:02}-{h:02}{mi:02}.ts")
@@ -81,7 +82,7 @@ mod tests {
     }
 
     #[test]
-    fn file_names_are_windows_safe_and_dated_in_utc() {
+    fn file_names_are_windows_safe_and_use_the_given_clock_time() {
         assert_eq!(file_name("Een: HD", "Nieuws/Weer?", 1_793_700_900), "Een_ HD - Nieuws_Weer_ - 20261103-1015.ts");
         let long = file_name(&"k".repeat(300), "t", 0);
         assert!(long.len() < 150 && long.ends_with("19700101-0000.ts"));

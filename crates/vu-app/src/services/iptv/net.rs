@@ -34,6 +34,11 @@ fn curl_quote(value: &str) -> Result<String> {
 
 /// Haalt `url` op en geeft de bytes terug. `allow_local` komt uit de instelling "lokale streams toestaan".
 pub fn fetch(url: &str, user_agent: Option<&str>, allow_local: bool) -> Result<Vec<u8>> {
+    fetch_with_limit(url, user_agent, allow_local, MAX_DOWNLOAD_BYTES)
+}
+
+/// Zoals `fetch`, met een eigen bovengrens voor de grootte (bytes).
+pub fn fetch_with_limit(url: &str, user_agent: Option<&str>, allow_local: bool, max_bytes: u64) -> Result<Vec<u8>> {
     let checked = validate_stream_url(url, allow_local)?;
     if !matches!(checked.scheme(), "http" | "https") {
         return Err(CoreError::Invalid("Alleen http- en https-adressen kunnen worden opgehaald".into()));
@@ -59,7 +64,7 @@ pub fn fetch(url: &str, user_agent: Option<&str>, allow_local: bool) -> Result<V
             "--max-time",
             "180",
             "--max-filesize",
-            &MAX_DOWNLOAD_BYTES.to_string(),
+            &max_bytes.to_string(),
             "--config",
             "-",
         ])

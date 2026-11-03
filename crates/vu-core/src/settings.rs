@@ -77,6 +77,15 @@ pub struct AppSettings {
     /// Map voor IPTV-opnames; `None` = nog niet gekozen (opnemen kan dan niet).
     #[serde(default)]
     pub iptv_record_dir: Option<String>,
+    /// IPTV (streams, lijsten, opnames) werkt alleen als er een VPN actief is.
+    #[serde(default)]
+    pub iptv_require_vpn: bool,
+    /// Deel van de naam van je VPN-adapter, voor een VPN die niet vanzelf wordt herkend.
+    #[serde(default)]
+    pub iptv_vpn_name: Option<String>,
+    /// Zenderlogo's tonen (haalt ze op bij de adressen uit je lijst).
+    #[serde(default)]
+    pub iptv_show_logos: bool,
     // netwerk en privacy
     pub network_caching_ms: u32,
     pub allow_local_streams: bool,
@@ -165,6 +174,9 @@ impl Default for AppSettings {
             watch_dir: None,
             watch_profile: None,
             iptv_record_dir: None,
+            iptv_require_vpn: false,
+            iptv_vpn_name: None,
+            iptv_show_logos: false,
             network_caching_ms: 1500,
             allow_local_streams: false,
             online_metadata: false,

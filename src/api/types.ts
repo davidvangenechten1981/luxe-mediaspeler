@@ -368,6 +368,9 @@ export interface AppSettings {
   watch_dir: string | null;
   watch_profile: string | null;
   iptv_record_dir: string | null;
+  iptv_require_vpn: boolean;
+  iptv_vpn_name: string | null;
+  iptv_show_logos: boolean;
   network_caching_ms: number;
   allow_local_streams: boolean;
   online_metadata: boolean;
@@ -575,3 +578,4 @@ export interface IptvGuideReport { programmes: number; matched: number; errors: 
 export interface IptvTick { reminders: IptvReminder[]; recordings_changed: boolean }
 export interface IptvEpisode { id: string; season: number; episode: number; title: string; extension: string }
 export interface IptvEpgChannel { id: string; name: string }
+export interface IptvVpn { checked: boolean; active: boolean; adapter: string | null; detail: string; required: boolean; stopped: boolean }

@@ -24,4 +24,11 @@ tempfile = "3"
 
 [target.'cfg(windows)'.dependencies]
 # Credential Manager voor inloggegevens van streams (zelfde versie als in src-tauri, geen nieuw pakket)
-windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security_Credentials"] }
+windows-sys = { version = "0.59", features = [
+  "Win32_Foundation",
+  "Win32_Security_Credentials",
+  "Win32_NetworkManagement_IpHelper",
+  "Win32_NetworkManagement_Ndis",
+  "Win32_Networking_WinSock",
+  "Win32_System_Time",
+] }

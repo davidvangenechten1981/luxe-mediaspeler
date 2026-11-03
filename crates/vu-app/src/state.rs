@@ -59,6 +59,8 @@ pub struct AppState {
     pub secrets: Box<dyn vu_core::iptv::secrets::SecretStore>,
     /// Lopende IPTV-opnames.
     pub iptv: crate::services::iptv::Runtime,
+    /// Controle of er een VPN actief is (parameter: eigen adapternaam). In tests te vervangen.
+    pub vpn_probe: Box<dyn Fn(&str) -> vu_core::iptv::vpn::VpnStatus + Send + Sync>,
 }
 
 /// Opent de database. Een beschadigd bestand wordt hernoemd (niet verwijderd) en er komt een nieuwe.
@@ -168,6 +170,7 @@ impl AppState {
             pin_guard: Mutex::new(Default::default()),
             secrets: vu_core::iptv::secrets::default_store(),
             iptv: Default::default(),
+            vpn_probe: Box::new(vu_core::iptv::vpn::detect),
         };
         // een eerder ingestelde equalizer meteen weer toepassen
         let _ = crate::services::audio::restore_on_startup(&state);

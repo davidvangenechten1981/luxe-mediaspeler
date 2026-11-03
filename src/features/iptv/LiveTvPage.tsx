@@ -1,11 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../../api/client";
-import type { IptvChannel, IptvEpisode, IptvKind, IptvNowNext } from "../../api/types";
+import type { IptvChannel, IptvEpisode, IptvKind, IptvNowNext, IptvVpn } from "../../api/types";
 import { Icon } from "../../components/Icon";
 import { Button, EmptyState, IconButton, Modal, SearchInput, Select, Spinner, Switch, Tabs } from "../../components/ui";
-import { formatClock, initials, nextDigitBuffer, programmeProgress } from "../../lib/iptv";
+import { formatClock, initials, programmeProgress } from "../../lib/iptv";
+import { fileSrc } from "../../lib/platform";
 import { useAsync } from "../../lib/useAsync";
+import { usePlayer } from "../../state/player";
+import { useSettings } from "../../state/settings";
 import { reportError, toast, useUi } from "../../state/ui";
+import { channelIdFromLocation, zapChannel } from "./channelKeys";
 import { SourcesDialog } from "./SourcesDialog";
 
 const KINDS: { id: IptvKind; label: string }[] = [
@@ -13,9 +17,34 @@ const KINDS: { id: IptvKind; label: string }[] = [
   { id: "movie", label: "Films" },
   { id: "series", label: "Series" },
 ];
-const NUMBER_DELAY_MS = 1500;
 const NOW_NEXT_EVERY_MS = 60_000;
+const VPN_EVERY_MS = 10_000;
 const MAX_ROWS = 1500;
+
+/** Logo van een zender als dat is aangezet (instelling) en beschikbaar is; anders initialen. */
+function ChannelLogo({ channel }: { channel: IptvChannel }) {
+  const show = useSettings((s) => s.settings.iptv_show_logos);
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    if (!show || !channel.logo) { setSrc(null); return; }
+    let alive = true;
+    void api.iptvLogo(channel.id).then((p) => (p ? fileSrc(p) : null)).then((u) => alive && setSrc(u)).catch(() => undefined);
+    return () => { alive = false; };
+  }, [show, channel.id, channel.logo]);
+  return (
+    <span aria-hidden="true" style={{ width: 36, height: 36, borderRadius: 8, display: "grid", placeItems: "center", background: "var(--surface-2, rgba(128,128,128,.2))", fontWeight: 600, fontSize: "var(--fs-xs)", flex: "none", overflow: "hidden" }}>
+      {src ? <img src={src} alt="" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} /> : initials(channel.name)}
+    </span>
+  );
+}
+
+function VpnBadge({ vpn }: { vpn: IptvVpn | null }) {
+  if (!vpn || !vpn.checked) return vpn?.required ? <span className="badge badge--warning" title={vpn.detail}>VPN-controle niet mogelijk</span> : null;
+  if (vpn.active) return <span className="badge badge--success" title={vpn.detail}>VPN actief{vpn.adapter ? ` · ${vpn.adapter}` : ""}</span>;
+  return vpn.required
+    ? <span className="badge badge--danger" role="alert" title={vpn.detail}>Geen VPN: streams zijn geblokkeerd</span>
+    : <span className="badge" title={vpn.detail}>Geen VPN gevonden</span>;
+}
 
 function EpisodesDialog({ channel, onClose }: { channel: IptvChannel; onClose: () => void }) {
   const eps = useAsync(() => api.iptvSeriesEpisodes(channel.id), [channel.id]);
@@ -64,11 +93,10 @@ export function LiveTvPage() {
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [showSources, setShowSources] = useState(false);
   const [series, setSeries] = useState<IptvChannel | null>(null);
-  const [currentId, setCurrentId] = useState<number | null>(null);
-  const [typed, setTyped] = useState("");
   const [nowNext, setNowNext] = useState<Record<number, IptvNowNext>>({});
   const [clock, setClock] = useState(() => Math.floor(Date.now() / 1000));
-  const typedRef = useRef("");
+  const [vpn, setVpn] = useState<IptvVpn | null>(null);
+  const currentId = channelIdFromLocation(usePlayer((s) => s.view.location));
 
   const sources = useAsync(() => api.iptvSources(), []);
   const groups = useAsync(() => api.iptvGroups(null, kind), [kind, sources.data?.length]);
@@ -77,6 +105,15 @@ export function LiveTvPage() {
     [kind, group, search, favoritesOnly, sources.data?.length],
   );
   const channels = useMemo(() => list.data ?? [], [list.data]);
+
+  // VPN-status (en bij een verplichte VPN ook de kill switch) elke 10 seconden
+  useEffect(() => {
+    let alive = true;
+    const check = () => void api.iptvVpnCheck().then((r) => { if (!alive) return; setVpn(r); if (r.stopped) toast.warning("De VPN is verbroken: de stream is gestopt."); }).catch(() => undefined);
+    check();
+    const t = setInterval(check, VPN_EVERY_MS);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
 
   // "Nu" en "Straks" voor de zichtbare zenders, elke minuut vernieuwd
   useEffect(() => {
@@ -98,59 +135,11 @@ export function LiveTvPage() {
     }
     try {
       await api.iptvPlay(c.id);
-      setCurrentId(c.id);
       go("now_playing");
     } catch (e) {
       reportError(e);
     }
   }, [go]);
-
-  const zap = useCallback(async (step: number) => {
-    try {
-      const c = await api.iptvZap(currentId ?? 0, step, favoritesOnly);
-      setCurrentId(c.id);
-      toast.info(`${c.number ? `${c.number} · ` : ""}${c.name}`);
-    } catch (e) {
-      reportError(e);
-    }
-  }, [currentId, favoritesOnly]);
-
-  const playNumber = useCallback(async (n: number) => {
-    try {
-      const c = await api.iptvPlayNumber(n);
-      setCurrentId(c.id);
-      go("now_playing");
-    } catch (e) {
-      reportError(e);
-    }
-  }, [go]);
-
-  // Kanaalnummer intypen (cijfers + Enter of kort wachten) en zappen met PageUp/PageDown
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const flush = () => {
-      const n = Number(typedRef.current);
-      typedRef.current = "";
-      setTyped("");
-      if (n > 0) void playNumber(n);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement | null;
-      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
-      if (e.ctrlKey || e.altKey || e.metaKey) return;
-      if (e.key === "PageDown") { e.preventDefault(); void zap(1); return; }
-      if (e.key === "PageUp") { e.preventDefault(); void zap(-1); return; }
-      if (e.key === "Enter" && typedRef.current) { e.preventDefault(); clearTimeout(timer); flush(); return; }
-      const next = nextDigitBuffer(typedRef.current, e.key);
-      if (next === null) return;
-      typedRef.current = next;
-      setTyped(next);
-      clearTimeout(timer);
-      timer = setTimeout(flush, NUMBER_DELAY_MS);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => { window.removeEventListener("keydown", onKey); clearTimeout(timer); };
-  }, [playNumber, zap]);
 
   const toggleFavorite = async (c: IptvChannel) => {
     try {
@@ -164,6 +153,7 @@ export function LiveTvPage() {
     try {
       const r = await api.iptvRecordNow(c.id, 60);
       if (r.status === "failed") toast.error(r.message ?? "De opname kon niet starten");
+      else if (r.status === "planned" && r.message) toast.warning(`${r.message} De opname begint zodra het kan.`);
       else toast.success(`Opname gestart: ${c.name} (60 minuten). Stoppen kan bij Opnames.`);
     } catch (e) {
       reportError(e);
@@ -186,15 +176,14 @@ export function LiveTvPage() {
       <div className="page__head">
         <div>
           <h1>Live-tv</h1>
-          <p>Je eigen zenders, films en series. Typ een kanaalnummer, of gebruik PageUp en PageDown om te zappen.</p>
+          <p>Je eigen zenders, films en series. Typ een kanaalnummer, of gebruik PageUp en PageDown om te zappen (werkt ook tijdens het kijken).</p>
         </div>
         <div className="page__actions">
+          <VpnBadge vpn={vpn} />
           <Button icon="refresh" disabled={!hasSources} onClick={() => list.reload()}>Vernieuwen</Button>
           <Button icon="settings" onClick={() => setShowSources(true)}>Bronnen</Button>
         </div>
       </div>
-
-      {typed && <div role="status" aria-live="polite" className="toast toast--info" style={{ position: "static", display: "inline-block" }}>Kanaal {typed}</div>}
 
       {sources.data && !hasSources && (
         <EmptyState icon="film" title="Nog geen bron" action={<Button variant="primary" icon="plus" onClick={() => setShowSources(true)}>Bron toevoegen</Button>}>
@@ -216,8 +205,8 @@ export function LiveTvPage() {
             <Switch label="Alleen favorieten" checked={favoritesOnly} onChange={setFavoritesOnly} />
             {kind === "live" && (
               <>
-                <IconButton icon="prev" label="Vorige zender" onClick={() => void zap(-1)} />
-                <IconButton icon="next" label="Volgende zender" onClick={() => void zap(1)} />
+                <IconButton icon="prev" label="Vorige zender" onClick={() => void zapChannel(-1, favoritesOnly)} />
+                <IconButton icon="next" label="Volgende zender" onClick={() => void zapChannel(1, favoritesOnly)} />
               </>
             )}
           </div>
@@ -233,9 +222,7 @@ export function LiveTvPage() {
               const nn = nowNext[c.id];
               return (
                 <div key={c.id} role="listitem" className={`list-item${c.id === currentId ? " is-active" : ""}`} style={{ alignItems: "center" }}>
-                  <span aria-hidden="true" style={{ width: 36, height: 36, borderRadius: 8, display: "grid", placeItems: "center", background: "var(--surface-2, rgba(128,128,128,.2))", fontWeight: 600, fontSize: "var(--fs-xs)", flex: "none" }}>
-                    {initials(c.name)}
-                  </span>
+                  <ChannelLogo channel={c} />
                   {c.number !== null && <span className="faint" style={{ width: 40, textAlign: "right", flex: "none" }}>{c.number}</span>}
                   <button type="button" className="grow" aria-label={`${c.kind === "series" ? "Open" : "Speel"} ${c.name}`} onClick={() => void play(c)} style={{ background: "none", border: 0, padding: 0, textAlign: "left", minWidth: 0 }}>
                     <span className="ellipsis" style={{ display: "block" }}><strong>{c.name}</strong>{c.group ? <span className="faint"> · {c.group}</span> : null}</span>

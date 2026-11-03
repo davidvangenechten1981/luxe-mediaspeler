@@ -107,6 +107,15 @@ export async function bootstrap(): Promise<() => void> {
       .catch(() => undefined);
   }, 30_000);
 
+  // VPN verplicht: elke 5 s controleren; valt de VPN weg, dan stopt de backend de stream en de opnames (kill switch).
+  const vpnTimer = setInterval(() => {
+    if (!useSettings.getState().settings.iptv_require_vpn) return;
+    void api
+      .iptvVpnCheck()
+      .then((r) => { if (r.stopped) toast.warning("De VPN is verbroken: IPTV-streams en opnames zijn gestopt."); })
+      .catch(() => undefined);
+  }, 5_000);
+
   // Kijkstatus delen met een andere pc: meteen en daarna elke 10 minuten, zolang er een map is gekozen.
   const stopSync = startAutoSync({
     folder: () => useSettings.getState().settings.sync_folder,
@@ -116,6 +125,7 @@ export async function bootstrap(): Promise<() => void> {
 
   return () => {
     clearInterval(iptvTimer);
+    clearInterval(vpnTimer);
     offs.forEach((o) => o());
     if (timer) clearInterval(timer);
     clearInterval(watchTimer);

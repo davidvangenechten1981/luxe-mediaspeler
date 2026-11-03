@@ -177,6 +177,8 @@ pub enum Request {
     IptvRecordingCancel { id: i64 },
     IptvRecordingDelete { id: i64 },
     IptvTick,
+    IptvVpnCheck,
+    IptvLogo { id: i64 },
 }
 
 fn json_of<T: serde::Serialize>(v: T) -> Result<Value> {
@@ -361,6 +363,8 @@ pub fn handle(st: &AppState, req: Request) -> Result<Value> {
         IptvRecordingCancel { id } => iptv::recording_cancel(st, id).and_then(|_| unit()),
         IptvRecordingDelete { id } => iptv::recording_delete(st, id).and_then(|_| unit()),
         IptvTick => json_of(iptv::tick(st)?),
+        IptvVpnCheck => json_of(iptv::vpn_check(st)?),
+        IptvLogo { id } => json_of(iptv::logo_path(st, id)?),
         SettingsExport { dest } => settings::export_file(st, &dest).and_then(|_| unit()),
         SettingsImport { src } => json_of(settings::import_file(st, &src)?),
         DatabaseBackup { dest } => settings::backup_database(st, &dest).and_then(|_| unit()),

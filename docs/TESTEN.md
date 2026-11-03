@@ -48,3 +48,8 @@ Meld elk probleem met: wat deed je, wat verwachtte je, wat gebeurde er, plus het
 37. **Opnemen**: kies in Opnames een map, neem een zender 2 minuten op (Live-tv → opnameknop, daarna Stoppen). Het .ts-bestand speelt af. Plan ook een opname in de gids en laat de app open.
 38. **Herinnering**: stel een herinnering in voor een programma dat over enkele minuten begint; je krijgt een melding.
 39. **Slechte bron**: voer een verkeerd wachtwoord in of verwijder het internet: er komt een duidelijke melding zonder je wachtwoord.
+40. **VPN-eis**: zet bij Instellingen → IPTV "Alleen streamen met VPN" aan terwijl je VPN uit staat: een zender afspelen en bronnen verversen geven een melding "Geen VPN actief". Start je VPN: het werkt. Zet je VPN tijdens het kijken uit: binnen ongeveer 5 seconden stopt de stream met een melding. Herkent de app je VPN niet, vul dan een deel van de adapternaam in.
+41. **Opname en VPN**: plan een opname en zet je VPN uit: de opname wacht ("Geen VPN actief") en start zodra de VPN terug is. Zet je VPN uit tijdens een opname: die stopt en het opgenomen deel blijft bewaard.
+42. **Zappen overal**: speel een zender, ga naar een andere pagina (of volledig scherm) en gebruik PageUp/PageDown en cijfers + Enter.
+43. **Logo's**: zet "Zenderlogo's tonen" aan bij Instellingen → IPTV; logo's verschijnen na enkele seconden. Zet het uit: initialen.
+44. **Bestandsnaam van opnames**: de tijd in de naam is je lokale tijd.

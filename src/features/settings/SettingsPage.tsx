@@ -11,17 +11,19 @@ import { useLibrary } from "../../state/library";
 import { LicensesDialog } from "./LicensesDialog";
 import { PinSettings } from "./PinSettings";
 import { ProfileSettings } from "./ProfileSettings";
+import { IptvSettings } from "./IptvSettings";
 import { WatchSettings } from "./WatchSettings";
 import { useJobs } from "../../state/jobs";
 import { useSettings } from "../../state/settings";
 import { reportError, toast } from "../../state/ui";
 
-type Section = "look" | "play" | "library" | "convert" | "keys" | "privacy" | "windows" | "backup" | "about";
+type Section = "look" | "play" | "library" | "convert" | "iptv" | "keys" | "privacy" | "windows" | "backup" | "about";
 const SECTIONS: { id: Section; label: string; icon: Parameters<typeof Icon>[0]["name"] }[] = [
   { id: "look", label: "Uiterlijk", icon: "sun" },
   { id: "play", label: "Afspelen", icon: "play" },
   { id: "library", label: "Bibliotheek", icon: "library" },
   { id: "convert", label: "Converter", icon: "convert" },
+  { id: "iptv", label: "IPTV", icon: "tv" },
   { id: "keys", label: "Sneltoetsen", icon: "keyboard" },
   { id: "privacy", label: "Privacy & netwerk", icon: "shield" },
   { id: "windows", label: "Windows-integratie", icon: "external" },
@@ -338,7 +340,7 @@ export function SettingsPage() {
   const [section, setSection] = useState<Section>("look");
   const warning = useSettings((s) => s.warning);
   const needsRestart = useSettings((s) => s.needsRestart);
-  const body = { look: <Look />, play: <Play />, library: <LibrarySettings />, convert: <ConvertSettingsSection />, keys: <Shortcuts />, privacy: <Privacy />, windows: <WindowsIntegration />, backup: <Backup />, about: <About /> }[section];
+  const body = { look: <Look />, play: <Play />, library: <LibrarySettings />, convert: <ConvertSettingsSection />, iptv: <IptvSettings />, keys: <Shortcuts />, privacy: <Privacy />, windows: <WindowsIntegration />, backup: <Backup />, about: <About /> }[section];
   return (
     <div className="page">
       <div className="page__head"><div><h1>Instellingen</h1></div></div>

@@ -216,6 +216,20 @@ fn golden_json_shapes_are_stable() {
         }),
     );
     check(
+        "iptv_vpn",
+        serde_json::to_value(vu_app::services::iptv::VpnCheck {
+            status: vu_core::iptv::vpn::VpnStatus {
+                checked: true,
+                active: true,
+                adapter: Some("NordLynx".into()),
+                detail: "Je internetverkeer loopt via de VPN".into(),
+            },
+            required: true,
+            stopped: false,
+        })
+        .unwrap(),
+    );
+    check(
         "session_events",
         json!([
             serde_json::to_value(SessionEvent::TrackChanged { index: 1, location: "/m/b.mp3".into() }).unwrap(),
