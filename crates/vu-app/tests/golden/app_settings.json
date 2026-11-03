@@ -39,6 +39,7 @@
   ],
   "high_contrast": false,
   "hw_decoding": "auto",
+  "iptv_record_dir": null,
   "language": "nl",
   "network_caching_ms": 1500,
   "normalize_realtime": false,

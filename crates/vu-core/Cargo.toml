@@ -15,6 +15,13 @@ url = "2"
 fs4 = "1"
 lofty = "0.24.0"
 sha2 = "0.11.0"
+# XMLTV-gids lezen en .gz uitpakken: beide stonden al in Cargo.lock (via Tauri), dezelfde versies
+quick-xml = "0.42"
+flate2 = "1.1"
 
 [dev-dependencies]
 tempfile = "3"
+
+[target.'cfg(windows)'.dependencies]
+# Credential Manager voor inloggegevens van streams (zelfde versie als in src-tauri, geen nieuw pakket)
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security_Credentials"] }

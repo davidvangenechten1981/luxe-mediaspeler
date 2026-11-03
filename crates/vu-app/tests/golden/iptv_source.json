@@ -1,0 +1,11 @@
+{
+  "channel_count": 120,
+  "epg_location": "http://gids.example/g.xml?key=***",
+  "id": 1,
+  "kind": "xtream",
+  "last_error": null,
+  "last_refresh": 1793700000,
+  "location": "http://prov.example",
+  "name": "Thuis",
+  "user_agent": "Agent/1"
+}

@@ -12,10 +12,24 @@ pub enum RepeatMode {
     All,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct QueueItem {
+    /// Sleutel van het item (pad of URL). Voor IPTV is dit een neutrale naam zonder inloggegevens.
     pub location: String,
     pub title: Option<String>,
+    /// Alleen voor IPTV: de echte stream-URL die naar de engine gaat (kan inloggegevens bevatten) en nooit wordt opgeslagen of getoond.
+    #[serde(skip)]
+    pub stream: Option<String>,
+    /// Extra LibVLC-opties voor dit item (bijvoorbeeld `:http-user-agent=...`).
+    #[serde(skip)]
+    pub options: Vec<String>,
+}
+
+impl QueueItem {
+    /// Een livestream (IPTV): niet in de geschiedenis, geen hervatpunt.
+    pub fn is_live(&self) -> bool {
+        self.stream.is_some()
+    }
 }
 
 /// Kleine, deterministische RNG (xorshift64*), zodat shuffle testbaar is zonder externe crate.
@@ -250,7 +264,7 @@ mod tests {
     use super::*;
 
     fn items(n: usize) -> Vec<QueueItem> {
-        (0..n).map(|i| QueueItem { location: format!("/m/{i}.mp3"), title: None }).collect()
+        (0..n).map(|i| QueueItem { location: format!("/m/{i}.mp3"), title: None, ..Default::default() }).collect()
     }
     fn q(n: usize) -> Queue {
         let mut q = Queue::new(42);

@@ -41,3 +41,10 @@ Meld elk probleem met: wat deed je, wat verwachtte je, wat gebeurde er, plus het
 30. **PIN**: stel een PIN in (Instellingen → Bibliotheek), herstart de app: de bibliotheekpagina's vragen de PIN. Vijf foute pogingen geven een korte blokkade.
 31. **Slimme lijst**: maak "Nog niet afgespeeld, langer dan 90 minuten" en controleer of hij klopt en bijwerkt als je iets afspeelt.
 32. **Draagbaar**: pak `VLC-Ultimate-draagbaar.zip` (artefact van de CI) uit op een andere plek en start de app; de map `data` verschijnt ernaast en in je Windows-profiel verschijnt niets.
+33. **IPTV bron**: open Live-tv → Bronnen en voeg je eigen M3U-link, M3U-bestand of Xtream-account toe. Kies Verversen: de zenders verschijnen. Controleer dat de link/het wachtwoord nergens leesbaar staat (ook niet in Instellingen → Over & diagnose → Diagnoserapport exporteren).
+34. **Zenders**: klik een zender (beeld en geluid starten, de app gaat naar Nu afspelen). Probeer favoriet, zoeken, groepsfilter, PageDown/PageUp en een kanaalnummer intypen (bijvoorbeeld 12 en Enter).
+35. **Programmagids**: kies bij Bronnen "Programmagids verversen". Open de Programmagids: kloppen "nu" en "straks" met de zender? Staan de programma's op de juiste tijd (let op tijdzone)? Koppel bij een zender zonder gids handmatig via de gids-id (alleen als je die hebt).
+36. **Terugkijken**: klik in de gids op een programma dat net voorbij is, bij een zender met catch-up. Speelt het goed, en kun je spoelen? (Sommige aanbieders staan dat niet toe.)
+37. **Opnemen**: kies in Opnames een map, neem een zender 2 minuten op (Live-tv → opnameknop, daarna Stoppen). Het .ts-bestand speelt af. Plan ook een opname in de gids en laat de app open.
+38. **Herinnering**: stel een herinnering in voor een programma dat over enkele minuten begint; je krijgt een melding.
+39. **Slechte bron**: voer een verkeerd wachtwoord in of verwijder het internet: er komt een duidelijke melding zonder je wachtwoord.

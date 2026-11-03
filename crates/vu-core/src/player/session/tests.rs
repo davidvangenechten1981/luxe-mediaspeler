@@ -180,7 +180,7 @@ impl Persistence for FakeStore {
 }
 
 fn items(names: &[&str]) -> Vec<QueueItem> {
-    names.iter().map(|n| QueueItem { location: format!("/m/{n}.mp3"), title: Some(n.to_string()) }).collect()
+    names.iter().map(|n| QueueItem { location: format!("/m/{n}.mp3"), title: Some(n.to_string()), ..Default::default() }).collect()
 }
 
 fn setup(names: &[&str]) -> (Session<FakeEngine>, FakeEngine, FakeStore) {
@@ -196,6 +196,28 @@ fn setup(names: &[&str]) -> (Session<FakeEngine>, FakeEngine, FakeStore) {
 
 fn resume_point(loc: &str, pos: u64, completed: bool) -> ResumePoint {
     ResumePoint { location: loc.into(), position_ms: pos, duration_ms: 100_000, completed, updated_at: 0 }
+}
+
+#[test]
+fn a_live_item_opens_its_hidden_stream_with_options_and_leaves_no_trace_of_the_url() {
+    let engine = FakeEngine::default();
+    let store = FakeStore::default();
+    let mut s = Session::new(engine.clone(), Box::new(store.clone()), 1);
+    let live = QueueItem {
+        location: "iptv://channel/7".into(),
+        title: Some("Een".into()),
+        stream: Some("http://prov.example/live/jan/pw/7.ts".into()),
+        options: vec![":http-user-agent=Agent/1".into()],
+    };
+    s.play_items(vec![live], 0).unwrap();
+    // de engine krijgt de echte URL en de opties
+    assert_eq!(engine.calls(), ["open http://prov.example/live/jan/pw/7.ts", "play"]);
+    assert_eq!(engine.with(|i| i.opened[0].1.extra.clone()), vec![":http-user-agent=Agent/1".to_string()]);
+    // geen geschiedenis, en alles wat de interface ziet gebruikt de neutrale naam
+    assert!(store.0.lock().unwrap().plays.is_empty(), "een livestream komt niet in de geschiedenis");
+    assert_eq!(s.take_events(), vec![SessionEvent::TrackChanged { index: 0, location: "iptv://channel/7".into() }]);
+    let view = format!("{:?}", s.view());
+    assert!(!view.contains("jan") && !view.contains("pw/7"), "de weergave lekt de stream-URL: {view}");
 }
 
 #[test]
@@ -573,7 +595,7 @@ fn video_setup(names: &[&str], delay_ms: u64) -> (Session<FakeEngine>, FakeEngin
     let store = FakeStore::default();
     let mut s = Session::new(engine.clone(), Box::new(store.clone()), 1);
     s.next_delay_ms = delay_ms;
-    let list = names.iter().map(|n| QueueItem { location: format!("/m/{n}.mkv"), title: None }).collect();
+    let list = names.iter().map(|n| QueueItem { location: format!("/m/{n}.mkv"), title: None, ..Default::default() }).collect();
     s.play_items(list, 0).unwrap();
     s.take_events();
     (s, engine, store)
@@ -920,7 +942,7 @@ fn an_episode_inherits_the_speed_chosen_for_its_series() {
     let engine = FakeEngine::default();
     let store = FakeStore::default();
     let mut s = Session::new(engine.clone(), Box::new(store.clone()), 1);
-    let ep = |n: u32| QueueItem { location: format!("/m/Show.S01E0{n}.mkv"), title: None };
+    let ep = |n: u32| QueueItem { location: format!("/m/Show.S01E0{n}.mkv"), title: None, ..Default::default() };
     s.play_items(vec![ep(1), ep(2)], 0).unwrap();
     s.take_events();
     s.set_rate(1.75).unwrap();

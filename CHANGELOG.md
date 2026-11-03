@@ -12,3 +12,5 @@
 - Converter: fragment knippen, voorbeeld, grootteschatting, eigen profielen, pauzeren, ondertitels inbranden en uitpakken, actie na afloop.
 - Windows-mediabediening (SMTC), terugval zonder hardwaredecodering, sneller opstarten.
 - Dubbelen opruimen met aanbeveling, slimme lijsten met eigen regels, posterwand, automatische kijkstatus-sync, PIN, draagbare versie.
+- IPTV, blok 0 (veilige basis): stream-URL's worden gemaskeerd in logbestanden en in het diagnoserapport (gebruikersnaam/wachtwoord in de URL, Xtream-paden, gevoelige queryparameters); opslag voor inloggegevens los van de database via de Windows Credential Manager.
+- IPTV: eigen bronnen (M3U-link, M3U-bestand, Xtream), zenderlijst met groepen, favorieten, zoeken en zappen, programmagids (XMLTV) met nu/straks en tijdlijn, herinneringen, terugkijken (catch-up), opnemen met FFmpeg. Inloggegevens in de Windows Credential Manager en overal gemaskeerd.

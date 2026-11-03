@@ -5,7 +5,7 @@
 //! Er bestaat geen manier om een shellcommando of een vrij FFmpeg-argument mee te geven.
 
 use crate::services::{
-    audio, converter, cover, history, library, lyrics, photos, pin, player, playlists, profiles, series, settings, sync, tags, video,
+    audio, converter, cover, history, iptv, library, lyrics, photos, pin, player, playlists, profiles, series, settings, sync, tags, video,
     videoprefs, watch,
 };
 use crate::state::AppState;
@@ -143,6 +143,40 @@ pub enum Request {
     DatabaseBackup { dest: String },
     DatabaseRestore { src: String },
     DiagnosticsExport { dest: String },
+    // iptv
+    IptvSources,
+    IptvSourceAddUrl { name: String, url: String, epg_url: Option<String>, user_agent: Option<String> },
+    IptvSourceAddFile { name: String, path: String, epg_url: Option<String> },
+    IptvSourceAddXtream { name: String, server: String, username: String, password: String },
+    IptvSourceUpdate { id: i64, name: String, epg_url: Option<String>, user_agent: Option<String> },
+    IptvSourceDelete { id: i64 },
+    IptvSourceRefresh { id: i64 },
+    IptvGuideRefresh,
+    IptvChannels { query: vu_core::db::IptvChannelQuery },
+    IptvGroups { source_id: Option<i64>, kind: String },
+    IptvChannelFavorite { id: i64, value: bool },
+    IptvChannelHide { id: i64, value: bool },
+    IptvRecent,
+    IptvPlay { id: i64 },
+    IptvPlayNumber { number: u32 },
+    IptvZap { from: i64, step: i32, favorites_only: bool },
+    IptvPlayCatchup { id: i64, start: i64, stop: i64 },
+    IptvSeriesEpisodes { id: i64 },
+    IptvPlayEpisode { id: i64, episode_id: String, extension: String },
+    IptvNowNext { ids: Vec<i64> },
+    IptvGuide { id: i64, from: i64, to: i64 },
+    IptvEpgChannels,
+    IptvEpgSet { id: i64, epg_id: Option<String> },
+    IptvSearchProgrammes { term: String },
+    IptvReminderAdd { channel_id: i64, title: String, start: i64 },
+    IptvReminders,
+    IptvReminderDelete { id: i64 },
+    IptvRecordingAdd { channel_id: i64, title: String, start: i64, stop: i64 },
+    IptvRecordNow { channel_id: i64, minutes: u32 },
+    IptvRecordings,
+    IptvRecordingCancel { id: i64 },
+    IptvRecordingDelete { id: i64 },
+    IptvTick,
 }
 
 fn json_of<T: serde::Serialize>(v: T) -> Result<Value> {
@@ -290,6 +324,43 @@ pub fn handle(st: &AppState, req: Request) -> Result<Value> {
         SettingsSave { settings: s } => json_of(settings::save(st, &s)?),
         SettingsReset => json_of(settings::reset(st)?),
         DiagnosticsExport { dest } => settings::export_diagnostics(st, &st.version, &dest).and_then(|_| unit()),
+        IptvSources => json_of(iptv::sources(st)?),
+        IptvSourceAddUrl { name, url, epg_url, user_agent } => {
+            json_of(iptv::add_m3u_url(st, &name, &url, epg_url.as_deref(), user_agent.as_deref())?)
+        }
+        IptvSourceAddFile { name, path, epg_url } => json_of(iptv::add_m3u_file(st, &name, &path, epg_url.as_deref())?),
+        IptvSourceAddXtream { name, server, username, password } => json_of(iptv::add_xtream(st, &name, &server, &username, &password)?),
+        IptvSourceUpdate { id, name, epg_url, user_agent } => {
+            json_of(iptv::update_source(st, id, &name, epg_url.as_deref(), user_agent.as_deref())?)
+        }
+        IptvSourceDelete { id } => iptv::delete_source(st, id).and_then(|_| unit()),
+        IptvSourceRefresh { id } => json_of(iptv::refresh_source(st, id)?),
+        IptvGuideRefresh => json_of(iptv::refresh_guide(st)?),
+        IptvChannels { query } => json_of(iptv::channels(st, &query)?),
+        IptvGroups { source_id, kind } => json_of(iptv::groups(st, source_id, &kind)?),
+        IptvChannelFavorite { id, value } => st.lock_db()?.set_iptv_favorite(id, value).and_then(|_| unit()),
+        IptvChannelHide { id, value } => st.lock_db()?.set_iptv_hidden(id, value).and_then(|_| unit()),
+        IptvRecent => json_of(iptv::recent(st)?),
+        IptvPlay { id } => json_of(iptv::play_channel(st, id)?),
+        IptvPlayNumber { number } => json_of(iptv::play_number(st, number)?),
+        IptvZap { from, step, favorites_only } => json_of(iptv::zap(st, from, step, favorites_only)?),
+        IptvPlayCatchup { id, start, stop } => json_of(iptv::play_catchup(st, id, start, stop)?),
+        IptvSeriesEpisodes { id } => json_of(iptv::series_episodes(st, id)?),
+        IptvPlayEpisode { id, episode_id, extension } => iptv::play_episode(st, id, &episode_id, &extension).and_then(|_| unit()),
+        IptvNowNext { ids } => json_of(iptv::now_next(st, &ids)?),
+        IptvGuide { id, from, to } => json_of(iptv::guide(st, id, from, to)?),
+        IptvEpgChannels => json_of(iptv::epg_channels(st)?),
+        IptvEpgSet { id, epg_id } => iptv::set_epg_manual(st, id, epg_id.as_deref()).and_then(|_| unit()),
+        IptvSearchProgrammes { term } => json_of(iptv::search_programmes(st, &term)?),
+        IptvReminderAdd { channel_id, title, start } => json_of(iptv::reminder_add(st, channel_id, &title, start)?),
+        IptvReminders => json_of(iptv::reminders(st)?),
+        IptvReminderDelete { id } => iptv::reminder_delete(st, id).and_then(|_| unit()),
+        IptvRecordingAdd { channel_id, title, start, stop } => json_of(iptv::recording_add(st, channel_id, &title, start, stop)?),
+        IptvRecordNow { channel_id, minutes } => json_of(iptv::record_now(st, channel_id, minutes)?),
+        IptvRecordings => json_of(iptv::recordings(st)?),
+        IptvRecordingCancel { id } => iptv::recording_cancel(st, id).and_then(|_| unit()),
+        IptvRecordingDelete { id } => iptv::recording_delete(st, id).and_then(|_| unit()),
+        IptvTick => json_of(iptv::tick(st)?),
         SettingsExport { dest } => settings::export_file(st, &dest).and_then(|_| unit()),
         SettingsImport { src } => json_of(settings::import_file(st, &src)?),
         DatabaseBackup { dest } => settings::backup_database(st, &dest).and_then(|_| unit()),
@@ -344,7 +415,7 @@ mod tests {
         let info = call(&app, json!({"type": "app_info"})).unwrap();
         assert_eq!(info["version"], "0.0.0-test");
         let d = call(&app, json!({"type": "diagnostics"})).unwrap();
-        assert_eq!(d["schema_version"], 8);
+        assert_eq!(d["schema_version"], 9);
     }
 
     #[test]

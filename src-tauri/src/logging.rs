@@ -7,6 +7,18 @@ use std::sync::OnceLock;
 static LOG_DIR: OnceLock<PathBuf> = OnceLock::new();
 const MAX_LOG_BYTES: u64 = 1_000_000;
 
+/// Stream-URL's met wachtwoord of token komen nooit leesbaar in een logbestand.
+fn line_for_log(line: &str) -> String {
+    #[cfg(feature = "core")]
+    {
+        vu_core::iptv::mask::mask_text(line)
+    }
+    #[cfg(not(feature = "core"))]
+    {
+        line.to_string()
+    }
+}
+
 fn append(file: &str, line: &str) {
     let Some(dir) = LOG_DIR.get() else { return };
     let path = dir.join(file);
@@ -14,6 +26,7 @@ fn append(file: &str, line: &str) {
     if std::fs::metadata(&path).map(|m| m.len() > MAX_LOG_BYTES).unwrap_or(false) {
         let _ = std::fs::rename(&path, dir.join(format!("{file}.old")));
     }
+    let line = line_for_log(line);
     if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
         let _ = writeln!(f, "{line}");
     }
@@ -92,6 +105,17 @@ mod tests {
         assert_eq!(take_previous_crash(dir.path()), None, "de tweede keer niets meer");
         std::fs::write(dir.path().join("crash.log"), "  \n").unwrap();
         assert_eq!(take_previous_crash(dir.path()), None, "een leeg bestand telt niet");
+    }
+
+    #[cfg(feature = "core")]
+    #[test]
+    fn stream_credentials_never_reach_the_log_file() {
+        // `append` schrijft elke regel via `line_for_log`; die functie testen we direct (de logmap is een gedeelde globale waarde)
+        let text = line_for_log("fout bij http://prov.example/live/gebruiker9/hunter2/5.ts en rtsp://cam:geheim99@h/x");
+        for secret in ["gebruiker9", "hunter2", "geheim99"] {
+            assert!(!text.contains(secret), "het log lekt {secret}");
+        }
+        assert!(text.contains("http://prov.example/live/***/***/5.ts"));
     }
 
     #[test]

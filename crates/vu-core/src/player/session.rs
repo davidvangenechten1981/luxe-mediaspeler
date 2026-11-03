@@ -53,6 +53,8 @@ pub struct EngineStatus {
 
 #[derive(Debug, Clone, Default)]
 pub struct OpenOptions {
+    /// Extra LibVLC-opties voor dit item (bijvoorbeeld headers van een IPTV-zender).
+    pub extra: Vec<String>,
     pub start_ms: u64,
     pub network_caching_ms: Option<u32>,
     /// Voor audiobestanden: laat de engine een spectrum tekenen in het videovenster.
@@ -483,17 +485,20 @@ impl<E: Engine> Session<E> {
             None
         };
         let opts = OpenOptions {
+            extra: item.options.clone(),
             start_ms: resume_ms.unwrap_or(0),
             network_caching_ms: self.network_caching_ms,
             audio_visual: is_audio_location(&item.location),
         };
-        if let Err(e) = self.engine.open(&item.location, &opts) {
+        if let Err(e) = self.engine.open(item.stream.as_deref().unwrap_or(&item.location), &opts) {
             self.current_location = None;
             self.events.push(SessionEvent::OpenFailed { location: item.location.clone(), message: e.to_string() });
             return Err(e);
         }
         self.engine.play()?;
-        self.store.record_play(&item.location, item.title.as_deref());
+        if !item.is_live() {
+            self.store.record_play(&item.location, item.title.as_deref());
+        }
         self.ab.clear();
         self.prefs_pending = true;
         self.last_resume_save_ms = 0;
@@ -775,8 +780,15 @@ impl<E: Engine> Session<E> {
         if !self.engine.disable_hw_decoding() {
             return;
         }
-        let opts = OpenOptions { start_ms: at_ms, network_caching_ms: self.network_caching_ms, audio_visual: is_audio_location(&loc) };
-        if self.engine.open(&loc, &opts).is_ok() && self.engine.play().is_ok() {
+        let item = self.queue.current().filter(|i| i.location == loc).cloned();
+        let opts = OpenOptions {
+            extra: item.as_ref().map(|i| i.options.clone()).unwrap_or_default(),
+            start_ms: at_ms,
+            network_caching_ms: self.network_caching_ms,
+            audio_visual: is_audio_location(&loc),
+        };
+        let open_loc = item.as_ref().and_then(|i| i.stream.clone()).unwrap_or_else(|| loc.clone());
+        if self.engine.open(&open_loc, &opts).is_ok() && self.engine.play().is_ok() {
             self.prefs_pending = true;
             self.events.push(SessionEvent::HwFallback { location: loc });
         }

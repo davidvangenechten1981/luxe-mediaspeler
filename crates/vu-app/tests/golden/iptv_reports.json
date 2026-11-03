@@ -1,0 +1,26 @@
+{
+  "episode": {
+    "episode": 2,
+    "extension": "mkv",
+    "id": "9",
+    "season": 1,
+    "title": "Titel"
+  },
+  "guide": {
+    "errors": [
+      "Bron: fout"
+    ],
+    "matched": 100,
+    "programmes": 900
+  },
+  "refresh": {
+    "channels": 120,
+    "guide_link_found": true,
+    "skipped": 2,
+    "source_id": 1
+  },
+  "tick": {
+    "recordings_changed": true,
+    "reminders": []
+  }
+}

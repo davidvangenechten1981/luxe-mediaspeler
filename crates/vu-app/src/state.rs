@@ -55,6 +55,10 @@ pub struct AppState {
     pub warnings: Vec<String>,
     /// Telt foute PIN-pogingen voor de bibliotheekvergrendeling.
     pub pin_guard: Mutex<crate::services::pin::PinGuard>,
+    /// Inloggegevens van IPTV-bronnen (Windows Credential Manager); nooit in de database of in logs.
+    pub secrets: Box<dyn vu_core::iptv::secrets::SecretStore>,
+    /// Lopende IPTV-opnames.
+    pub iptv: crate::services::iptv::Runtime,
 }
 
 /// Opent de database. Een beschadigd bestand wordt hernoemd (niet verwijderd) en er komt een nieuwe.
@@ -162,6 +166,8 @@ impl AppState {
             scan: Mutex::new(None),
             warnings,
             pin_guard: Mutex::new(Default::default()),
+            secrets: vu_core::iptv::secrets::default_store(),
+            iptv: Default::default(),
         };
         // een eerder ingestelde equalizer meteen weer toepassen
         let _ = crate::services::audio::restore_on_startup(&state);
@@ -200,6 +206,7 @@ impl AppState {
                 let _ = run.handle.join();
             }
         }
+        crate::services::iptv::shutdown(self);
         if let Some(t) = &self.tasks {
             t.shutdown();
         }

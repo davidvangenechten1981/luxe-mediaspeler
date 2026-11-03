@@ -405,6 +405,7 @@ impl Engine for VlcEngine {
         if let Some(ms) = opts.network_caching_ms {
             options.push(format!(":network-caching={ms}"));
         }
+        options.extend(opts.extra.iter().cloned());
         if opts.audio_visual {
             options.push(":audio-visual=visual".into());
             options.push(format!(":effect-list={}", self.visualization.effect()));

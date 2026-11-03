@@ -110,7 +110,7 @@ fn tail_lines(path: &Path, n: usize) -> String {
 }
 
 /// Eén tekstbestand met alles wat nodig is om een probleem te onderzoeken. Bevat geen mediabestanden,
-/// geen instellingen en geen wachtwoorden; wel de paden die in de logs staan.
+/// geen instellingen en geen wachtwoorden (URL's worden gemaskeerd); wel de paden die in de logs staan.
 pub fn diagnostic_report(st: &AppState, app_version: &str) -> Result<String> {
     let d = diagnostics(st, app_version)?;
     let logs = &st.dirs.logs;
@@ -144,7 +144,8 @@ pub fn diagnostic_report(st: &AppState, app_version: &str) -> Result<String> {
         }
     }
     out.push('\n');
-    Ok(out)
+    // Stream-URL's met inloggegevens (ook in oude logregels) worden altijd gemaskeerd.
+    Ok(vu_core::iptv::mask::mask_text(&out))
 }
 
 pub fn export_diagnostics(st: &AppState, app_version: &str, dest: &str) -> Result<()> {
@@ -240,11 +241,29 @@ mod tests {
     }
 
     #[test]
+    fn diagnostic_report_never_contains_stream_credentials() {
+        let app = app();
+        std::fs::create_dir_all(&app.state.dirs.logs).unwrap();
+        std::fs::write(
+            app.state.dirs.logs.join("app.log"),
+            "afspelen mislukt: http://prov.example/live/gebruiker9/hunter2/5.ts
+ook rtsp://cam:geheim99@192.0.2.5/x?token=tok_777
+",
+        )
+        .unwrap();
+        let report = diagnostic_report(&app.state, "0.1.0").unwrap();
+        for secret in ["gebruiker9", "hunter2", "geheim99", "tok_777"] {
+            assert!(!report.contains(secret), "het rapport lekt {secret}");
+        }
+        assert!(report.contains("http://prov.example/live/***/***/5.ts"));
+    }
+
+    #[test]
     fn diagnostics_report_real_versions_and_capabilities() {
         let app = app();
         let d = diagnostics(&app.state, "0.1.0").unwrap();
         assert_eq!(d.app_version, "0.1.0");
-        assert_eq!(d.schema_version, 8);
+        assert_eq!(d.schema_version, 9);
         if app.state.tools.ffmpeg.is_some() {
             assert!(d.ffmpeg.unwrap().starts_with("ffmpeg version"));
             assert!(d.containers.contains(&"mp4".to_string()));

@@ -165,6 +165,81 @@ const MIGRATIONS: &[&str] = &[
         json TEXT NOT NULL
     );
     "#,
+    // 9: IPTV (bronnen, zenders, programmagids, opnames, herinneringen); geheimen staan in de Credential Manager
+    r#"
+    CREATE TABLE iptv_sources (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        kind TEXT NOT NULL CHECK (kind IN ('m3u_url', 'm3u_file', 'xtream')),
+        location TEXT NOT NULL DEFAULT '',
+        epg_location TEXT NOT NULL DEFAULT '',
+        user_agent TEXT,
+        last_refresh INTEGER,
+        last_error TEXT
+    );
+    CREATE TABLE iptv_channels (
+        id INTEGER PRIMARY KEY,
+        source_id INTEGER NOT NULL REFERENCES iptv_sources(id) ON DELETE CASCADE,
+        key TEXT NOT NULL,
+        position INTEGER NOT NULL,
+        number INTEGER,
+        name TEXT NOT NULL,
+        url TEXT NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'live' CHECK (kind IN ('live', 'movie', 'series', 'episode')),
+        group_name TEXT,
+        logo TEXT,
+        tvg_id TEXT,
+        radio INTEGER NOT NULL DEFAULT 0,
+        catchup_mode TEXT,
+        catchup_source TEXT,
+        catchup_days INTEGER,
+        user_agent TEXT,
+        referrer TEXT,
+        epg_id TEXT,
+        epg_manual TEXT,
+        favorite INTEGER NOT NULL DEFAULT 0,
+        hidden INTEGER NOT NULL DEFAULT 0,
+        last_watched INTEGER,
+        UNIQUE (source_id, key)
+    );
+    CREATE INDEX iptv_channels_order ON iptv_channels (source_id, position);
+    CREATE TABLE iptv_epg_channels (
+        epg_id TEXT PRIMARY KEY,
+        name TEXT,
+        icon TEXT
+    );
+    CREATE TABLE iptv_programmes (
+        epg_id TEXT NOT NULL,
+        start INTEGER NOT NULL,
+        stop INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        desc TEXT,
+        PRIMARY KEY (epg_id, start)
+    );
+    CREATE INDEX iptv_programmes_stop ON iptv_programmes (epg_id, stop);
+    CREATE TABLE iptv_recordings (
+        id INTEGER PRIMARY KEY,
+        channel_name TEXT NOT NULL,
+        url TEXT NOT NULL,
+        user_agent TEXT,
+        referrer TEXT,
+        title TEXT NOT NULL,
+        start INTEGER NOT NULL,
+        stop INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'recording', 'done', 'failed', 'cancelled')),
+        path TEXT,
+        message TEXT
+    );
+    CREATE TABLE iptv_reminders (
+        id INTEGER PRIMARY KEY,
+        channel_id INTEGER,
+        channel_name TEXT NOT NULL,
+        title TEXT NOT NULL,
+        start INTEGER NOT NULL,
+        notified INTEGER NOT NULL DEFAULT 0,
+        UNIQUE (channel_name, start)
+    );
+    "#,
 ];
 
 pub fn now() -> i64 {
@@ -1295,6 +1370,9 @@ fn with_trailing_sep(p: &str) -> String {
         format!("{p}/")
     }
 }
+
+mod iptv;
+pub use iptv::*;
 
 #[cfg(test)]
 mod profiles_tests;

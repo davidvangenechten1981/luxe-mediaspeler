@@ -152,7 +152,7 @@ fn to_queue_items(st: &AppState, locations: &[String]) -> Result<(Vec<QueueItem>
             })
         };
         match checked {
-            Ok((location, title)) => items.push(QueueItem { location, title }),
+            Ok((location, title)) => items.push(QueueItem { location, title, ..Default::default() }),
             Err(e) => rejected.push((loc.clone(), e.to_string())),
         }
     }

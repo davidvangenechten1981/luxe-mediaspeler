@@ -4435,8 +4435,10 @@ dependencies = [
 name = "vu-core"
 version = "0.1.0"
 dependencies = [
+ "flate2",
  "fs4",
  "lofty",
+ "quick-xml",
  "rusqlite",
  "serde",
  "serde_json",
@@ -4445,6 +4447,7 @@ dependencies = [
  "thiserror 2.0.21",
  "url",
  "walkdir",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

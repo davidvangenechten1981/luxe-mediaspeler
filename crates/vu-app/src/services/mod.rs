@@ -4,6 +4,7 @@ pub mod audio;
 pub mod converter;
 pub mod cover;
 pub mod history;
+pub mod iptv;
 pub mod library;
 pub mod lyrics;
 pub mod photos;
@@ -43,10 +44,13 @@ pub mod testutil {
         let dir = tempfile::tempdir().unwrap();
         let sink = Arc::new(RecordingSink::default());
         let dirs = AppDirs::new(dir.path()).unwrap();
+        #[cfg_attr(windows, allow(unused_mut))]
         let mut vlc_args = vec!["--aout=dummy".to_string(), "--vout=dummy".to_string()];
         #[cfg(not(windows))]
         vlc_args.push("--no-xlib".into());
-        let state = AppState::init("0.0.0-test", dirs, Tools::discover(None), sink.clone(), vlc_args).unwrap();
+        let mut state = AppState::init("0.0.0-test", dirs, Tools::discover(None), sink.clone(), vlc_args).unwrap();
+        // tests raken nooit de echte Credential Manager aan
+        state.secrets = Box::new(vu_core::iptv::secrets::MemorySecretStore::default());
         TestApp { state, sink, dir }
     }
 

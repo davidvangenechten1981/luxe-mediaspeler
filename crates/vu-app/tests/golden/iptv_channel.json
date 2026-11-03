@@ -1,0 +1,18 @@
+{
+  "catchup_days": 3,
+  "catchup_mode": "xc",
+  "epg_id": "een.nl",
+  "epg_manual": false,
+  "favorite": true,
+  "group": "Nieuws",
+  "hidden": false,
+  "id": 5,
+  "kind": "live",
+  "last_watched": 1793700000,
+  "logo": "https://l.example/een.png",
+  "name": "Een",
+  "number": 1,
+  "radio": false,
+  "source_id": 1,
+  "tvg_id": "een.nl"
+}

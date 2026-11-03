@@ -16,6 +16,7 @@ fn fixture(name: &str) -> String {
 }
 
 fn engine() -> Option<VlcEngine> {
+    #[cfg_attr(windows, allow(unused_mut))]
     let mut args = vec!["--aout=dummy".to_string(), "--vout=dummy".to_string()];
     #[cfg(not(windows))]
     args.push("--no-xlib".into());
@@ -265,7 +266,10 @@ fn full_session_plays_a_queue_to_the_end_and_saves_history() {
     let a = fixture("sample_small_change.mkv");
     let b = fixture("sample.mp3");
     s.play_items(
-        vec![QueueItem { location: a.clone(), title: Some("A".into()) }, QueueItem { location: b.clone(), title: Some("B".into()) }],
+        vec![
+            QueueItem { location: a.clone(), title: Some("A".into()), ..Default::default() },
+            QueueItem { location: b.clone(), title: Some("B".into()), ..Default::default() },
+        ],
         0,
     )
     .unwrap();

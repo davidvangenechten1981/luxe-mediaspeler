@@ -3,6 +3,7 @@ pub mod convert;
 pub mod cover;
 pub mod db;
 pub mod error;
+pub mod iptv;
 pub mod lyrics;
 pub mod m3u;
 pub mod nfo;

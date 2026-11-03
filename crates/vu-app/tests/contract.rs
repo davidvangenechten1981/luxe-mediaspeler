@@ -8,7 +8,10 @@ use std::path::PathBuf;
 use vu_core::audio::{builtin_presets, EqConfig};
 use vu_core::convert::queue::{JobSnapshot, JobState};
 use vu_core::convert::{builtin_profiles, Mode};
-use vu_core::db::{Bookmark, HistoryEntry, Media, MediaKind, MediaQuery, Playlist, PlaylistItem};
+use vu_core::db::{
+    Bookmark, HistoryEntry, IptvChannel, IptvProgramme, IptvRecording, IptvReminder, IptvSource, Media, MediaKind, MediaQuery, NowNext,
+    Playlist, PlaylistItem,
+};
 use vu_core::player::queue::{QueueItem, RepeatMode};
 use vu_core::player::session::{EngineStatus, PlaybackState, SessionEvent, SessionView, Track};
 use vu_core::probe::{parse_ffprobe_json, MediaInfo};
@@ -113,7 +116,105 @@ fn golden_json_shapes_are_stable() {
         })
         .unwrap(),
     );
-    check("queue_item", serde_json::to_value(QueueItem { location: "/m/a.mp3".into(), title: Some("A".into()) }).unwrap());
+    check(
+        "queue_item",
+        serde_json::to_value(QueueItem { location: "/m/a.mp3".into(), title: Some("A".into()), ..Default::default() }).unwrap(),
+    );
+    check(
+        "iptv_source",
+        serde_json::to_value(IptvSource {
+            id: 1,
+            name: "Thuis".into(),
+            kind: "xtream".into(),
+            location: "http://prov.example".into(),
+            epg_location: "http://gids.example/g.xml?key=***".into(),
+            user_agent: Some("Agent/1".into()),
+            last_refresh: Some(1_793_700_000),
+            last_error: None,
+            channel_count: 120,
+        })
+        .unwrap(),
+    );
+    let programme = IptvProgramme {
+        epg_id: "een.nl".into(),
+        start: 1_793_700_000,
+        stop: 1_793_703_600,
+        title: "Journaal".into(),
+        desc: Some("Nieuws".into()),
+    };
+    check(
+        "iptv_channel",
+        serde_json::to_value(IptvChannel {
+            id: 5,
+            source_id: 1,
+            number: Some(1),
+            name: "Een".into(),
+            url: "http://prov.example/live/gebruiker/geheim/5.ts".into(), // wordt nooit geserialiseerd
+            kind: "live".into(),
+            group: Some("Nieuws".into()),
+            logo: Some("https://l.example/een.png".into()),
+            tvg_id: Some("een.nl".into()),
+            radio: false,
+            catchup_mode: Some("xc".into()),
+            catchup_source: Some("geheim".into()),
+            catchup_days: Some(3),
+            user_agent: Some("geheim".into()),
+            referrer: Some("geheim".into()),
+            epg_id: Some("een.nl".into()),
+            epg_manual: false,
+            favorite: true,
+            hidden: false,
+            last_watched: Some(1_793_700_000),
+        })
+        .unwrap(),
+    );
+    check("iptv_programme", serde_json::to_value(&programme).unwrap());
+    check(
+        "iptv_now_next",
+        serde_json::to_value(vu_app::services::iptv::ChannelNowNext {
+            channel_id: 5,
+            programmes: NowNext { now: Some(programme.clone()), next: None },
+        })
+        .unwrap(),
+    );
+    check(
+        "iptv_recording",
+        serde_json::to_value(IptvRecording {
+            id: 2,
+            channel_name: "Een".into(),
+            url: "http://geheim".into(),
+            user_agent: None,
+            referrer: None,
+            title: "Journaal".into(),
+            start: 1_793_700_000,
+            stop: 1_793_703_600,
+            status: "done".into(),
+            path: Some("D:/Opnames/een.ts".into()),
+            message: None,
+        })
+        .unwrap(),
+    );
+    check(
+        "iptv_reminder",
+        serde_json::to_value(IptvReminder {
+            id: 3,
+            channel_id: Some(5),
+            channel_name: "Een".into(),
+            title: "Journaal".into(),
+            start: 1_793_700_000,
+            notified: false,
+        })
+        .unwrap(),
+    );
+    check(
+        "iptv_reports",
+        json!({
+            "refresh": serde_json::to_value(vu_app::services::iptv::RefreshReport { source_id: 1, channels: 120, skipped: 2, guide_link_found: true }).unwrap(),
+            "guide": serde_json::to_value(vu_app::services::iptv::GuideReport { programmes: 900, matched: 100, errors: vec!["Bron: fout".into()] }).unwrap(),
+            "tick": serde_json::to_value(vu_app::services::iptv::TickResult { reminders: vec![], recordings_changed: true }).unwrap(),
+            "episode": serde_json::to_value(vu_app::services::iptv::EpisodeInfo { id: "9".into(), season: 1, episode: 2, title: "Titel".into(), extension: "mkv".into() }).unwrap(),
+        }),
+    );
     check(
         "session_events",
         json!([

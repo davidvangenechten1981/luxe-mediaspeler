@@ -74,6 +74,9 @@ pub struct AppSettings {
     /// Bewaakte map: nieuwe bestanden worden automatisch geconverteerd met dit profiel.
     pub watch_dir: Option<String>,
     pub watch_profile: Option<String>,
+    /// Map voor IPTV-opnames; `None` = nog niet gekozen (opnemen kan dan niet).
+    #[serde(default)]
+    pub iptv_record_dir: Option<String>,
     // netwerk en privacy
     pub network_caching_ms: u32,
     pub allow_local_streams: bool,
@@ -161,6 +164,7 @@ impl Default for AppSettings {
             sync_folder: None,
             watch_dir: None,
             watch_profile: None,
+            iptv_record_dir: None,
             network_caching_ms: 1500,
             allow_local_streams: false,
             online_metadata: false,
